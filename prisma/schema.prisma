@@ -1,0 +1,230 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  TEACHER
+  STUDENT
+}
+
+enum ServiceType {
+  HOME_TUTOR
+  TUITION_BATCH
+}
+
+enum Board {
+  ICSE
+  CBSE
+  WBBSE
+}
+
+enum EnquiryStatus {
+  PENDING
+  FEES_DISCUSSED
+  ADMITTED
+  LOST
+}
+
+enum LostReason {
+  FEES
+  TIMING
+  SUBJECT_ISSUES
+  OTHER
+}
+
+// Models
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password_hash String
+  role          Role
+  image         String?
+  is_active     Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  studentProfile StudentProfile?
+  teacherProfile TeacherProfile?
+  batches        Batch[]
+  enquiries      Enquiry[]
+
+  @@map("users")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model StudentProfile {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  // Personal Details
+  gender                  Gender?
+  dob                     DateTime?
+  fatherName              String?
+  motherName              String?
+  parentMobile            String?
+  permanentAddress        String?
+  correspondenceAddress   String?  // Current Address
+  aadharNo                String?
+  nationality             String?  @default("Indian")
+  
+  // Previous fields mapped or kept
+  age                     Int?     // Calculated from DOB usually, but keeping for legacy compatibility or quick access
+  phone                   String   // Student's own mobile
+  
+  // Academic & Course Info
+  board                   Board?
+  class_level             Int?
+  stream                  String?  // Science, Commerce, Arts
+  aspirant_of             String?  // JEE, NEET, etc.
+  service_type            ServiceType
+  
+  // Complex Data
+  subjects                String?  // Comma separated list of subjects
+  chosen_courses          Json?    // Stores checkbox selections: { engineering: [], robotics: [], extra: [] }
+  source_of_enquiry       String?
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admissions Admission[]
+  payments  Payment[]
+  results   Result[]
+  academicRecords AcademicRecord[]
+
+  @@map("student_profiles")
+}
+
+model AcademicRecord {
+  id              String   @id @default(cuid())
+  studentId       String
+  qualification   String   // Class 10, 12, etc.
+  exam            String?  // Board Exam Name
+  year            String?  // YYYY-YYYY
+  institution     String?
+  percentage      String?
+  
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("academic_records")
+}
+
+model TeacherProfile {
+  id                      String @id @default(cuid())
+  userId                  String @unique
+  qualifications          String
+  experience_years        Int
+  subjects_specialization String // Store as comma-separated or JSON
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("teacher_profiles")
+}
+
+model Enquiry {
+  id                    String        @id @default(cuid())
+  name                  String
+  phone                 String
+  class_level           Int
+  subjects              String
+  service_type          ServiceType
+  status                EnquiryStatus @default(PENDING)
+  follow_up_date        DateTime?
+  lost_reason           LostReason?
+  assigned_counselor_id String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  assignedCounselor User? @relation(fields: [assigned_counselor_id], references: [id])
+
+  @@map("enquiries")
+}
+
+model Batch {
+  id        String   @id @default(cuid())
+  name      String
+  subject   String
+  teacherId String
+  schedule  String
+  capacity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teacher    User        @relation(fields: [teacherId], references: [id])
+  admissions Admission[]
+  exams      Exam[]
+
+  @@map("batches")
+}
+
+model Admission {
+  id             String   @id @default(cuid())
+  studentId      String
+  batchId        String?
+  admission_date DateTime @default(now())
+  total_fees     Float
+  fees_pending   Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batch   Batch?         @relation(fields: [batchId], references: [id])
+
+  @@map("admissions")
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  studentId  String
+  amount     Float
+  date       DateTime @default(now())
+  mode       String // Cash/UPI/Bank
+  receipt_no String   @unique
+  createdAt  DateTime @default(now())
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Exam {
+  id          String   @id @default(cuid())
+  batchId     String
+  date        DateTime
+  total_marks Int
+  name        String
+  createdAt   DateTime @default(now())
+
+  batch   Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  results Result[]
+
+  @@map("exams")
+}
+
+model Result {
+  id        String   @id @default(cuid())
+  examId    String
+  studentId String
+  score     Float
+  remarks   String?
+  createdAt DateTime @default(now())
+
+  exam    Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, studentId])
+  @@map("results")
+}
