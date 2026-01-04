@@ -48,7 +48,7 @@ model User {
   id            String    @id @default(cuid())
   name          String
   email         String    @unique
-  password_hash String
+
   role          Role
   image         String?
   is_active     Boolean   @default(true)

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 
@@ -8,9 +8,10 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const session = await auth();
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
 
-        if (!session || !session.user || (session.user.role !== Role.TEACHER && session.user.role !== Role.ADMIN)) {
+        if (error || !user || (user.user_metadata.role !== Role.TEACHER && user.user_metadata.role !== Role.ADMIN)) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
@@ -18,13 +19,13 @@ export async function GET(
 
         // Verify this batch belongs to the teacher (security check)
         // Only if role is TEACHER. Admin can see all.
-        if (session.user.role === Role.TEACHER) {
+        if (user.user_metadata.role === Role.TEACHER) {
             const batch = await db.batch.findUnique({
                 where: { id },
                 select: { teacherId: true }
             });
 
-            if (!batch || batch.teacherId !== session.user.id) {
+            if (!batch || batch.teacherId !== user.id) {
                 return new NextResponse("Unauthorized access to batch", { status: 403 });
             }
         }

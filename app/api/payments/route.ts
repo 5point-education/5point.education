@@ -1,13 +1,14 @@
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 
 export async function POST(req: Request) {
     try {
-        const session = await auth();
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
 
-        if (!session || !session.user || (session.user.role !== Role.ADMIN && session.user.role !== Role.RECEPTIONIST)) {
+        if (error || !user || (user.user_metadata.role !== Role.ADMIN && user.user_metadata.role !== Role.RECEPTIONIST)) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 

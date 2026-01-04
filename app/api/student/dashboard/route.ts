@@ -1,19 +1,20 @@
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 
 export async function GET(req: Request) {
   try {
-    const session = await auth();
+    const supabase = createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    if (!session || !session.user || session.user.role !== Role.STUDENT) {
+    if (error || !user || user.user_metadata.role !== Role.STUDENT) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
     // 1. Get Student Profile ID
     const studentProfile = await db.studentProfile.findUnique({
-      where: { userId: session.user.id }
+      where: { userId: user.id }
     });
 
     if (!studentProfile) {

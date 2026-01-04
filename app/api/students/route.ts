@@ -1,14 +1,15 @@
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role, Board, ServiceType } from "@prisma/client";
-import bcrypt from "bcryptjs";
+
 
 export async function POST(req: Request) {
     try {
-        const session = await auth();
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
 
-        if (!session || !session.user || (session.user.role !== Role.ADMIN && session.user.role !== Role.RECEPTIONIST)) {
+        if (error || !user || (user.user_metadata.role !== Role.ADMIN && user.user_metadata.role !== Role.RECEPTIONIST)) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
@@ -56,15 +57,30 @@ export async function POST(req: Request) {
 
         // Generate random 6-char password
         const generatedPassword = Math.random().toString(36).slice(-8);
-        const hashedPassword = await bcrypt.hash(generatedPassword, 10);
+
+        // 1. Create user in Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email,
+            password: generatedPassword,
+            email_confirm: true,
+            user_metadata: {
+                name,
+                role: Role.STUDENT,
+            },
+        });
+
+        if (authError || !authData.user) {
+            console.error("Supabase Auth Error:", authError);
+            return new NextResponse(authError?.message || "Failed to create user in Supabase", { status: 500 });
+        }
 
         // Transaction to create User and Profile
         const result = await db.$transaction(async (tx) => {
             const user = await tx.user.create({
                 data: {
+                    id: authData.user!.id, // Sync with Supabase Auth ID
                     name,
                     email,
-                    password_hash: hashedPassword,
                     role: Role.STUDENT,
                 }
             });

@@ -1,13 +1,14 @@
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role, EnquiryStatus } from "@prisma/client";
 
 export async function GET(req: Request) {
   try {
-    const session = await auth();
+    const supabase = createAdminClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    if (!session || !session.user || session.user.role !== Role.ADMIN) {
+    if (error || !user || user.user_metadata.role !== Role.ADMIN) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 

@@ -1,19 +1,20 @@
 "use client";
 
-import { signOut } from "next-auth/react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LogoutPage() {
     const router = useRouter();
+    const supabase = createClient();
 
     useEffect(() => {
         const doLogout = async () => {
-            await signOut({ redirect: false });
+            await supabase.auth.signOut();
             router.replace("/auth/login");
         };
         doLogout();
-    }, [router]);
+    }, [router, supabase]);
 
     return (
         <div className="min-h-screen flex items-center justify-center">

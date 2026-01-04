@@ -1,12 +1,13 @@
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
     try {
-        const session = await auth();
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
 
-        if (!session || !session.user) {
+        if (error || !user) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
