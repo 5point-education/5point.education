@@ -12,7 +12,6 @@ import {
     BookOpen,
     Calendar,
     Settings,
-    FileText,
     UserPlus,
     Layers,
     LogOut,
@@ -74,7 +73,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 return (
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/admin" exact onClick={closeMobileSidebar} />
-                        <SidebarItem icon={Users} label="Users" href="/dashboard/admin/users" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Users} label="Users" href="/dashboard/admin/register" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Settings} label="Settings" href="/dashboard/admin/settings" onClick={closeMobileSidebar} />
                     </>
                 );

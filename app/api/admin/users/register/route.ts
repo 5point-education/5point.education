@@ -58,12 +58,26 @@ export async function POST(request: Request) {
 
         if (authError) {
             console.error("Supabase Auth Error:", authError);
+
+            // Provide more specific error messages
+            let errorMessage = authError.message;
+
+            if (authError.message.includes("already registered")) {
+                errorMessage = "This email is already registered in the authentication system.";
+            } else if (authError.message.includes("Password should be")) {
+                errorMessage = "Password is too weak. Please use a stronger password.";
+            } else if (authError.message.includes("rate limit")) {
+                errorMessage = "Too many registration attempts. Please try again later.";
+            } else if (authError.message.includes("invalid email")) {
+                errorMessage = "The email address format is invalid.";
+            }
+
             return NextResponse.json(
                 {
                     success: false,
-                    message: authError.message,
+                    message: errorMessage,
                 },
-                { status: 500 }
+                { status: 400 }
             );
         }
 
@@ -78,15 +92,34 @@ export async function POST(request: Request) {
         }
 
         // 3. Create user in Prisma Database
-        await prisma.user.create({
-            data: {
-                id: authData.user.id, // VITAL: Sync UUID
-                email,
-                name,
-                role,
-                image: null,
-            },
-        });
+        try {
+            await prisma.user.create({
+                data: {
+                    id: authData.user.id, // VITAL: Sync UUID
+                    email,
+                    name,
+                    role,
+                    image: null,
+                },
+            });
+        } catch (dbError) {
+            console.error("Database Error:", dbError);
+
+            // Attempt to clean up the Supabase user since DB creation failed
+            try {
+                await supabase.auth.admin.deleteUser(authData.user.id);
+            } catch (cleanupError) {
+                console.error("Failed to cleanup Supabase user:", cleanupError);
+            }
+
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Failed to create user in database. Please try again.",
+                },
+                { status: 500 }
+            );
+        }
 
         return NextResponse.json(
             {

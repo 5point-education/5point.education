@@ -37,18 +37,42 @@ export default function RegisterUserPage() {
             const result = await response.json();
 
             if (!response.ok) {
-                // Handle 400/500 errors
-                if (result.errors) {
-                    setErrors(result.errors);
+                // Handle specific HTTP error codes
+                if (response.status === 400) {
+                    // Validation errors
+                    if (result.errors) {
+                        setErrors(result.errors);
+                        toast({
+                            title: "Validation Error",
+                            description: result.message || "Please fix the form errors and try again.",
+                            variant: "destructive",
+                        });
+                    } else {
+                        toast({
+                            title: "Invalid Input",
+                            description: result.message || "Please check your input and try again.",
+                            variant: "destructive",
+                        });
+                    }
+                } else if (response.status === 409) {
+                    // Conflict - user already exists
                     toast({
-                        title: "Validation Error",
-                        description: result.message || "Please fix the form errors.",
+                        title: "User Already Exists",
+                        description: result.message || "A user with this email already exists.",
+                        variant: "destructive",
+                    });
+                } else if (response.status === 500) {
+                    // Server error
+                    toast({
+                        title: "Server Error",
+                        description: result.message || "An error occurred on the server. Please try again later.",
                         variant: "destructive",
                     });
                 } else {
+                    // Other errors
                     toast({
                         title: "Error",
-                        description: result.message || "Something went wrong.",
+                        description: result.message || "Something went wrong. Please try again.",
                         variant: "destructive",
                     });
                 }
@@ -57,18 +81,21 @@ export default function RegisterUserPage() {
 
             // Success case
             toast({
-                title: "Success",
-                description: result.message,
+                title: "✅ User Created Successfully",
+                description: result.message || `User has been registered successfully.`,
                 variant: "default",
             });
+
+            // Reset form and refresh
             formRef.current?.reset();
-            router.refresh(); // Refresh server components if needed (e.g. user list)
+            setErrors(null);
+            router.refresh();
 
         } catch (error) {
-            console.error("Submission error:", error);
+            console.error("Registration submission error:", error);
             toast({
                 title: "Network Error",
-                description: "Failed to connect to the server.",
+                description: "Failed to connect to the server. Please check your internet connection and try again.",
                 variant: "destructive",
             });
         } finally {

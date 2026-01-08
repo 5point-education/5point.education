@@ -22,30 +22,79 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
+    // Basic validation
+    if (!email || !password) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter both email and password",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        // Handle specific error cases
+        let errorMessage = error.message;
+
+        if (error.message.includes("Invalid login credentials")) {
+          errorMessage = "Invalid email or password. Please check your credentials and try again.";
+        } else if (error.message.includes("Email not confirmed")) {
+          errorMessage = "Please verify your email address before logging in.";
+        } else if (error.message.includes("User not found")) {
+          errorMessage = "No account found with this email address.";
+        }
+
         toast({
-          title: "Error",
-          description: error.message,
+          title: "Login Failed",
+          description: errorMessage,
           variant: "destructive",
         });
-      } else {
+        return;
+      }
+
+      if (!data.user) {
         toast({
-          title: "Success",
-          description: "Logged in successfully",
+          title: "Login Failed",
+          description: "Unable to authenticate. Please try again.",
+          variant: "destructive",
         });
+        return;
+      }
+
+      // Success
+      toast({
+        title: "Success",
+        description: "Logged in successfully! Redirecting...",
+      });
+
+      // Small delay to show success message before redirect
+      setTimeout(() => {
         router.push("/dashboard");
         router.refresh();
-      }
+      }, 500);
+
     } catch (error) {
+      console.error("Login error:", error);
       toast({
-        title: "Error",
-        description: "An unexpected error occurred",
+        title: "Network Error",
+        description: "Unable to connect to the server. Please check your internet connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -72,6 +121,7 @@ export default function LoginPage() {
                 placeholder="m@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
                 required
               />
             </div>
@@ -82,6 +132,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
                 required
               />
             </div>
