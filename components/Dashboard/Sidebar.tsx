@@ -82,6 +82,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Overview" href="/dashboard/reception" exact onClick={closeMobileSidebar} />
                         <SidebarItem icon={UserPlus} label="Teacher Onboarding" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Users} label="Student List" href="/dashboard/reception/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Layers} label="Batch Management" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
                     </>
                 );

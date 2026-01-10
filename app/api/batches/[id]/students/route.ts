@@ -11,14 +11,16 @@ export async function GET(
         const supabase = createAdminClient();
         const { data: { user }, error } = await supabase.auth.getUser();
 
-        if (error || !user || (user.user_metadata.role !== Role.TEACHER && user.user_metadata.role !== Role.ADMIN)) {
+        if (error || !user || (user.user_metadata.role !== Role.TEACHER && 
+            user.user_metadata.role !== Role.ADMIN && 
+            user.user_metadata.role !== Role.RECEPTIONIST)) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
         const { id } = params;
 
         // Verify this batch belongs to the teacher (security check)
-        // Only if role is TEACHER. Admin can see all.
+        // Only if role is TEACHER. Admin and Receptionist can see all.
         if (user.user_metadata.role === Role.TEACHER) {
             const batch = await db.batch.findUnique({
                 where: { id },
