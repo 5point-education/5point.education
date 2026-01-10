@@ -214,6 +214,7 @@ model Exam {
   chapters Chapter[]
   results  Result[]
 
+  @@index([batchId])
   @@map("exams")
 }
 
@@ -227,6 +228,7 @@ model Chapter {
   exam   Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
   scores ExamScore[]
 
+  @@index([examId])
   @@map("chapters")
 }
 
@@ -240,6 +242,7 @@ model ExamScore {
   student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([chapterId, studentId])
+  @@index([studentId])
   @@map("exam_scores")
 }
 

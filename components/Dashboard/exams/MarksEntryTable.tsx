@@ -46,6 +46,12 @@ export function MarksEntryTable({ examId, chapters, students }: Props) {
     });
 
     const handleMarkChange = (studentId: string, chapterId: string, val: string) => {
+        if (val === '') {
+            const newData = { ...marksData };
+            delete newData[`${studentId}_${chapterId}`];
+            setMarksData(newData);
+            return;
+        }
         const num = parseFloat(val);
         if (isNaN(num)) return;
         setMarksData(prev => ({ ...prev, [`${studentId}_${chapterId}`]: num }));
@@ -62,7 +68,7 @@ export function MarksEntryTable({ examId, chapters, students }: Props) {
             const res = await fetch(`/api/exams/${examId}/scores`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(scoresToSave),
+                body: JSON.stringify({ scores: scoresToSave }),
             });
 
             if (!res.ok) throw new Error("Failed");
@@ -119,13 +125,13 @@ export function MarksEntryTable({ examId, chapters, students }: Props) {
                                         <td key={ch.id} className="p-3">
                                             <Input
                                                 type="number"
+                                                step="any"
                                                 min={0}
                                                 max={ch.max_marks}
                                                 className="w-20"
                                                 value={marksData[`${studentId}_${ch.id}`] ?? ''}
                                                 onChange={(e) => {
                                                     const val = parseFloat(e.target.value);
-                                                    // if (val > ch.max_marks) { ... }
                                                     handleMarkChange(studentId, ch.id, e.target.value)
                                                 }}
                                             />
