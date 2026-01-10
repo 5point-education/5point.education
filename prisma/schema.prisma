@@ -103,6 +103,7 @@ model StudentProfile {
   admissions Admission[]
   payments  Payment[]
   results   Result[]
+  examScores ExamScore[]
   academicRecords AcademicRecord[]
 
   @@map("student_profiles")
@@ -208,10 +209,37 @@ model Exam {
   name        String
   createdAt   DateTime @default(now())
 
-  batch   Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  results Result[]
+  batch    Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  chapters Chapter[]
+  results  Result[]
 
   @@map("exams")
+}
+
+model Chapter {
+  id        String @id @default(cuid())
+  examId    String
+  name      String
+  max_marks Float
+  order     Int    @default(0)
+
+  exam   Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  scores ExamScore[]
+
+  @@map("chapters")
+}
+
+model ExamScore {
+  id        String @id @default(cuid())
+  chapterId String
+  studentId String
+  marks     Float
+
+  chapter Chapter        @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, studentId])
+  @@map("exam_scores")
 }
 
 model Result {

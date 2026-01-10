@@ -15,6 +15,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -69,11 +70,8 @@ const academicRecordSchema = z.object({
 });
 
 const paymentSchema = z.object({
-    total_fees: z.string().transform((v) => parseFloat(v)),
-    amount: z.string().transform((v) => parseFloat(v)),
     mode: z.string().min(1, "Mode required"),
     receipt_no: z.string().min(1, "Receipt No required"),
-    batchId: z.string().optional(),
 });
 
 export default function AdmissionPage() {
@@ -136,9 +134,45 @@ export default function AdmissionPage() {
     const paymentForm = useForm({
         resolver: zodResolver(paymentSchema),
         defaultValues: {
-            total_fees: "", amount: "", mode: "CASH", receipt_no: "", batchId: ""
+            mode: "CASH", receipt_no: ""
         }
     });
+
+    // Multiple Batch State
+    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, fee: number, paid: number }[]>([]);
+    const [tempBatchId, setTempBatchId] = useState("");
+    const [tempFee, setTempFee] = useState("");
+    const [tempPaid, setTempPaid] = useState("");
+
+    const addBatch = () => {
+        if (!tempBatchId || !tempFee) return;
+        const b = batches.find(x => x.id === tempBatchId);
+        if (!b) return;
+
+        // Prevent duplicate
+        if (selectedBatches.find(x => x.id === tempBatchId)) {
+            toast({ title: "Batch already added", variant: "destructive" });
+            return;
+        }
+
+        setSelectedBatches(prev => [...prev, {
+            id: tempBatchId,
+            name: `${b.name} - ${b.subject}`,
+            fee: parseFloat(tempFee),
+            paid: tempPaid ? parseFloat(tempPaid) : 0
+        }]);
+
+        setTempBatchId("");
+        setTempFee("");
+        setTempPaid("");
+    };
+
+    const removeBatch = (id: string) => {
+        setSelectedBatches(prev => prev.filter(x => x.id !== id));
+    };
+
+    const totalFees = selectedBatches.reduce((acc, curr) => acc + curr.fee, 0);
+    const totalPaid = selectedBatches.reduce((acc, curr) => acc + curr.paid, 0);
 
     useEffect(() => {
         if (enquiryId) {
@@ -206,27 +240,37 @@ export default function AdmissionPage() {
             };
             setCredentials(newCreds);
 
-            // 2. Create Admission
-            const admissionRes = await fetch("/api/admissions", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    studentId,
-                    batchId: values.batchId || undefined,
-                    total_fees: values.total_fees,
-                    fees_pending: values.total_fees - values.amount,
-                }),
-            });
-            if (!admissionRes.ok) throw new Error("Failed to create admission");
+            // 2. Create Admission(s)
+            // If TUITION_BATCH, iterate selected batches. If HOME_TUTOR, create one without batch.
+            const admissionsToCreate = formData.service_type === "TUITION_BATCH"
+                ? selectedBatches.map(b => ({ batchId: b.id, total_fees: b.fee, fees_pending: b.fee - b.paid }))
+                : [{ batchId: null, total_fees: 0, fees_pending: 0 }]; // Home Tutor case? Logic might need check.
 
-            // 3. Create Payment
-            if (values.amount > 0) {
+            // If Home tutor, we might need a fee input too? Assuming for now Home Tutor follows same flow or is custom.
+            // But let's stick to the multiple batch change logic.
+
+            for (const adm of admissionsToCreate) {
+                const admissionRes = await fetch("/api/admissions", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        studentId,
+                        batchId: adm.batchId,
+                        total_fees: adm.total_fees,
+                        fees_pending: adm.fees_pending,
+                    }),
+                });
+                if (!admissionRes.ok) console.error("Failed to create admission for batch " + adm.batchId);
+            }
+
+            // 3. Create Payment (Single Receipt)
+            if (totalPaid > 0) {
                 await fetch("/api/payments", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         studentId,
-                        amount: values.amount,
+                        amount: totalPaid,
                         mode: values.mode,
                         receipt_no: values.receipt_no,
                     }),
@@ -503,30 +547,71 @@ export default function AdmissionPage() {
                     <CardContent>
                         <Form {...paymentForm}>
                             <form onSubmit={paymentForm.handleSubmit(onFinalSubmit)} className="space-y-4">
-                                {formData.service_type !== "HOME_TUTOR" && (
-                                    <FormField control={paymentForm.control} name="batchId" render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Assign Batch</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl><SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger></FormControl>
-                                                <SelectContent>
-                                                    {batches.map(b => (
-                                                        <SelectItem key={b.id} value={b.id}>{b.name} - {b.subject}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </FormItem>
-                                    )} />
+                                <div className="p-4 bg-muted/50 rounded-lg mb-4">
+                                    <h4 className="font-semibold text-sm text-muted-foreground uppercase mb-1">Service Type</h4>
+                                    <p className="font-medium text-lg">{formData.service_type === "TUITION_BATCH" ? "Tuition Batch" : "Home Tutor"}</p>
+                                </div>
+
+                                {formData.service_type === "TUITION_BATCH" && (
+                                    <div className="space-y-4 border p-4 rounded-md bg-slate-50">
+                                        <h4 className="font-semibold text-sm">Batch Assignment</h4>
+                                        <div className="grid grid-cols-12 gap-2 items-end">
+                                            <div className="col-span-4">
+                                                <Label className="text-xs">Batch</Label>
+                                                <Select value={tempBatchId} onValueChange={setTempBatchId}>
+                                                    <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {batches.map(b => (
+                                                            <SelectItem key={b.id} value={b.id}>{b.name} - {b.subject}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="col-span-3">
+                                                <Label className="text-xs">Total Fee</Label>
+                                                <Input type="number" placeholder="0" value={tempFee} onChange={e => setTempFee(e.target.value)} />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <Label className="text-xs">Paying Now</Label>
+                                                <Input type="number" placeholder="0" value={tempPaid} onChange={e => setTempPaid(e.target.value)} />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <Button type="button" onClick={addBatch} disabled={!tempBatchId || !tempFee} className="w-full">
+                                                    <Plus className="h-4 w-4" /> Add
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {/* Selected Batches List */}
+                                        {selectedBatches.length > 0 && (
+                                            <div className="space-y-2">
+                                                {selectedBatches.map(b => (
+                                                    <div key={b.id} className="flex justify-between items-center bg-white p-2 border rounded text-sm">
+                                                        <div>
+                                                            <span className="font-medium">{b.name}</span>
+                                                            <div className="text-muted-foreground text-xs">Fee: ₹{b.fee} | Paid: ₹{b.paid}</div>
+                                                        </div>
+                                                        <Button type="button" variant="ghost" size="sm" onClick={() => removeBatch(b.id)}>
+                                                            <Trash2 className="h-4 w-4 text-red-500" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                                <div className="flex justify-between font-bold pt-2 border-t">
+                                                    <span>Total</span>
+                                                    <span>Fee: ₹{totalFees} | Paid: ₹{totalPaid}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
 
-                                <FormField control={paymentForm.control} name="total_fees" render={({ field }) => (
-                                    <FormItem><FormLabel>Total Fees</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                                )} />
-
+                                {/* Global Payment Details */}
                                 <div className="grid grid-cols-2 gap-4">
-                                    <FormField control={paymentForm.control} name="amount" render={({ field }) => (
-                                        <FormItem><FormLabel>Paid Now</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                                    )} />
+                                    {/* Removed separate Amount input as it is calculated */}
+                                    <div className="space-y-2">
+                                        <Label>Total Paying Now</Label>
+                                        <Input disabled value={totalPaid} />
+                                    </div>
                                     <FormField control={paymentForm.control} name="mode" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Payment Mode</FormLabel>

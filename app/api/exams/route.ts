@@ -1,26 +1,40 @@
+
 import { db } from "@/lib/db";
-import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
     try {
-        const supabase = createAdminClient();
+        const supabase = createClient();
         const { data: { user }, error } = await supabase.auth.getUser();
 
-        if (error || !user || (user.user_metadata.role !== Role.TEACHER && user.user_metadata.role !== Role.ADMIN)) {
+        if (error || !user) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
-        const { batchId, name, date, total_marks } = await req.json();
+        const body = await req.json();
+        const { batchId, name, date, chapters } = body;
+
+        if (!batchId || !name || !date || !chapters || chapters.length === 0) {
+            return new NextResponse("Missing required fields", { status: 400 });
+        }
+
+        const total_marks = chapters.reduce((sum: number, ch: any) => sum + Number(ch.max_marks), 0);
 
         const exam = await db.exam.create({
             data: {
                 batchId,
                 name,
                 date: new Date(date),
-                total_marks: parseInt(total_marks),
-            }
+                total_marks,
+                chapters: {
+                    create: chapters.map((ch: any) => ({
+                        name: ch.name,
+                        max_marks: Number(ch.max_marks),
+                        order: ch.order,
+                    })),
+                },
+            },
         });
 
         return NextResponse.json(exam);
@@ -36,17 +50,17 @@ export async function GET(req: Request) {
         const batchId = searchParams.get("batchId");
 
         if (!batchId) {
-            return new NextResponse("Batch ID required", { status: 400 });
+            return new NextResponse("Batch ID missing", { status: 400 });
         }
 
         const exams = await db.exam.findMany({
             where: { batchId },
-            orderBy: { date: 'desc' },
             include: {
-                _count: {
-                    select: { results: true }
+                chapters: {
+                    orderBy: { order: 'asc' }
                 }
-            }
+            },
+            orderBy: { date: 'desc' }
         });
 
         return NextResponse.json(exams);
