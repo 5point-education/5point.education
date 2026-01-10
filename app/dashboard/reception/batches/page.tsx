@@ -22,16 +22,63 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { Layers, Loader2 } from "lucide-react";
+import { Archive, Layers, Loader2, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { TimePicker } from "@/components/ui/time-picker";
+
+const DAYS_OF_WEEK = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday"
+];
+
+interface ScheduleItem {
+  day: string;
+  startTime: string;
+  endTime: string;
+}
+
+interface Batch {
+  id: string;
+  name: string;
+  subject: string;
+  teacherId: string;
+  teacher?: { name: string };
+  schedule: string;
+  capacity: number;
+  isActive: boolean;
+  createdAt: string;
+  _count: { admissions: number };
+}
 
 export default function BatchesPage() {
-  const [batches, setBatches] = useState<any[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
   const { toast } = useToast();
+
+  // Schedule State
+  const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([
+    { day: "", startTime: "12:00", endTime: "13:00" }
+  ]);
+
+  // Edit form state
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    subject: "",
+    teacherId: "",
+    capacity: "",
+  });
+  const [editScheduleItems, setEditScheduleItems] = useState<ScheduleItem[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -57,11 +104,79 @@ export default function BatchesPage() {
     }
   };
 
+  const handleAddScheduleItem = () => {
+    setScheduleItems([...scheduleItems, { day: "", startTime: "12:00", endTime: "13:00" }]);
+  };
+
+  const handleRemoveScheduleItem = (index: number) => {
+    const newItems = [...scheduleItems];
+    newItems.splice(index, 1);
+    setScheduleItems(newItems);
+  };
+
+  const handleScheduleChange = (index: number, field: keyof ScheduleItem, value: string) => {
+    const newItems = [...scheduleItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setScheduleItems(newItems);
+  };
+
+  // Edit schedule handlers
+  const handleAddEditScheduleItem = () => {
+    setEditScheduleItems([...editScheduleItems, { day: "", startTime: "12:00", endTime: "13:00" }]);
+  };
+
+  const handleRemoveEditScheduleItem = (index: number) => {
+    const newItems = [...editScheduleItems];
+    newItems.splice(index, 1);
+    setEditScheduleItems(newItems);
+  };
+
+  const handleEditScheduleChange = (index: number, field: keyof ScheduleItem, value: string) => {
+    const newItems = [...editScheduleItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setEditScheduleItems(newItems);
+  };
+
+  const handleEditClick = (batch: Batch) => {
+    setEditingBatch(batch);
+    setEditFormData({
+      name: batch.name,
+      subject: batch.subject,
+      teacherId: batch.teacherId,
+      capacity: batch.capacity.toString(),
+    });
+    try {
+      const schedule = JSON.parse(batch.schedule);
+      setEditScheduleItems(Array.isArray(schedule) ? schedule : [{ day: "", startTime: "12:00", endTime: "13:00" }]);
+    } catch {
+      setEditScheduleItems([{ day: "", startTime: "12:00", endTime: "13:00" }]);
+    }
+    setEditOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
+    
+    // Validate schedule
+    const validSchedule = scheduleItems.every(item => item.day.trim() !== "" && item.startTime !== "" && item.endTime !== "");
+    
+    if (!validSchedule) {
+      toast({
+        title: "Incomplete Schedule",
+        description: "Please select a Day, Start Time, and End Time for all schedule entries.",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    const payload = {
+      ...data,
+      schedule: JSON.stringify(scheduleItems)
+    };
     
     try {
       const response = await fetch("/api/batches", {
@@ -69,7 +184,7 @@ export default function BatchesPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -82,6 +197,7 @@ export default function BatchesPage() {
         description: "Batch created successfully",
       });
       setOpen(false);
+      setScheduleItems([{ day: "", startTime: "12:00", endTime: "13:00" }]);
       fetchData();
     } catch (error: any) {
         toast({
@@ -93,6 +209,282 @@ export default function BatchesPage() {
         setSubmitting(false);
     }
   };
+
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingBatch) return;
+    
+    setSubmitting(true);
+
+    // Validate schedule
+    const validSchedule = editScheduleItems.every(item => item.day.trim() !== "" && item.startTime !== "" && item.endTime !== "");
+    
+    if (!validSchedule) {
+      toast({
+        title: "Incomplete Schedule",
+        description: "Please select a Day, Start Time, and End Time for all schedule entries.",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    const payload = {
+      id: editingBatch.id,
+      ...editFormData,
+      schedule: JSON.stringify(editScheduleItems)
+    };
+    
+    try {
+      const response = await fetch("/api/batches", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData || "Failed to update batch");
+      }
+
+      toast({
+        title: "Success",
+        description: "Batch updated successfully",
+      });
+      setEditOpen(false);
+      setEditingBatch(null);
+      fetchData();
+    } catch (error: any) {
+        toast({
+            title: "Error",
+            description: error.message,
+            variant: "destructive",
+        });
+    } finally {
+        setSubmitting(false);
+    }
+  };
+
+  const handleArchiveBatch = async (batch: Batch) => {
+    try {
+      const response = await fetch("/api/batches", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: batch.id, isActive: false }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to archive batch");
+      }
+
+      toast({
+        title: "Success",
+        description: "Batch archived successfully",
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRestoreBatch = async (batch: Batch) => {
+    try {
+      const response = await fetch("/api/batches", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: batch.id, isActive: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to restore batch");
+      }
+
+      toast({
+        title: "Success",
+        description: "Batch restored successfully",
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatSchedule = (scheduleString: string) => {
+    try {
+      const items = JSON.parse(scheduleString);
+      if (Array.isArray(items)) {
+        return (
+          <div className="flex flex-col gap-1">
+            {items.map((item: ScheduleItem, i: number) => (
+              <div key={i} className="text-xs">
+                <span className="font-medium">{item.day.slice(0, 3)}:</span> {item.startTime} - {item.endTime}
+              </div>
+            ))}
+          </div>
+        );
+      }
+      return scheduleString;
+    } catch (e) {
+      return scheduleString;
+    }
+  };
+
+  const activeBatches = batches.filter(b => b.isActive !== false);
+  const archivedBatches = batches.filter(b => b.isActive === false);
+
+  const renderBatchTable = (batchList: Batch[], isArchived: boolean = false) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Batch Name</TableHead>
+          <TableHead>Subject</TableHead>
+          <TableHead>Teacher</TableHead>
+          <TableHead>Schedule</TableHead>
+          <TableHead>Capacity</TableHead>
+          <TableHead>Created</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {batchList.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+              {isArchived ? "No archived batches" : "No active batches found"}
+            </TableCell>
+          </TableRow>
+        ) : (
+          batchList.map((batch) => (
+            <TableRow key={batch.id}>
+              <TableCell className="font-medium">{batch.name}</TableCell>
+              <TableCell>{batch.subject}</TableCell>
+              <TableCell>{batch.teacher?.name}</TableCell>
+              <TableCell>{formatSchedule(batch.schedule)}</TableCell>
+              <TableCell>
+                {batch._count.admissions} / {batch.capacity}
+              </TableCell>
+              <TableCell>{new Date(batch.createdAt).toLocaleDateString()}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end gap-2">
+                  {!isArchived ? (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => handleEditClick(batch)}
+                        title="Edit batch"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => handleArchiveBatch(batch)}
+                        title="Archive batch"
+                      >
+                        <Archive className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={() => handleRestoreBatch(batch)}
+                      title="Restore batch"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
+
+  const renderScheduleEditor = (
+    items: ScheduleItem[],
+    onAdd: () => void,
+    onRemove: (index: number) => void,
+    onChange: (index: number, field: keyof ScheduleItem, value: string) => void
+  ) => (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <Label>Schedule</Label>
+        <Button 
+          type="button" 
+          variant="outline" 
+          size="sm" 
+          onClick={onAdd}
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Add Time
+        </Button>
+      </div>
+      
+      <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+        {items.map((item, index) => (
+          <div key={index} className="flex gap-2 items-end">
+            <div className="flex-1 space-y-1">
+               <Label className="text-xs text-muted-foreground">Day</Label>
+               <Select 
+                value={item.day} 
+                onValueChange={(val) => onChange(index, 'day', val)}
+               >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Day" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAYS_OF_WEEK.map(day => (
+                    <SelectItem key={day} value={day}>{day}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-[130px] space-y-1">
+              <Label className="text-xs text-muted-foreground">Start</Label>
+              <TimePicker 
+                value={item.startTime}
+                onChange={(val) => onChange(index, 'startTime', val)}
+              />
+            </div>
+             <div className="w-[130px] space-y-1">
+              <Label className="text-xs text-muted-foreground">End</Label>
+              <TimePicker 
+                value={item.endTime}
+                onChange={(val) => onChange(index, 'endTime', val)}
+              />
+            </div>
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="icon" 
+              className="h-9 w-9 text-destructive hover:text-destructive/90"
+              onClick={() => onRemove(index)}
+              disabled={items.length === 1}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -109,7 +501,7 @@ export default function BatchesPage() {
               Create Batch
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
             <form onSubmit={handleSubmit}>
               <DialogHeader>
                 <DialogTitle>Create New Batch</DialogTitle>
@@ -141,15 +533,12 @@ export default function BatchesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="schedule">Schedule</Label>
-                    <Input id="schedule" name="schedule" required placeholder="MWF 4-6 PM" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="capacity">Capacity</Label>
-                    <Input id="capacity" name="capacity" type="number" required min="1" placeholder="30" />
-                  </div>
+                
+                {renderScheduleEditor(scheduleItems, handleAddScheduleItem, handleRemoveScheduleItem, handleScheduleChange)}
+
+                <div className="space-y-2">
+                  <Label htmlFor="capacity">Capacity</Label>
+                  <Input id="capacity" name="capacity" type="number" required min="1" placeholder="30" />
                 </div>
               </div>
               <DialogFooter>
@@ -161,56 +550,134 @@ export default function BatchesPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+            <form onSubmit={handleEditSubmit}>
+              <DialogHeader>
+                <DialogTitle>Edit Batch</DialogTitle>
+                <DialogDescription>
+                  Update batch details.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Batch Name</Label>
+                  <Input 
+                    id="edit-name" 
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
+                    required 
+                    placeholder="Class 12 Physics - Batch A" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subject">Subject</Label>
+                  <Input 
+                    id="edit-subject" 
+                    value={editFormData.subject}
+                    onChange={(e) => setEditFormData({...editFormData, subject: e.target.value})}
+                    required 
+                    placeholder="Physics" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-teacher">Assign Teacher</Label>
+                  <Select 
+                    value={editFormData.teacherId}
+                    onValueChange={(val) => setEditFormData({...editFormData, teacherId: val})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a teacher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teachers.map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>
+                          {teacher.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {renderScheduleEditor(editScheduleItems, handleAddEditScheduleItem, handleRemoveEditScheduleItem, handleEditScheduleChange)}
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-capacity">Capacity</Label>
+                  <Input 
+                    id="edit-capacity" 
+                    type="number" 
+                    value={editFormData.capacity}
+                    onChange={(e) => setEditFormData({...editFormData, capacity: e.target.value})}
+                    required 
+                    min="1" 
+                    placeholder="30" 
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Batches</CardTitle>
-          <CardDescription>
-            List of all active batches and their occupancy
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">Loading...</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Batch Name</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Teacher</TableHead>
-                  <TableHead>Schedule</TableHead>
-                  <TableHead>Capacity</TableHead>
-                  <TableHead>Created</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {batches.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No batches found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  batches.map((batch) => (
-                    <TableRow key={batch.id}>
-                      <TableCell className="font-medium">{batch.name}</TableCell>
-                      <TableCell>{batch.subject}</TableCell>
-                      <TableCell>{batch.teacher?.name}</TableCell>
-                      <TableCell>{batch.schedule}</TableCell>
-                      <TableCell>
-                        {batch._count.admissions} / {batch.capacity}
-                      </TableCell>
-                      <TableCell>{new Date(batch.createdAt).toLocaleDateString()}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="active" className="w-full">
+        <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+          <TabsTrigger value="active" className="flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            Active ({activeBatches.length})
+          </TabsTrigger>
+          <TabsTrigger value="archived" className="flex items-center gap-2">
+            <Archive className="h-4 w-4" />
+            Archived ({archivedBatches.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active">
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Batches</CardTitle>
+              <CardDescription>
+                List of all active batches and their occupancy
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">Loading...</div>
+              ) : (
+                renderBatchTable(activeBatches, false)
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="archived">
+          <Card>
+            <CardHeader>
+              <CardTitle>Archived Batches</CardTitle>
+              <CardDescription>
+                List of archived batches that are no longer active
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">Loading...</div>
+              ) : (
+                renderBatchTable(archivedBatches, true)
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
