@@ -139,7 +139,7 @@ export default function TeacherDashboard() {
                           </Button>
                           <Button
                             size="sm"
-                            onClick={() => router.push(`/dashboard/teacher/batch/${batch.id}/exam`)}
+                            onClick={() => router.push(`/dashboard/teacher/batch/${batch.id}/exams`)}
                           >
                             Manage Exams
                           </Button>

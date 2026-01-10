@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, User, Mail, Phone, Calendar as CalendarIcon, GraduationCap } from "lucide-react";
+import { ArrowLeft, User, Mail, Phone, Calendar as CalendarIcon, GraduationCap, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 
-export default function BatchDetailPage({ params }: { params: { id: string } }) {
+export default function BatchDetailPage({ params }: { params: any }) {
     const router = useRouter();
     const [students, setStudents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -40,11 +40,15 @@ export default function BatchDetailPage({ params }: { params: { id: string } }) 
                     </Button>
                     <div>
                         <h1 className="text-3xl font-bold">Batch Details</h1>
-                        <p className="text-muted-foreground">Manage students and performassessments</p>
+                        <p className="text-muted-foreground">Manage students and perform assessments</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={() => router.push(`/dashboard/teacher/batch/${params.id}/exam`)}>
+                    <Button variant="outline" onClick={() => router.push(`/dashboard/teacher/batch/${params.id}/analytics`)}>
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        Analytics
+                    </Button>
+                    <Button onClick={() => router.push(`/dashboard/teacher/batch/${params.id}/exams`)}>
                         <GraduationCap className="h-4 w-4 mr-2" />
                         Manage Exams
                     </Button>

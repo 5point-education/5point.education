@@ -11,14 +11,13 @@ async function main() {
   console.log('Starting seed...');
 
   // Create Admin User
-  const adminPassword = await bcrypt.hash('admin123', 10);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@5point.edu' },
+    where: { email: 'admin@point.edu' },
     update: {},
     create: {
-      email: 'admin@5point.edu',
+      email: 'admin@point.edu',
       name: 'Admin User',
-      password_hash: adminPassword,
+      // password_hash removed as it's not in schema (Supabase Auth used)
       role: Role.ADMIN,
       is_active: true,
     },
@@ -26,14 +25,14 @@ async function main() {
   console.log('Created admin:', admin.email);
 
   // Create Receptionist User
-  const receptionistPassword = await bcrypt.hash('reception123', 10);
   const receptionist = await prisma.user.upsert({
     where: { email: 'reception@5point.edu' },
     update: {},
     create: {
       email: 'reception@5point.edu',
       name: 'Reception Desk',
-      password_hash: receptionistPassword,
+      // password_hash removed
+
       role: Role.RECEPTIONIST,
       is_active: true,
     },
@@ -48,7 +47,8 @@ async function main() {
     create: {
       email: 'teacher1@5point.edu',
       name: 'Dr. Rajesh Kumar',
-      password_hash: teacherPassword,
+      // password_hash removed
+
       role: Role.TEACHER,
       is_active: true,
     },
@@ -60,7 +60,8 @@ async function main() {
     create: {
       email: 'teacher2@5point.edu',
       name: 'Ms. Priya Sharma',
-      password_hash: teacherPassword,
+      // password_hash removed
+
       role: Role.TEACHER,
       is_active: true,
     },
@@ -174,7 +175,8 @@ async function main() {
     data: {
       email: 'student1@example.com',
       name: 'Rohan Mukherjee',
-      password_hash: studentPassword,
+      // password_hash removed
+
       role: Role.STUDENT,
       is_active: true,
     },
@@ -277,7 +279,8 @@ async function main() {
     data: {
       email: 'student2@example.com',
       name: 'Priya Sharma',
-      password_hash: studentPassword,
+      // password_hash removed
+
       role: 'STUDENT',
       is_active: true,
     },

@@ -71,3 +71,40 @@ export async function POST(req: Request) {
         return new NextResponse("Internal Error", { status: 500 });
     }
 }
+
+export async function PATCH(req: Request) {
+    try {
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user || (user.user_metadata.role !== Role.ADMIN && user.user_metadata.role !== Role.RECEPTIONIST)) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const body = await req.json();
+        const { id, name, subject, teacherId, schedule, capacity, isActive } = body;
+
+        if (!id) {
+            return new NextResponse("Batch ID is required", { status: 400 });
+        }
+
+        const updateData: any = {};
+        if (name !== undefined) updateData.name = name;
+        if (subject !== undefined) updateData.subject = subject;
+        if (teacherId !== undefined) updateData.teacherId = teacherId;
+        if (schedule !== undefined) updateData.schedule = schedule;
+        if (capacity !== undefined) updateData.capacity = parseInt(capacity);
+        if (isActive !== undefined) updateData.isActive = isActive;
+
+        const batch = await db.batch.update({
+            where: { id },
+            data: updateData,
+        });
+
+        return NextResponse.json(batch);
+
+    } catch (error) {
+        console.log("[BATCHES_PATCH]", error);
+        return new NextResponse("Internal Error", { status: 500 });
+    }
+}

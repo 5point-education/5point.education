@@ -143,7 +143,7 @@ export default function LoginPage() {
           </form>
         </CardContent>
         <CardFooter className="flex justify-center text-sm text-gray-500">
-          Contact administrator if you don't have an account
+          Contact administrator if you don&apos;t have an account
         </CardFooter>
       </Card>
     </div>
