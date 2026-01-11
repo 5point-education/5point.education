@@ -165,17 +165,29 @@ export default function AdmissionPage() {
     const handleBatchSelection = (batchId: string) => {
         setTempBatchId(batchId);
         const selectedBatch = batches.find(b => b.id === batchId);
-        if (selectedBatch && selectedBatch.feeAmount) {
-            if (selectedBatch.feeModel === "CUSTOM" && selectedBatch.installments) {
+        if (selectedBatch) {
+            if (selectedBatch.feeModel === "CUSTOM" && selectedBatch.installments && selectedBatch.installments.length > 0) {
                 // For custom, sum all installments
                 const total = selectedBatch.installments.reduce((sum: number, i: InstallmentItem) => sum + (i.amount || 0), 0);
                 setTempFee(total.toString());
-            } else {
+            } else if (selectedBatch.feeAmount) {
                 setTempFee(selectedBatch.feeAmount.toString());
+            } else {
+                setTempFee("");
             }
         } else {
             setTempFee("");
         }
+    };
+
+    // Get selected batch's installments for display
+    const getSelectedBatchInstallments = () => {
+        if (!tempBatchId) return null;
+        const batch = batches.find(b => b.id === tempBatchId);
+        if (batch?.feeModel === "CUSTOM" && batch.installments && batch.installments.length > 0) {
+            return batch.installments;
+        }
+        return null;
     };
 
     const getFeeModelLabel = (model: FeeModel) => {
@@ -288,7 +300,11 @@ export default function AdmissionPage() {
             // 2. Create Admission(s)
             // If TUITION_BATCH, iterate selected batches. If HOME_TUTOR, create one without batch.
             const admissionsToCreate = formData.service_type === "TUITION_BATCH"
-                ? selectedBatches.map(b => ({ batchId: b.id, total_fees: b.fee, fees_pending: b.fee - b.paid }))
+                ? selectedBatches.map(b => ({ 
+                    batchId: b.id, 
+                    total_fees: b.fee, 
+                    fees_pending: Math.max(0, b.fee - b.paid) 
+                }))
                 : [{ batchId: null, total_fees: 0, fees_pending: 0 }]; // Home Tutor case? Logic might need check.
 
             // If Home tutor, we might need a fee input too? Assuming for now Home Tutor follows same flow or is custom.
@@ -630,6 +646,25 @@ export default function AdmissionPage() {
                                             </div>
                                         </div>
 
+                                        {/* Custom Installments Breakdown */}
+                                        {getSelectedBatchInstallments() && (
+                                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                                <h5 className="text-xs font-semibold text-blue-800 mb-2">Installment Breakdown</h5>
+                                                <div className="space-y-1">
+                                                    {getSelectedBatchInstallments()!.map((inst: InstallmentItem, idx: number) => (
+                                                        <div key={idx} className="flex justify-between text-xs">
+                                                            <span>{inst.name}</span>
+                                                            <span className="font-medium">₹{inst.amount?.toLocaleString() || 0} {inst.dueDate && <span className="text-muted-foreground ml-1">(Due: {new Date(inst.dueDate).toLocaleDateString()})</span>}</span>
+                                                        </div>
+                                                    ))}
+                                                    <div className="flex justify-between text-xs font-bold pt-1 border-t border-blue-200">
+                                                        <span>Total</span>
+                                                        <span>₹{getSelectedBatchInstallments()!.reduce((sum: number, i: InstallmentItem) => sum + (i.amount || 0), 0).toLocaleString()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Selected Batches List */}
                                         {selectedBatches.length > 0 && (
                                             <div className="space-y-2">
@@ -659,7 +694,7 @@ export default function AdmissionPage() {
                                     {/* Removed separate Amount input as it is calculated */}
                                     <div className="space-y-2">
                                         <Label>Total Paying Now</Label>
-                                        <Input disabled value={totalPaid} />
+                                        <Input disabled value={`₹${totalPaid.toLocaleString()}`} />
                                     </div>
                                     <FormField control={paymentForm.control} name="mode" render={({ field }) => (
                                         <FormItem>

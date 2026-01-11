@@ -35,15 +35,16 @@ export async function POST(req: Request) {
         });
 
         if (latestAdmission) {
+            // Calculate new pending amount, ensuring it doesn't go negative
+            const newPending = Math.max(0, latestAdmission.fees_pending - paymentAmount);
             await db.admission.update({
                 where: { id: latestAdmission.id },
                 data: {
-                    fees_pending: {
-                        decrement: paymentAmount
-                    }
+                    fees_pending: newPending
                 }
             });
         }
+
 
         return NextResponse.json(payment);
 
