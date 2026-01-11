@@ -84,6 +84,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={UserPlus} label="Teacher Onboarding" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="Student List" href="/dashboard/reception/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Layers} label="Batch Management" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                     </>
                 );
             case "TEACHER":
@@ -92,6 +93,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/teacher" exact onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="My Students" href="/dashboard/teacher/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Schedule" href="/dashboard/teacher/schedule" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/teacher/attendance" onClick={closeMobileSidebar} />
                     </>
                 );
             case "STUDENT":

@@ -105,6 +105,7 @@ model StudentProfile {
   results   Result[]
   examScores ExamScore[]
   academicRecords AcademicRecord[]
+  attendances  Attendance[]
 
   @@map("student_profiles")
 }
@@ -180,6 +181,7 @@ model Batch {
   teacher    User        @relation(fields: [teacherId], references: [id])
   admissions Admission[]
   exams      Exam[]
+  attendances  Attendance[]
 
   @@map("batches")
 }
@@ -271,4 +273,20 @@ model Result {
 
   @@unique([examId, studentId])
   @@map("results")
+}
+
+model Attendance {
+  id         String   @id @default(cuid())
+  date       DateTime @default(now())
+  batchId    String
+  studentId  String
+  status     Boolean  @default(true) // true = Present, false = Absent
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  batch   Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([date, batchId, studentId])
+  @@map("attendances")
 }

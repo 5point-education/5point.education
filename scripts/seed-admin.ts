@@ -14,22 +14,23 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const prisma = new PrismaClient();
 
 async function main() {
-    const email = "master_admin@5point.com";
-    const password = "masterpassword123";
-    const name = "Master Admin";
+    // Create Master Admin
+    const masterEmail = "master_admin@5point.com";
+    const masterPassword = "masterpassword123";
+    const masterName = "Master Admin";
 
-    console.log(`Seeding Admin: ${email}`);
+    console.log(`Seeding Master Admin: ${masterEmail}`);
 
-    // 1. Create User in Supabase Auth
-    const { data, error } = await supabase.auth.admin.createUser({
-        email,
-        password,
+    // 1. Create Master Admin User in Supabase Auth
+    const { data: masterData, error: masterError } = await supabase.auth.admin.createUser({
+        email: masterEmail,
+        password: masterPassword,
         email_confirm: true,
-        user_metadata: { name, role: Role.ADMIN },
+        user_metadata: { name: masterName, role: Role.ADMIN },
     });
 
-    if (error) {
-        console.log("Supabase User creation failed/exists:", error.message);
+    if (masterError) {
+        console.log("Master Admin creation failed/exists:", masterError.message);
 
         // Try to find the user if they exist
         const { data: userList, error: listError } = await supabase.auth.admin.listUsers();
@@ -39,17 +40,56 @@ async function main() {
             return;
         }
 
-        const existingUser = userList.users.find((u) => u.email === email);
+        const existingUser = userList.users.find((u) => u.email === masterEmail);
 
         if (existingUser) {
-            console.log(`User ${email} found. Syncing to Prisma...`);
-            await syncToPrisma(existingUser.id, email, name);
+            console.log(`User ${masterEmail} found. Syncing to Prisma...`);
+            await syncToPrisma(existingUser.id, masterEmail, masterName);
         } else {
             console.error("User reported as existing but not found in list.");
         }
-    } else if (data.user) {
-        console.log("Supabase Auth created:", data.user.id);
-        await syncToPrisma(data.user.id, email, name);
+    } else if (masterData.user) {
+        console.log("Master Admin created:", masterData.user.id);
+        await syncToPrisma(masterData.user.id, masterEmail, masterName);
+    }
+
+    // Create Additional Admin
+    const adminEmail = "admin@gmail.com";
+    const adminPassword = "123456";
+    const adminName = "Admin User";
+
+    console.log(`Seeding Admin: ${adminEmail}`);
+
+    // 2. Create Additional Admin User in Supabase Auth
+    const { data: adminData, error: adminError } = await supabase.auth.admin.createUser({
+        email: adminEmail,
+        password: adminPassword,
+        email_confirm: true,
+        user_metadata: { name: adminName, role: Role.ADMIN },
+    });
+
+    if (adminError) {
+        console.log("Additional Admin creation failed/exists:", adminError.message);
+
+        // Try to find the user if they exist
+        const { data: userList, error: listError } = await supabase.auth.admin.listUsers();
+
+        if (listError) {
+            console.error("Failed to list users:", listError.message);
+            return;
+        }
+
+        const existingUser = userList.users.find((u) => u.email === adminEmail);
+
+        if (existingUser) {
+            console.log(`User ${adminEmail} found. Syncing to Prisma...`);
+            await syncToPrisma(existingUser.id, adminEmail, adminName);
+        } else {
+            console.error("User reported as existing but not found in list.");
+        }
+    } else if (adminData.user) {
+        console.log("Additional Admin created:", adminData.user.id);
+        await syncToPrisma(adminData.user.id, adminEmail, adminName);
     }
 }
 
