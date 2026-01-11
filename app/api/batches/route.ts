@@ -48,7 +48,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { name, subject, teacherId, schedule, capacity } = body;
+        const { name, subject, teacherId, schedule, capacity, feeModel, feeAmount, installments } = body;
 
         if (!name || !subject || !teacherId || !schedule || !capacity) {
             return new NextResponse("Missing required fields", { status: 400 });
@@ -61,6 +61,9 @@ export async function POST(req: Request) {
                 teacherId,
                 schedule,
                 capacity: parseInt(capacity),
+                feeModel: feeModel || null,
+                feeAmount: feeAmount ? parseFloat(feeAmount) : null,
+                installments: installments || null,
             },
         });
 
@@ -82,7 +85,7 @@ export async function PATCH(req: Request) {
         }
 
         const body = await req.json();
-        const { id, name, subject, teacherId, schedule, capacity, isActive } = body;
+        const { id, name, subject, teacherId, schedule, capacity, isActive, feeModel, feeAmount, installments } = body;
 
         if (!id) {
             return new NextResponse("Batch ID is required", { status: 400 });
@@ -95,6 +98,9 @@ export async function PATCH(req: Request) {
         if (schedule !== undefined) updateData.schedule = schedule;
         if (capacity !== undefined) updateData.capacity = parseInt(capacity);
         if (isActive !== undefined) updateData.isActive = isActive;
+        if (feeModel !== undefined) updateData.feeModel = feeModel || null;
+        if (feeAmount !== undefined) updateData.feeAmount = feeAmount ? parseFloat(feeAmount) : null;
+        if (installments !== undefined) updateData.installments = installments;
 
         const batch = await db.batch.update({
             where: { id },

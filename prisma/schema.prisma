@@ -154,6 +154,13 @@ model Enquiry {
   @@map("enquiries")
 }
 
+enum FeeModel {
+  ONE_TIME    // Single payment for the entire course
+  MONTHLY     // Monthly recurring payments
+  QUARTERLY   // Quarterly (every 3 months)
+  CUSTOM      // Custom installment schedule
+}
+
 model Batch {
   id        String   @id @default(cuid())
   name      String
@@ -164,6 +171,11 @@ model Batch {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Fee Configuration
+  feeModel     FeeModel? // Type of fee structure
+  feeAmount    Float?    // Base fee amount
+  installments Json?     // For CUSTOM: [{ name: "Installment 1", amount: 5000, dueDate: "2026-02-01" }]
 
   teacher    User        @relation(fields: [teacherId], references: [id])
   admissions Admission[]

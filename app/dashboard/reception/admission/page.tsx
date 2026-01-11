@@ -74,6 +74,23 @@ const paymentSchema = z.object({
     receipt_no: z.string().min(1, "Receipt No required"),
 });
 
+interface InstallmentItem {
+    name: string;
+    amount: number;
+    dueDate: string;
+}
+
+type FeeModel = "ONE_TIME" | "MONTHLY" | "QUARTERLY" | "CUSTOM" | null;
+
+interface Batch {
+    id: string;
+    name: string;
+    subject: string;
+    feeModel?: FeeModel;
+    feeAmount?: number;
+    installments?: InstallmentItem[];
+}
+
 export default function AdmissionPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -139,10 +156,37 @@ export default function AdmissionPage() {
     });
 
     // Multiple Batch State
-    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, fee: number, paid: number }[]>([]);
+    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, fee: number, paid: number, feeModel?: FeeModel }[]>([]);
     const [tempBatchId, setTempBatchId] = useState("");
     const [tempFee, setTempFee] = useState("");
     const [tempPaid, setTempPaid] = useState("");
+
+    // Auto-populate fee when batch is selected
+    const handleBatchSelection = (batchId: string) => {
+        setTempBatchId(batchId);
+        const selectedBatch = batches.find(b => b.id === batchId);
+        if (selectedBatch && selectedBatch.feeAmount) {
+            if (selectedBatch.feeModel === "CUSTOM" && selectedBatch.installments) {
+                // For custom, sum all installments
+                const total = selectedBatch.installments.reduce((sum: number, i: InstallmentItem) => sum + (i.amount || 0), 0);
+                setTempFee(total.toString());
+            } else {
+                setTempFee(selectedBatch.feeAmount.toString());
+            }
+        } else {
+            setTempFee("");
+        }
+    };
+
+    const getFeeModelLabel = (model: FeeModel) => {
+        switch (model) {
+            case "ONE_TIME": return "One-time";
+            case "MONTHLY": return "/month";
+            case "QUARTERLY": return "/quarter";
+            case "CUSTOM": return "(Custom)";
+            default: return "";
+        }
+    };
 
     const addBatch = () => {
         if (!tempBatchId || !tempFee) return;
@@ -159,7 +203,8 @@ export default function AdmissionPage() {
             id: tempBatchId,
             name: `${b.name} - ${b.subject}`,
             fee: parseFloat(tempFee),
-            paid: tempPaid ? parseFloat(tempPaid) : 0
+            paid: tempPaid ? parseFloat(tempPaid) : 0,
+            feeModel: b.feeModel
         }]);
 
         setTempBatchId("");
@@ -558,22 +603,25 @@ export default function AdmissionPage() {
                                         <div className="grid grid-cols-12 gap-2 items-end">
                                             <div className="col-span-4">
                                                 <Label className="text-xs">Batch</Label>
-                                                <Select value={tempBatchId} onValueChange={setTempBatchId}>
+                                                <Select value={tempBatchId} onValueChange={handleBatchSelection}>
                                                     <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
                                                     <SelectContent>
                                                         {batches.map(b => (
-                                                            <SelectItem key={b.id} value={b.id}>{b.name} - {b.subject}</SelectItem>
+                                                            <SelectItem key={b.id} value={b.id}>
+                                                                {b.name} - {b.subject}
+                                                                {b.feeModel && <span className="text-muted-foreground ml-1">({b.feeModel === "ONE_TIME" ? "One-time" : b.feeModel === "MONTHLY" ? "Monthly" : b.feeModel === "QUARTERLY" ? "Quarterly" : "Custom"})</span>}
+                                                            </SelectItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
                                             </div>
                                             <div className="col-span-3">
-                                                <Label className="text-xs">Total Fee</Label>
-                                                <Input type="number" placeholder="0" value={tempFee} onChange={e => setTempFee(e.target.value)} />
+                                                <Label className="text-xs">Total Fee {tempBatchId && batches.find(b => b.id === tempBatchId)?.feeModel && <span className="text-muted-foreground">{getFeeModelLabel(batches.find(b => b.id === tempBatchId)?.feeModel as FeeModel)}</span>}</Label>
+                                                <Input type="number" placeholder="₹0" value={tempFee} onChange={e => setTempFee(e.target.value)} />
                                             </div>
                                             <div className="col-span-3">
                                                 <Label className="text-xs">Paying Now</Label>
-                                                <Input type="number" placeholder="0" value={tempPaid} onChange={e => setTempPaid(e.target.value)} />
+                                                <Input type="number" placeholder="₹0" value={tempPaid} onChange={e => setTempPaid(e.target.value)} />
                                             </div>
                                             <div className="col-span-2">
                                                 <Button type="button" onClick={addBatch} disabled={!tempBatchId || !tempFee} className="w-full">
@@ -589,7 +637,8 @@ export default function AdmissionPage() {
                                                     <div key={b.id} className="flex justify-between items-center bg-white p-2 border rounded text-sm">
                                                         <div>
                                                             <span className="font-medium">{b.name}</span>
-                                                            <div className="text-muted-foreground text-xs">Fee: ₹{b.fee} | Paid: ₹{b.paid}</div>
+                                                            {b.feeModel && <span className="text-xs ml-2 text-blue-600">{getFeeModelLabel(b.feeModel)}</span>}
+                                                            <div className="text-muted-foreground text-xs">Fee: ₹{b.fee.toLocaleString()} | Paid: ₹{b.paid.toLocaleString()}</div>
                                                         </div>
                                                         <Button type="button" variant="ghost" size="sm" onClick={() => removeBatch(b.id)}>
                                                             <Trash2 className="h-4 w-4 text-red-500" />
@@ -598,7 +647,7 @@ export default function AdmissionPage() {
                                                 ))}
                                                 <div className="flex justify-between font-bold pt-2 border-t">
                                                     <span>Total</span>
-                                                    <span>Fee: ₹{totalFees} | Paid: ₹{totalPaid}</span>
+                                                    <span>Fee: ₹{totalFees.toLocaleString()} | Paid: ₹{totalPaid.toLocaleString()}</span>
                                                 </div>
                                             </div>
                                         )}

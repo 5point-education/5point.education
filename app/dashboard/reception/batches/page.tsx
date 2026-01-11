@@ -43,6 +43,14 @@ interface ScheduleItem {
   endTime: string;
 }
 
+interface InstallmentItem {
+  name: string;
+  amount: number;
+  dueDate: string;
+}
+
+type FeeModel = "ONE_TIME" | "MONTHLY" | "QUARTERLY" | "CUSTOM" | null;
+
 interface Batch {
   id: string;
   name: string;
@@ -53,6 +61,9 @@ interface Batch {
   capacity: number;
   isActive: boolean;
   createdAt: string;
+  feeModel?: FeeModel;
+  feeAmount?: number;
+  installments?: InstallmentItem[];
   _count: { admissions: number };
 }
 
@@ -71,6 +82,11 @@ export default function BatchesPage() {
     { day: "", startTime: "12:00", endTime: "13:00" }
   ]);
 
+  // Fee Configuration State (Create)
+  const [feeModel, setFeeModel] = useState<FeeModel>(null);
+  const [feeAmount, setFeeAmount] = useState("");
+  const [installments, setInstallments] = useState<InstallmentItem[]>([]);
+
   // Edit form state
   const [editFormData, setEditFormData] = useState({
     name: "",
@@ -79,6 +95,11 @@ export default function BatchesPage() {
     capacity: "",
   });
   const [editScheduleItems, setEditScheduleItems] = useState<ScheduleItem[]>([]);
+  
+  // Fee Configuration State (Edit)
+  const [editFeeModel, setEditFeeModel] = useState<FeeModel>(null);
+  const [editFeeAmount, setEditFeeAmount] = useState("");
+  const [editInstallments, setEditInstallments] = useState<InstallmentItem[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -137,6 +158,40 @@ export default function BatchesPage() {
     setEditScheduleItems(newItems);
   };
 
+  // Installment Handlers (Create)
+  const handleAddInstallment = () => {
+    setInstallments([...installments, { name: `Installment ${installments.length + 1}`, amount: 0, dueDate: "" }]);
+  };
+
+  const handleRemoveInstallment = (index: number) => {
+    const newItems = [...installments];
+    newItems.splice(index, 1);
+    setInstallments(newItems);
+  };
+
+  const handleInstallmentChange = (index: number, field: keyof InstallmentItem, value: string | number) => {
+    const newItems = [...installments];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setInstallments(newItems);
+  };
+
+  // Installment Handlers (Edit)
+  const handleAddEditInstallment = () => {
+    setEditInstallments([...editInstallments, { name: `Installment ${editInstallments.length + 1}`, amount: 0, dueDate: "" }]);
+  };
+
+  const handleRemoveEditInstallment = (index: number) => {
+    const newItems = [...editInstallments];
+    newItems.splice(index, 1);
+    setEditInstallments(newItems);
+  };
+
+  const handleEditInstallmentChange = (index: number, field: keyof InstallmentItem, value: string | number) => {
+    const newItems = [...editInstallments];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setEditInstallments(newItems);
+  };
+
   const handleEditClick = (batch: Batch) => {
     setEditingBatch(batch);
     setEditFormData({
@@ -151,6 +206,10 @@ export default function BatchesPage() {
     } catch {
       setEditScheduleItems([{ day: "", startTime: "12:00", endTime: "13:00" }]);
     }
+    // Load fee configuration
+    setEditFeeModel(batch.feeModel || null);
+    setEditFeeAmount(batch.feeAmount?.toString() || "");
+    setEditInstallments(batch.installments || []);
     setEditOpen(true);
   };
 
@@ -175,7 +234,10 @@ export default function BatchesPage() {
 
     const payload = {
       ...data,
-      schedule: JSON.stringify(scheduleItems)
+      schedule: JSON.stringify(scheduleItems),
+      feeModel: feeModel,
+      feeAmount: feeAmount,
+      installments: feeModel === "CUSTOM" ? installments : null,
     };
     
     try {
@@ -198,6 +260,10 @@ export default function BatchesPage() {
       });
       setOpen(false);
       setScheduleItems([{ day: "", startTime: "12:00", endTime: "13:00" }]);
+      // Reset fee state
+      setFeeModel(null);
+      setFeeAmount("");
+      setInstallments([]);
       fetchData();
     } catch (error: any) {
         toast({
@@ -232,7 +298,10 @@ export default function BatchesPage() {
     const payload = {
       id: editingBatch.id,
       ...editFormData,
-      schedule: JSON.stringify(editScheduleItems)
+      schedule: JSON.stringify(editScheduleItems),
+      feeModel: editFeeModel,
+      feeAmount: editFeeAmount,
+      installments: editFeeModel === "CUSTOM" ? editInstallments : null,
     };
     
     try {
@@ -486,6 +555,119 @@ export default function BatchesPage() {
     </div>
   );
 
+  const renderFeeEditor = (
+    currentModel: FeeModel,
+    setModel: (val: FeeModel) => void,
+    amount: string,
+    setAmount: (val: string) => void,
+    instItems: InstallmentItem[],
+    onAddInst: () => void,
+    onRemoveInst: (index: number) => void,
+    onChangeInst: (index: number, field: keyof InstallmentItem, value: string | number) => void
+  ) => (
+    <div className="space-y-3 border rounded-md p-4 bg-muted/10">
+      <div className="flex justify-between items-center">
+        <Label className="text-base font-medium">Fee Configuration</Label>
+      </div>
+      
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Fee Model</Label>
+        <Select 
+          value={currentModel || ""} 
+          onValueChange={(val) => setModel(val as FeeModel)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select fee model" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ONE_TIME">One-time Fee</SelectItem>
+            <SelectItem value="MONTHLY">Monthly Fee</SelectItem>
+            <SelectItem value="QUARTERLY">Quarterly Fee</SelectItem>
+            <SelectItem value="CUSTOM">Custom Installments</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {currentModel && currentModel !== "CUSTOM" && (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">
+            {currentModel === "ONE_TIME" && "Total Fee Amount"}
+            {currentModel === "MONTHLY" && "Monthly Fee Amount"}
+            {currentModel === "QUARTERLY" && "Quarterly Fee Amount"}
+          </Label>
+          <Input 
+            type="number" 
+            placeholder="₹0" 
+            value={amount} 
+            onChange={(e) => setAmount(e.target.value)}
+            min="0"
+          />
+        </div>
+      )}
+
+      {currentModel === "CUSTOM" && (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <Label className="text-xs text-muted-foreground">Installments</Label>
+            <Button type="button" variant="outline" size="sm" onClick={onAddInst}>
+              <Plus className="h-3 w-3 mr-1" /> Add Installment
+            </Button>
+          </div>
+          
+          {instItems.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-2">No installments added yet</p>
+          )}
+          
+          {instItems.map((item, index) => (
+            <div key={index} className="flex gap-2 items-end bg-background p-2 rounded border">
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">Name</Label>
+                <Input 
+                  placeholder="Installment name" 
+                  value={item.name} 
+                  onChange={(e) => onChangeInst(index, 'name', e.target.value)}
+                />
+              </div>
+              <div className="w-[120px] space-y-1">
+                <Label className="text-xs text-muted-foreground">Amount</Label>
+                <Input 
+                  type="number" 
+                  placeholder="₹0" 
+                  value={item.amount || ""} 
+                  onChange={(e) => onChangeInst(index, 'amount', parseFloat(e.target.value) || 0)}
+                  min="0"
+                />
+              </div>
+              <div className="w-[130px] space-y-1">
+                <Label className="text-xs text-muted-foreground">Due Date</Label>
+                <Input 
+                  type="date" 
+                  value={item.dueDate} 
+                  onChange={(e) => onChangeInst(index, 'dueDate', e.target.value)}
+                />
+              </div>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="icon" 
+                className="h-9 w-9 text-destructive hover:text-destructive/90"
+                onClick={() => onRemoveInst(index)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+          
+          {instItems.length > 0 && (
+            <div className="text-sm font-medium text-right pt-2 border-t">
+              Total: ₹{instItems.reduce((sum, i) => sum + (i.amount || 0), 0).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -540,6 +722,8 @@ export default function BatchesPage() {
                   <Label htmlFor="capacity">Capacity</Label>
                   <Input id="capacity" name="capacity" type="number" required min="1" placeholder="30" />
                 </div>
+
+                {renderFeeEditor(feeModel, setFeeModel, feeAmount, setFeeAmount, installments, handleAddInstallment, handleRemoveInstallment, handleInstallmentChange)}
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={submitting}>
@@ -615,6 +799,8 @@ export default function BatchesPage() {
                     placeholder="30" 
                   />
                 </div>
+
+                {renderFeeEditor(editFeeModel, setEditFeeModel, editFeeAmount, setEditFeeAmount, editInstallments, handleAddEditInstallment, handleRemoveEditInstallment, handleEditInstallmentChange)}
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
