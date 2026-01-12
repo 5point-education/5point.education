@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
-import { MarksEntryTable } from "@/components/dashboard/exams/MarksEntryTable";
+import { MarksEntryTable } from "@/components/Dashboard/exams/MarksEntryTable";
 import { notFound } from "next/navigation";
+
+import { Badge } from "@/components/ui/badge";
 
 export default async function ScoreEntryPage({ params }: { params: { id: string } }) {
     const exam: any = await db.exam.findUnique({
@@ -39,13 +41,15 @@ export default async function ScoreEntryPage({ params }: { params: { id: string 
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">{exam.name}</h1>
-                    <p className="text-muted-foreground">
-                        Date: {exam.date.toLocaleDateString()} | Batch: {exam.batch?.name}
-                    </p>
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-sm py-1 px-3 border-primary/20 bg-primary/5 text-primary">
+                        {exam.batch?.name}
+                    </Badge>
+                    <span className="text-muted-foreground text-sm">•</span>
+                    <span className="text-muted-foreground text-sm">{exam.date.toLocaleDateString()}</span>
                 </div>
+                <h1 className="text-3xl font-bold tracking-tight">{exam.name}</h1>
             </div>
 
             <MarksEntryTable

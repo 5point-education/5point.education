@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
+    ClipboardList,
     LayoutDashboard,
     Users,
     GraduationCap,
@@ -38,12 +39,19 @@ const SidebarItem = ({ icon: Icon, label, href, exact, onClick }: SidebarItemPro
             href={href}
             onClick={onClick}
             className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 group hover:bg-primary/10",
-                isActive ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "text-muted-foreground hover:text-primary"
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group mx-2",
+                isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             )}
         >
-            <Icon className={cn("h-5 w-5", isActive ? "text-primary-foreground" : "group-hover:text-primary")} />
-            <span className="font-medium text-sm">{label}</span>
+            <Icon
+                className={cn(
+                    "h-4 w-4 transition-colors",
+                    isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                )}
+            />
+            <span className={cn("font-medium text-sm", isActive ? "font-semibold" : "")}>{label}</span>
         </Link>
     );
 };
@@ -92,7 +100,8 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/teacher" exact onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="My Students" href="/dashboard/teacher/students" onClick={closeMobileSidebar} />
-                        <SidebarItem icon={Calendar} label="Schedule" href="/dashboard/teacher/schedule" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={ClipboardList} label="Exams" href="/dashboard/teacher/exam" onClick={closeMobileSidebar} />
+                        {/* <SidebarItem icon={Calendar} label="Schedule" href="/dashboard/teacher/schedule" onClick={closeMobileSidebar} /> */}
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/teacher/attendance" onClick={closeMobileSidebar} />
                     </>
                 );
@@ -110,48 +119,50 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
     };
 
     const sidebarContent = (
-        <>
+        <div className="flex flex-col h-full bg-background border-r">
             {/* Branding */}
-            <div className="p-6 border-b">
-                <Link href="/" className="flex items-center gap-2">
-                    <GraduationCap className="h-8 w-8 text-primary" />
-                    <div>
-                        <span className="text-lg font-bold text-primary block leading-none">5 Point</span>
-                        <span className="text-xs text-muted-foreground font-medium">Education Hub</span>
+            <div className="p-6">
+                <Link href="/" className="flex items-center gap-2.5">
+                    <div className="bg-primary/10 p-2 rounded-lg">
+                        <GraduationCap className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-lg font-bold tracking-tight text-foreground">5 Point</span>
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Education Hub</span>
                     </div>
                 </Link>
             </div>
 
             {/* Navigation */}
-            <div className="p-4 flex-1 overflow-y-auto">
-                <div className="space-y-1">
+            <div className="flex-1 py-4 overflow-y-auto">
+                <div className="space-y-1 px-2">
                     {renderLinks()}
                 </div>
             </div>
 
             {/* User Profile & Logout */}
-            <div className="p-4 border-t bg-slate-50">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="font-semibold text-primary">{userInitial}</span>
+            <div className="p-4 border-t bg-card/50">
+                <div className="flex items-center gap-3 mb-4 px-2">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border ring-2 ring-background">
+                        <span className="font-semibold text-sm text-primary">{userInitial}</span>
                     </div>
                     <div className="flex-1 overflow-hidden">
-                        <p className="text-sm font-medium truncate">{userName}</p>
+                        <p className="text-sm font-medium truncate text-foreground">{userName}</p>
                         <p className="text-xs text-muted-foreground capitalize truncate">
                             {user?.role?.toLowerCase() || "student"}
                         </p>
                     </div>
                 </div>
                 <Button
-                    variant="outline"
-                    className="w-full justify-start text-muted-foreground hover:text-destructive"
+                    variant="ghost"
+                    className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-2"
                     onClick={onLogout}
                 >
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
                 </Button>
             </div>
-        </>
+        </div>
     );
 
     return (
@@ -169,7 +180,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
             {/* Mobile Sidebar Overlay */}
             {isMobileOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                    className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
                     onClick={closeMobileSidebar}
                 />
             )}
@@ -177,7 +188,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
             {/* Mobile Sidebar */}
             <div
                 className={cn(
-                    "fixed top-0 left-0 w-64 bg-white h-screen z-40 flex flex-col transition-transform duration-300 md:hidden",
+                    "fixed top-0 left-0 w-72 bg-background h-screen z-50 flex flex-col transition-transform duration-300 md:hidden border-r shadow-lg",
                     isMobileOpen ? "translate-x-0" : "-translate-x-full"
                 )}
             >
@@ -185,10 +196,9 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
             </div>
 
             {/* Desktop Sidebar */}
-            <div className="w-64 bg-white border-r h-screen sticky top-0 flex flex-col hidden md:flex">
+            <div className="w-72 bg-background h-screen sticky top-0 flex flex-col hidden md:flex shrink-0">
                 {sidebarContent}
             </div>
         </>
     );
 }
-
