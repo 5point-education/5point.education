@@ -361,9 +361,10 @@ export default function AdmissionPage() {
                 ? selectedBatches.map(b => ({
                     batchId: b.id,
                     total_fees: b.fee,
-                    fees_pending: Math.max(0, b.fee - b.paid)
+                    fees_pending: Math.max(0, b.fee - b.paid),
+                    selectedDays: b.selectedDays // Include selectedDays for days-wise fees
                 }))
-                : [{ batchId: null, total_fees: 0, fees_pending: 0 }]; // Home Tutor case? Logic might need check.
+                : [{ batchId: null, total_fees: 0, fees_pending: 0, selectedDays: undefined }]; // Home Tutor case
 
             // If Home tutor, we might need a fee input too? Assuming for now Home Tutor follows same flow or is custom.
             // But let's stick to the multiple batch change logic.
@@ -377,6 +378,7 @@ export default function AdmissionPage() {
                         batchId: adm.batchId,
                         total_fees: adm.total_fees,
                         fees_pending: adm.fees_pending,
+                        selectedDays: adm.selectedDays, // Pass selectedDays to API
                     }),
                 });
                 if (!admissionRes.ok) console.error("Failed to create admission for batch " + adm.batchId);

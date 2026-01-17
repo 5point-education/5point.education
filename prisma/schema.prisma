@@ -197,11 +197,13 @@ model Admission {
   admission_date DateTime @default(now())
   total_fees     Float
   fees_pending   Float
+  selectedDays   Int?     // For days-wise fees: number of days per week selected
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  batch   Batch?         @relation(fields: [batchId], references: [id])
+  student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batch            Batch?               @relation(fields: [batchId], references: [id])
+  recurringPeriods RecurringFeePeriod[]
 
   @@map("admissions")
 }
@@ -215,9 +217,31 @@ model Payment {
   receipt_no String   @unique
   createdAt  DateTime @default(now())
 
-  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  recurringPeriods RecurringFeePeriod[]
 
   @@map("payments")
+}
+
+model RecurringFeePeriod {
+  id           String    @id @default(cuid())
+  admissionId  String
+  periodNumber Int       // 1, 2, 3... (1st month, 2nd month, etc.)
+  periodType   String    // "MONTHLY" or "QUARTERLY"
+  periodStart  DateTime  // Start date of this period
+  periodEnd    DateTime  // End date of this period
+  amount       Float     // Fee amount for this period
+  isPaid       Boolean   @default(false)
+  paidAt       DateTime?
+  paymentId    String?   // Reference to payment that covered this
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  payment   Payment?  @relation(fields: [paymentId], references: [id])
+
+  @@unique([admissionId, periodNumber])
+  @@map("recurring_fee_periods")
 }
 
 model Exam {

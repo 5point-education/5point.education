@@ -18,6 +18,7 @@ import {
     LogOut,
     Menu,
     X,
+    IndianRupee,
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -92,6 +93,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={UserPlus} label="Teacher Onboarding" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="Student List" href="/dashboard/reception/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Layers} label="Batch Management" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={IndianRupee} label="Fees Management" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                     </>
                 );

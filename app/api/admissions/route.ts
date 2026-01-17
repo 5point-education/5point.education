@@ -13,7 +13,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { studentId, batchId, total_fees, fees_pending } = body;
+        const { studentId, batchId, total_fees, fees_pending, selectedDays } = body;
 
         if (!studentId || total_fees === undefined || fees_pending === undefined) {
             return new NextResponse("Missing required fields", { status: 400 });
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
                 batchId: batchId || null, // Optional for Home Tutor
                 total_fees: parseFloat(total_fees),
                 fees_pending: parseFloat(fees_pending),
+                selectedDays: selectedDays ? parseInt(selectedDays) : null, // For days-wise fees
             }
         });
 
