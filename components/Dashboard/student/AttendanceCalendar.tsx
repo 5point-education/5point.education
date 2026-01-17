@@ -114,7 +114,7 @@ export default function AttendanceCalendar({ attendance }: AttendanceCalendarPro
                         <div
                             key={day.toString()}
                             className={cn(
-                                "min-h-[70px] bg-white p-1 flex flex-col gap-1 transition-colors hover:bg-slate-50/50",
+                                "min-h-[110px] bg-white p-1 flex flex-col gap-1 transition-colors hover:bg-slate-50/50",
                                 !isCurrentMonth && "bg-slate-50/30 text-slate-400"
                             )}
                         >

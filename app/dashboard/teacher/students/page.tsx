@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import StudentListTable from "@/components/Dashboard/StudentListTable";
+import StudentListTable from "@/components/dashboard/StudentListTable";
 
 interface Batch {
   id: string;
@@ -24,7 +24,7 @@ export default function TeacherStudentListPage() {
         const response = await fetch("/api/teacher/batches");
         if (response.ok) {
           const data = await response.json();
-          
+
           // The data from the API already matches our interface
           setBatches(data);
         } else {
@@ -47,15 +47,15 @@ export default function TeacherStudentListPage() {
         <p className="text-muted-foreground">View and manage students in your assigned batches</p>
       </div>
 
-    
-          {loading ? (
-            <div className="text-center py-8">Loading your batches...</div>
-          ) : (
-            <StudentListTable 
-              batches={batches} 
-              role="teacher" 
-            />
-          )}
+
+      {loading ? (
+        <div className="text-center py-8">Loading your batches...</div>
+      ) : (
+        <StudentListTable
+          batches={batches}
+          role="teacher"
+        />
+      )}
     </div>
   );
 }

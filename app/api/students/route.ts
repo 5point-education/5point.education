@@ -136,8 +136,51 @@ export async function POST(req: Request) {
             generatedPassword // Important: Return this so Receptionist can see it once
         });
 
+
     } catch (error) {
         console.log("[STUDENTS_POST]", error);
+        return new NextResponse("Internal Error", { status: 500 });
+    }
+}
+
+
+export async function GET(req: Request) {
+    try {
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user || (user.user_metadata.role !== Role.ADMIN && user.user_metadata.role !== Role.RECEPTIONIST)) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const users = await db.user.findMany({
+            where: {
+                role: Role.STUDENT
+            },
+            include: {
+                studentProfile: true
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        const formattedStudents = users
+            .filter(u => u.studentProfile) // Only return users with a profile
+            .map(u => ({
+                admissionId: "N/A",
+                studentId: u.studentProfile!.id,
+                name: u.name,
+                email: u.email,
+                phone: u.studentProfile!.phone,
+                parentName: u.studentProfile!.fatherName,
+                joinDate: u.createdAt
+            }));
+
+        return NextResponse.json(formattedStudents);
+
+    } catch (error) {
+        console.log("[STUDENTS_GET]", error);
         return new NextResponse("Internal Error", { status: 500 });
     }
 }

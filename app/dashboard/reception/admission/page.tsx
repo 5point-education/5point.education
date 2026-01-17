@@ -189,10 +189,10 @@ export default function AdmissionPage() {
         const selectedBatch = batches.find(b => b.id === batchId);
         if (selectedBatch) {
             // Check if days-wise fees is enabled and has configured options
-            const hasDaysWiseFees = selectedBatch.daysWiseFeesEnabled && 
-                selectedBatch.daysWiseFees && 
+            const hasDaysWiseFees = selectedBatch.daysWiseFeesEnabled &&
+                selectedBatch.daysWiseFees &&
                 Object.keys(selectedBatch.daysWiseFees).length > 0;
-            
+
             if (hasDaysWiseFees) {
                 // Don't auto-populate fee, wait for days selection
                 setTempFee("");
@@ -245,8 +245,8 @@ export default function AdmissionPage() {
         if (!b) return;
 
         // Check if batch has days-wise fees configured
-        const hasDaysWiseFees = b.daysWiseFeesEnabled && 
-            b.daysWiseFees && 
+        const hasDaysWiseFees = b.daysWiseFeesEnabled &&
+            b.daysWiseFees &&
             Object.keys(b.daysWiseFees).length > 0;
 
         // Validate days selection if days-wise fees is enabled and configured
@@ -552,10 +552,42 @@ export default function AdmissionPage() {
                                             <FormItem><FormLabel>Mother&apos;s Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                                         )} />
                                         <FormField control={studentForm.control} name="parentMobile" render={({ field }) => (
-                                            <FormItem><FormLabel>Parent&apos;s Mob</FormLabel><FormControl><Input {...field} maxLength={10} inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                                            <FormItem>
+                                                <FormLabel>Parent&apos;s Mob</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        {...field}
+                                                        maxLength={10}
+                                                        inputMode="numeric"
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            if (value === "" || /^\d+$/.test(value)) {
+                                                                field.onChange(value);
+                                                            }
+                                                        }}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
                                         )} />
                                         <FormField control={studentForm.control} name="phone" render={({ field }) => (
-                                            <FormItem><FormLabel>Student Mob</FormLabel><FormControl><Input {...field} maxLength={10} inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                                            <FormItem>
+                                                <FormLabel>Student Mob</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        {...field}
+                                                        maxLength={10}
+                                                        inputMode="numeric"
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            if (value === "" || /^\d+$/.test(value)) {
+                                                                field.onChange(value);
+                                                            }
+                                                        }}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
                                         )} />
                                         <FormField control={studentForm.control} name="email" render={({ field }) => (
                                             <FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -697,28 +729,28 @@ export default function AdmissionPage() {
                                                 const batch = batches.find(b => b.id === tempBatchId);
                                                 return batch?.daysWiseFeesEnabled && batch?.daysWiseFees && Object.keys(batch.daysWiseFees).length > 0;
                                             })() && (
-                                                <div className="col-span-2">
-                                                    <Label className="text-xs">Days/Week</Label>
-                                                    <Select value={tempSelectedDays} onValueChange={handleDaysSelection}>
-                                                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                                                        <SelectContent>
-                                                            {(() => {
-                                                                const batch = batches.find(b => b.id === tempBatchId);
-                                                                if (!batch || !batch.daysWiseFees) return null;
-                                                                // Only show days that have been configured with fees
-                                                                const configuredDays = Object.keys(batch.daysWiseFees)
-                                                                    .map(Number)
-                                                                    .sort((a, b) => a - b);
-                                                                return configuredDays.map((dayCount) => (
-                                                                    <SelectItem key={dayCount} value={dayCount.toString()}>
-                                                                        {dayCount} day{dayCount > 1 ? 's' : ''} - ₹{batch.daysWiseFees![dayCount.toString()].toLocaleString()}
-                                                                    </SelectItem>
-                                                                ));
-                                                            })()}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            )}
+                                                    <div className="col-span-2">
+                                                        <Label className="text-xs">Days/Week</Label>
+                                                        <Select value={tempSelectedDays} onValueChange={handleDaysSelection}>
+                                                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                                                            <SelectContent>
+                                                                {(() => {
+                                                                    const batch = batches.find(b => b.id === tempBatchId);
+                                                                    if (!batch || !batch.daysWiseFees) return null;
+                                                                    // Only show days that have been configured with fees
+                                                                    const configuredDays = Object.keys(batch.daysWiseFees)
+                                                                        .map(Number)
+                                                                        .sort((a, b) => a - b);
+                                                                    return configuredDays.map((dayCount) => (
+                                                                        <SelectItem key={dayCount} value={dayCount.toString()}>
+                                                                            {dayCount} day{dayCount > 1 ? 's' : ''} - ₹{batch.daysWiseFees![dayCount.toString()].toLocaleString()}
+                                                                        </SelectItem>
+                                                                    ));
+                                                                })()}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                )}
                                             {(() => {
                                                 const batch = tempBatchId ? batches.find(b => b.id === tempBatchId) : null;
                                                 const hasDaysWiseFees = batch?.daysWiseFeesEnabled && batch?.daysWiseFees && Object.keys(batch.daysWiseFees).length > 0;

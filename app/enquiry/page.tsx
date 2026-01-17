@@ -123,8 +123,12 @@ function EnquiryForm() {
             <Input
               id="phone"
               {...register("phone")}
+              onInput={(e) => {
+                e.currentTarget.value = e.currentTarget.value.replace(/[^0-9]/g, '');
+              }}
               placeholder="10-digit mobile number"
               maxLength={10}
+              inputMode="numeric"
             />
             {errors.phone && (
               <p className="text-sm text-red-600 mt-1">{errors.phone.message}</p>

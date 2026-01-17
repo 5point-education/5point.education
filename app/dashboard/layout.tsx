@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Sidebar } from "@/components/Dashboard/Sidebar";
+import { Sidebar } from "@/components/dashboard/Sidebar";
 
 export default function DashboardLayout({
   children,

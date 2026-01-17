@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, User, Phone, GraduationCap } from "lucide-react";
+import { Search, User, Phone, GraduationCap, PlusCircle } from "lucide-react";
+import { AddStudentToBatchModal } from "./AddStudentToBatchModal";
 
 interface Student {
   admissionId: string;
@@ -36,6 +37,12 @@ interface Batch {
   id: string;
   name: string;
   subject: string;
+  feeModel?: "ONE_TIME" | "MONTHLY" | "QUARTERLY" | "CUSTOM" | null;
+  feeAmount?: number;
+  installments?: any[];
+  daysWiseFeesEnabled?: boolean;
+  daysWiseFees?: Record<string, number>;
+  isActive?: boolean;
 }
 
 interface StudentListTableProps {
@@ -50,7 +57,7 @@ export default function StudentListTable({
   role
 }: StudentListTableProps) {
   const router = useRouter();
-  const [selectedBatch, setSelectedBatch] = useState<string>("");
+  const [selectedBatch, setSelectedBatch] = useState<string>("all");
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>(initialStudents);
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -58,21 +65,34 @@ export default function StudentListTable({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(10);
 
+  // Modal State
+  const [isAddBatchOpen, setIsAddBatchOpen] = useState(false);
+  const [selectedStudentForBatch, setSelectedStudentForBatch] = useState<{ id: string, name: string } | null>(null);
+
   // Fetch students when batch is selected
   useEffect(() => {
     const fetchStudents = async () => {
       if (selectedBatch) {
         setLoading(true);
         try {
-          const response = await fetch(`/api/batches/${selectedBatch}/students`);
+          let url = "";
+          if (selectedBatch === "all") {
+            url = "/api/students";
+          } else {
+            url = `/api/batches/${selectedBatch}/students`;
+          }
+
+          const response = await fetch(url);
           if (response.ok) {
             const data = await response.json();
             setStudents(data);
           } else {
             console.error("Failed to fetch students");
+            setStudents([]);
           }
         } catch (error) {
           console.error("Error fetching students:", error);
+          setStudents([]);
         } finally {
           setLoading(false);
         }
@@ -117,172 +137,209 @@ export default function StudentListTable({
     return new Date(dateString).toLocaleDateString('en-IN');
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Student List</CardTitle>
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex-1 w-full">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="w-full sm:w-64">
-                <Select value={selectedBatch} onValueChange={handleBatchChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a batch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {batches.map((batch) => (
-                      <SelectItem key={batch.id} value={batch.id}>
-                        {batch.name} ({batch.subject})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+  const openAddBatchModal = (student: Student) => {
+    setSelectedStudentForBatch({ id: student.studentId, name: student.name });
+    setIsAddBatchOpen(true);
+  };
 
-              <div className="relative w-full sm:w-80">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search students..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Student List</CardTitle>
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex-1 w-full">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="w-full sm:w-64">
+                  <Select value={selectedBatch} onValueChange={handleBatchChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a batch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Students </SelectItem>
+                      {batches.filter(b => b.isActive !== false).map((batch) => (
+                        <SelectItem key={batch.id} value={batch.id}>
+                          {batch.name} ({batch.subject})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative w-full sm:w-80">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search students..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="text-center py-8">Loading students...</div>
-        ) : selectedBatch ? (
-          <>
-            {filteredStudents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {searchTerm ? (
-                  <div>
-                    <p>No students match your search for &quot;{searchTerm}&quot;</p>
-                    <p className="text-sm mt-2">Try adjusting your search term</p>
-                  </div>
-                ) : (
-                  <div>
-                    <p>This batch has no students enrolled yet</p>
-                    <p className="text-sm mt-2">Students will appear here once they are admitted to this batch</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Photo</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Parent/Guardian</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Join Date</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedStudents.map((student) => (
-                        <TableRow key={student.studentId}>
-                          <TableCell>
-                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <User className="h-5 w-5 text-primary" />
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-medium">{student.name}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
-                              {student.phone}
-                            </div>
-                          </TableCell>
-                          <TableCell>{student.parentName || "-"}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <GraduationCap className="mr-2 h-4 w-4 text-muted-foreground" />
-                              {student.email}
-                            </div>
-                          </TableCell>
-                          <TableCell>{formatDate(student.joinDate)}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => alert(`Student details would be shown here for: ${student.name}`)}
-                              disabled
-                            >
-                              View
-                            </Button>
-                          </TableCell>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">Loading students...</div>
+          ) : selectedBatch ? (
+            <>
+              {filteredStudents.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchTerm ? (
+                    <div>
+                      <p>No students match your search for &quot;{searchTerm}&quot;</p>
+                      <p className="text-sm mt-2">Try adjusting your search term</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p>This batch has no students enrolled yet</p>
+                      <p className="text-sm mt-2">Students will appear here once they are admitted to this batch</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Photo</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Parent/Guardian</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Join Date</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {totalPages > 1 && (
-                  <div className="mt-6 flex justify-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-
-                      return (
-                        <Button
-                          key={pageNum}
-                          variant={currentPage === pageNum ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentPage(pageNum)}
-                        >
-                          {pageNum}
-                        </Button>
-                      );
-                    })}
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedStudents.map((student) => (
+                          <TableRow key={`${student.studentId}-${student.admissionId}`}>
+                            <TableCell>
+                              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <User className="h-5 w-5 text-primary" />
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-medium">{student.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
+                                {student.phone}
+                              </div>
+                            </TableCell>
+                            <TableCell>{student.parentName || "-"}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                <GraduationCap className="mr-2 h-4 w-4 text-muted-foreground" />
+                                {student.email}
+                              </div>
+                            </TableCell>
+                            <TableCell>{formatDate(student.joinDate)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                {/* Only show Add to Batch if role is receptionist or admin */}
+                                {(role === 'receptionist' || role === 'admin') && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openAddBatchModal(student)}
+                                    title="Add to another batch"
+                                  >
+                                    <PlusCircle className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => alert(`Student details would be shown here for: ${student.name}`)}
+                                  disabled
+                                >
+                                  View
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
-                )}
 
-                <div className="mt-4 text-sm text-muted-foreground text-center">
-                  Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredStudents.length)} of {filteredStudents.length} students
-                </div>
-              </>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            Please select a batch to view students
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                  {totalPages > 1 && (
+                    <div className="mt-6 flex justify-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="mt-4 text-sm text-muted-foreground text-center">
+                    Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredStudents.length)} of {filteredStudents.length} students
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Please select a batch or &quot;All Students&quot; to view details
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add to Batch Modal */}
+      {selectedStudentForBatch && (
+        <AddStudentToBatchModal
+          studentId={selectedStudentForBatch.id}
+          studentName={selectedStudentForBatch.name}
+          isOpen={isAddBatchOpen}
+          onOpenChange={setIsAddBatchOpen}
+          batches={batches}
+          onSuccess={() => {
+            // Optional: refresh list if needed, but not strictly required if we just added to a batch
+            // Maybe if we are viewing that batch, we should refresh.
+            // For now, doing nothing.
+          }}
+        />
+      )}
+    </>
   );
 }
