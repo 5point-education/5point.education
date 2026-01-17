@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, CheckCircle, XCircle } from "lucide-react";
+import { Calendar as CalendarIcon, CheckCircle, XCircle } from "lucide-react";
+import AttendanceCalendar from "@/components/dashboard/student/AttendanceCalendar";
 import { format } from "date-fns";
 
 interface AttendanceRecord {
@@ -57,135 +58,76 @@ export default function StudentAttendancePage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div>
-                <h1 className="text-3xl font-bold">My Attendance</h1>
+                <h1 className="text-2xl font-bold">My Attendance</h1>
                 <p className="text-muted-foreground">Track your class attendance and punctuality</p>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100 shadow-sm">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                            <CardDescription className="text-blue-600 font-medium">Total Classes</CardDescription>
-                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                <Calendar className="h-4 w-4 text-blue-600" />
+                    <CardContent className="p-4 flex flex-col justify-between h-full">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-blue-600">Total Classes</span>
+                            <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center">
+                                <CalendarIcon className="h-3 w-3 text-blue-600" />
                             </div>
                         </div>
-                        <CardTitle className="text-4xl font-bold text-slate-800 mt-2">{data.stats.total}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-xs text-muted-foreground">Total scheduled classes</p>
+                        <div>
+                            <div className="text-2xl font-bold text-slate-800">{data.stats.total}</div>
+                            <p className="text-[10px] text-muted-foreground mt-1">Scheduled classes</p>
+                        </div>
                     </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-green-50 to-white border-green-100 shadow-sm">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                            <CardDescription className="text-green-600 font-medium">Present</CardDescription>
-                            <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
+                    <CardContent className="p-4 flex flex-col justify-between h-full">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-green-600">Present</span>
+                            <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center">
+                                <CheckCircle className="h-3 w-3 text-green-600" />
                             </div>
                         </div>
-                        <CardTitle className="text-4xl font-bold text-slate-800 mt-2">{data.stats.present}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-xs text-muted-foreground">Classes attended</p>
+                        <div>
+                            <div className="text-2xl font-bold text-slate-800">{data.stats.present}</div>
+                            <p className="text-[10px] text-muted-foreground mt-1">Classes attended</p>
+                        </div>
                     </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-red-50 to-white border-red-100 shadow-sm">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                            <CardDescription className="text-red-600 font-medium">Absent</CardDescription>
-                            <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-                                <XCircle className="h-4 w-4 text-red-600" />
+                    <CardContent className="p-4 flex flex-col justify-between h-full">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-red-600">Absent</span>
+                            <div className="h-6 w-6 rounded-full bg-red-100 flex items-center justify-center">
+                                <XCircle className="h-3 w-3 text-red-600" />
                             </div>
                         </div>
-                        <CardTitle className="text-4xl font-bold text-slate-800 mt-2">{data.stats.absent}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-xs text-muted-foreground">Classes missed</p>
+                        <div>
+                            <div className="text-2xl font-bold text-slate-800">{data.stats.absent}</div>
+                            <p className="text-[10px] text-muted-foreground mt-1">Classes missed</p>
+                        </div>
                     </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-indigo-50 to-white border-indigo-100 shadow-sm">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                            <CardDescription className="text-indigo-600 font-medium">Attendance Rate</CardDescription>
-                            <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                                <span className="text-xs font-bold text-indigo-600">%</span>
+                    <CardContent className="p-4 flex flex-col justify-between h-full">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-indigo-600">Attendance Rate</span>
+                            <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <span className="text-[10px] font-bold text-indigo-600">%</span>
                             </div>
                         </div>
-                        <CardTitle className="text-4xl font-bold text-slate-800 mt-2">{data.stats.percentage}%</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-xs text-muted-foreground">Overall attendance</p>
+                        <div>
+                            <div className="text-2xl font-bold text-slate-800">{data.stats.percentage}%</div>
+                            <p className="text-[10px] text-muted-foreground mt-1">Overall rate</p>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Attendance List */}
-            <Card className="shadow-sm border-slate-200">
-                <CardHeader>
-                    <CardTitle>Attendance History</CardTitle>
-                    <CardDescription>Detailed log of your class attendance</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-slate-50 hover:bg-slate-50">
-                                <TableHead className="font-semibold text-slate-700">Date</TableHead>
-                                <TableHead className="font-semibold text-slate-700">Batch</TableHead>
-                                <TableHead className="font-semibold text-slate-700">Subject</TableHead>
-                                <TableHead className="font-semibold text-slate-700">Status</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {data.attendance.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                        No attendance records found
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                data.attendance.map((record) => (
-                                    <TableRow key={record.id} className="hover:bg-slate-50/50">
-                                        <TableCell className="font-medium text-slate-700">
-                                            {format(new Date(record.date), "MMM dd, yyyy")}
-                                        </TableCell>
-                                        <TableCell>{record.batch.name}</TableCell>
-                                        <TableCell>
-                                            <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
-                                                {record.batch.subject}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span
-                                                className={`px-2 py-1 rounded-md text-xs font-bold inline-flex items-center gap-1 ${record.status
-                                                        ? "bg-green-100 text-green-700"
-                                                        : "bg-red-100 text-red-700"
-                                                    }`}
-                                            >
-                                                {record.status ? (
-                                                    <>
-                                                        <CheckCircle className="h-3 w-3" /> Present
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <XCircle className="h-3 w-3" /> Absent
-                                                    </>
-                                                )}
-                                            </span>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            <AttendanceCalendar attendance={data.attendance} />
         </div>
     );
 }

@@ -5,15 +5,15 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -44,10 +44,10 @@ interface StudentListTableProps {
   role: 'teacher' | 'receptionist' | 'admin';
 }
 
-export default function StudentListTable({ 
-  batches, 
+export default function StudentListTable({
+  batches,
   initialStudents = [],
-  role 
+  role
 }: StudentListTableProps) {
   const router = useRouter();
   const [selectedBatch, setSelectedBatch] = useState<string>("");
@@ -57,7 +57,7 @@ export default function StudentListTable({
   const [loading, setLoading] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(10);
-  
+
   // Fetch students when batch is selected
   useEffect(() => {
     const fetchStudents = async () => {
@@ -87,17 +87,17 @@ export default function StudentListTable({
   // Apply search filter
   useEffect(() => {
     let result = students;
-    
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = students.filter(student => 
+      result = students.filter(student =>
         student.name.toLowerCase().includes(term) ||
         student.phone.includes(term) ||
         student.email.toLowerCase().includes(term) ||
         (student.parentName && student.parentName.toLowerCase().includes(term))
       );
     }
-    
+
     setFilteredStudents(result);
     setCurrentPage(1); // Reset to first page when search changes
   }, [searchTerm, students]);
@@ -138,7 +138,7 @@ export default function StudentListTable({
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="relative w-full sm:w-80">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -161,7 +161,7 @@ export default function StudentListTable({
               <div className="text-center py-8 text-muted-foreground">
                 {searchTerm ? (
                   <div>
-                    <p>No students match your search for "{searchTerm}"</p>
+                    <p>No students match your search for &quot;{searchTerm}&quot;</p>
                     <p className="text-sm mt-2">Try adjusting your search term</p>
                   </div>
                 ) : (
@@ -210,8 +210,8 @@ export default function StudentListTable({
                           </TableCell>
                           <TableCell>{formatDate(student.joinDate)}</TableCell>
                           <TableCell className="text-right">
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => alert(`Student details would be shown here for: ${student.name}`)}
                               disabled
@@ -224,18 +224,18 @@ export default function StudentListTable({
                     </TableBody>
                   </Table>
                 </div>
-                
+
                 {totalPages > 1 && (
                   <div className="mt-6 flex justify-center space-x-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
                     >
                       Previous
                     </Button>
-                    
+
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       let pageNum;
                       if (totalPages <= 5) {
@@ -247,9 +247,9 @@ export default function StudentListTable({
                       } else {
                         pageNum = currentPage - 2 + i;
                       }
-                      
+
                       return (
-                        <Button 
+                        <Button
                           key={pageNum}
                           variant={currentPage === pageNum ? "default" : "outline"}
                           size="sm"
@@ -259,9 +259,9 @@ export default function StudentListTable({
                         </Button>
                       );
                     })}
-                    
-                    <Button 
-                      variant="outline" 
+
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                       disabled={currentPage === totalPages}
@@ -270,7 +270,7 @@ export default function StudentListTable({
                     </Button>
                   </div>
                 )}
-                
+
                 <div className="mt-4 text-sm text-muted-foreground text-center">
                   Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredStudents.length)} of {filteredStudents.length} students
                 </div>

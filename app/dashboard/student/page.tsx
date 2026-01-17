@@ -2,23 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from "recharts";
 import {
   BookOpen,
   TrendingUp,
-  DollarSign,
-  Calendar,
-  Sparkles,
-  GraduationCap,
   Clock,
   CheckCircle2,
-  XCircle,
-  ArrowUpRight,
-  ArrowDownRight
+  IndianRupee
 } from "lucide-react";
 import { format } from "date-fns";
-import AnalyticsOverview from "@/components/dashboard/student/AnalyticsOverview";
 
 interface DashboardData {
   overview: {
@@ -48,7 +40,14 @@ export default function StudentDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [timeOfDay, setTimeOfDay] = useState("day");
+
   useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setTimeOfDay("morning");
+    else if (hour < 18) setTimeOfDay("afternoon");
+    else setTimeOfDay("evening");
+
     fetchDashboardData();
   }, []);
 
@@ -67,7 +66,7 @@ export default function StudentDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -87,278 +86,212 @@ export default function StudentDashboard() {
     percentage: parseFloat(((item.score / item.totalMarks) * 100).toFixed(1)),
   }));
 
+  // Parse Schedule safely
+  let scheduleItems: any[] = [];
+  try {
+    const parsed = JSON.parse(data.overview.nextClass);
+    if (Array.isArray(parsed)) scheduleItems = parsed;
+    else scheduleItems = [{ day: "General", time: data.overview.nextClass }];
+  } catch {
+    scheduleItems = [{ day: "Info", time: data.overview.nextClass }];
+  }
+
   return (
-    <div className="space-y-8 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* Header Section */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white shadow-xl">
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-100">
-              Student Dashboard
-            </h1>
-            <p className="text-blue-100 mt-2 text-lg">
-              Welcome back! Here's your academic performance overview.
-            </p>
+    <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 bg-slate-50/50 min-h-screen">
+
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+
+        {/* LEFT MAIN COLUMN */}
+        <div className="xl:col-span-3 space-y-6">
+
+          {/* 1. Welcome Banner */}
+          <div className="relative overflow-hidden rounded-3xl bg-[#2563eb] p-8 text-white shadow-xl shadow-blue-200">
+            <div className="relative z-10 flex flex-col justify-center h-full max-w-2xl">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-2">
+                Good {timeOfDay}, Student! 👋
+              </h1>
+              <p className="text-blue-100 text-lg md:text-xl font-light leading-relaxed">
+                You've completed <span className="font-semibold text-white">{data.overview.totalExams} exams</span> so far.
+                Keep pushing your limits!
+              </p>
+            </div>
+
+            {/* Abstract Illustration Elements */}
+            <div className="absolute right-0 bottom-0 opacity-20 transform translate-x-1/4 translate-y-1/4">
+              <svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#FFFFFF" d="M44.7,-76.4C58.9,-69.2,71.8,-59.1,81.6,-46.6C91.4,-34.1,98.1,-19.2,95.8,-5.4C93.5,8.4,82.2,21.1,70.9,32.2C59.6,43.3,48.3,52.8,36.4,60.6C24.5,68.4,12,74.5,-0.3,75C-12.6,75.5,-25.1,70.4,-36.4,63.1C-47.7,55.8,-57.8,46.3,-66.2,35.1C-74.6,23.9,-81.3,11,-80.4,-1.5C-79.5,-13.9,-71,-25.9,-61.4,-36.3C-51.8,-46.7,-41.1,-55.5,-29.4,-64.1C-17.7,-72.7,-5,-81.1,5.9,-91.3L16.8,-101.5L44.7,-76.4Z" transform="translate(100 100)" />
+              </svg>
+            </div>
           </div>
-          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
-            <Sparkles className="h-5 w-5 text-yellow-300" />
-            <span className="font-medium">Keep it up!</span>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* 2. Performance Chart (Takes 2/3) */}
+            <Card className="lg:col-span-2 border-none shadow-sm rounded-3xl bg-white">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 bg-transparent">
+                <div className="space-y-1">
+                  <CardTitle className="text-xl font-bold text-slate-800">Overall Performance</CardTitle>
+                  <CardDescription>Score trajectory over time</CardDescription>
+                </div>
+                <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-bold shadow-sm">
+                  Avg: {data.overview.averageScore}%
+                </div>
+              </CardHeader>
+              <CardContent className="pl-0">
+                <div className="h-[400px] w-full mt-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#94a3b8', fontSize: 12 }}
+                        dy={10}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#94a3b8', fontSize: 12 }}
+                        tickFormatter={(val) => `${val}%`}
+                      />
+                      <Tooltip
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                        itemStyle={{ color: '#1e293b', fontWeight: 600 }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="percentage"
+                        stroke="#3b82f6"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorScore)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 3. Statistics Stack (Takes 1/3) */}
+            <div className="flex flex-col gap-4">
+
+              {/* Stat 1: Pending Fees */}
+              <Card className="flex-1 border-none shadow-sm rounded-2xl flex items-center p-4 hover:shadow-md transition-shadow">
+                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mr-4 ${data.overview.pendingFees > 0 ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-green-600'}`}>
+                  <IndianRupee className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-800">
+                    {data.overview.pendingFees > 0 ? `₹${data.overview.pendingFees}` : 'Clear'}
+                  </p>
+                  <p className="text-sm text-slate-500 font-medium">
+                    {data.overview.pendingFees > 0 ? 'Pending Fees' : 'Dues Cleared'}
+                  </p>
+                </div>
+              </Card>
+              {/* Stat 2: Total Exams */}
+              <Card className="flex-1 border-none shadow-sm rounded-2xl flex items-center p-4 hover:shadow-md transition-shadow">
+                <div className="h-12 w-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600 mr-4">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-800">{data.overview.totalExams}</p>
+                  <p className="text-sm text-slate-500 font-medium">Total Exams</p>
+                </div>
+              </Card>
+
+              {/* Stat 3: Average Score */}
+              <Card className="flex-1 border-none shadow-sm rounded-2xl flex items-center p-4 hover:shadow-md transition-shadow">
+                <div className="h-12 w-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 mr-4">
+                  <TrendingUp className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-800">{data.overview.averageScore}%</p>
+                  <p className="text-sm text-slate-500 font-medium">Average Score</p>
+                </div>
+              </Card>
+            </div>
+
           </div>
+
+
+
         </div>
 
-        {/* Decorative Background Elements */}
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 -mb-10 -ml-10 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl"></div>
-      </div>
+        {/* RIGHT SIDEBAR COLUMN */}
+        <div className="xl:col-span-1 space-y-6">
 
-      {/* Analytics Overview Section */}
-      <AnalyticsOverview />
-
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="group hover:-translate-y-1 transition-all duration-300 border-none shadow-lg bg-gradient-to-br from-white to-slate-50 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <BookOpen className="h-24 w-24 text-blue-600" />
-          </div>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-slate-500 font-medium flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-blue-100 text-blue-600">
-                <BookOpen className="h-4 w-4" />
-              </span>
-              Total Exams
-            </CardDescription>
-            <CardTitle className="text-4xl font-bold text-slate-800 mt-2 relative z-10">
-              {data.overview.totalExams}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center text-sm text-green-600 font-medium">
-              <ArrowUpRight className="h-4 w-4 mr-1" />
-              <span>Lifetime exams</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="group hover:-translate-y-1 transition-all duration-300 border-none shadow-lg bg-gradient-to-br from-white to-slate-50 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <TrendingUp className="h-24 w-24 text-emerald-600" />
-          </div>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-slate-500 font-medium flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600">
-                <TrendingUp className="h-4 w-4" />
-              </span>
-              Average Score
-            </CardDescription>
-            <CardTitle className="text-4xl font-bold text-slate-800 mt-2 relative z-10">
-              {data.overview.averageScore}%
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center text-sm text-slate-500">
-              <span>Across all subjects</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="group hover:-translate-y-1 transition-all duration-300 border-none shadow-lg bg-gradient-to-br from-white to-slate-50 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Calendar className="h-24 w-24 text-violet-600" />
-          </div>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-slate-500 font-medium flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-violet-100 text-violet-600">
-                <Calendar className="h-4 w-4" />
-              </span>
-              Batch Schedule
-            </CardDescription>
-            <div className="min-h-[40px] flex items-center mt-2">
-              <CardTitle className="text-xl font-bold text-slate-800 leading-tight relative z-10">
-                {(() => {
-                  try {
-                    const schedule = JSON.parse(data.overview.nextClass);
-                    if (Array.isArray(schedule)) {
-                      return schedule.map((s: any) => s.day.slice(0, 3)).join(", ");
-                    }
-                    return data.overview.nextClass;
-                  } catch {
-                    return data.overview.nextClass;
-                  }
-                })()}
+          {/* 5. Upcoming Classes Widget */}
+          <Card className="border-none shadow-sm rounded-3xl bg-white h-auto">
+            <CardHeader className="pb-3 border-b border-slate-50">
+              <CardTitle className="text-lg font-bold text-slate-800 flex items-center justify-between">
+                <span>Upcoming Classes</span>
+                <span className="text-xs bg-slate-100 px-2 py-1 rounded-full text-slate-500 font-normal">{scheduleItems.length} active</span>
               </CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center text-sm text-slate-500">
-              {(() => {
-                try {
-                  const schedule = JSON.parse(data.overview.nextClass);
-                  if (Array.isArray(schedule) && schedule.length > 0) {
-                    return <span>{schedule.length} Weekly Classes</span>;
-                  }
-                  return <span>Active timings</span>;
-                } catch {
-                  return <span>Active timings</span>;
-                }
-              })()}
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              {scheduleItems.map((item: any, idx) => (
+                <div key={idx} className="flex flex-col p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100 hover:bg-indigo-50 transition-colors">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-indigo-900">{item.day}</span>
 
-        <Card className="group hover:-translate-y-1 transition-all duration-300 border-none shadow-lg bg-gradient-to-br from-white to-slate-50 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <DollarSign className="h-24 w-24 text-rose-600" />
-          </div>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-slate-500 font-medium flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-rose-100 text-rose-600">
-                <DollarSign className="h-4 w-4" />
-              </span>
-              Pending Fees
-            </CardDescription>
-            <CardTitle className="text-4xl font-bold text-slate-800 mt-2 relative z-10">
-              ₹{data.overview.pendingFees.toLocaleString()}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.overview.pendingFees > 0 ? (
-              <div className="flex items-center text-sm text-rose-600 font-medium">
-                <XCircle className="h-4 w-4 mr-1" />
-                <span>Action Required</span>
-              </div>
-            ) : (
-              <div className="flex items-center text-sm text-green-600 font-medium">
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                <span>All clear</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  </div>
+                  <div className="flex items-center text-sm text-slate-600">
+                    <Clock className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
+                    {item.time ? item.time : (item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : "Time check required")}
+                  </div>
+                </div>
+              ))}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Performance Chart */}
-        <Card className="lg:col-span-2 border-none shadow-lg overflow-hidden">
-          <CardHeader className="bg-slate-50/50 border-b border-slate-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl font-bold text-slate-800">Performance Trend</CardTitle>
-                <CardDescription>Your exam scores timeline over the academic year</CardDescription>
-              </div>
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="h-[350px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis
-                    dataKey="name"
-                    angle={-45}
-                    textAnchor="end"
-                    height={70}
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    tickLine={false}
-                    axisLine={false}
-                    interval="preserveStartEnd"
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `${value}%`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: '12px',
-                      border: 'none',
-                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                      padding: '12px'
-                    }}
-                    cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '4 4' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="percentage"
-                    stroke="#2563eb"
-                    fillOpacity={1}
-                    fill="url(#colorScore)"
-                    strokeWidth={3}
-                    activeDot={{ r: 6, strokeWidth: 0, fill: '#1d4ed8' }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+              <button className="w-full py-2 text-sm text-indigo-600 font-medium hover:bg-indigo-50 rounded-xl transition-colors mt-2">
+                View Full Schedule
+              </button>
+            </CardContent>
+          </Card>
 
-        {/* Recent Results */}
-        <Card className="lg:col-span-1 border-none shadow-lg h-full flex flex-col">
-          <CardHeader className="bg-slate-50/50 border-b border-slate-100">
-            <CardTitle className="text-xl font-bold text-slate-800">Recent Results</CardTitle>
-            <CardDescription>Latest exam outcomes</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 overflow-auto">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 hover:bg-slate-50">
-                    <TableHead className="font-semibold text-slate-700">Subject</TableHead>
-                    <TableHead className="font-semibold text-slate-700 text-right">Score</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.recentResults.slice(0, 6).map((result) => {
-                    const percentage = (result.score / result.totalMarks) * 100;
-                    let gradeColor = "text-slate-600";
-                    if (percentage >= 80) gradeColor = "text-emerald-600";
-                    else if (percentage >= 60) gradeColor = "text-yellow-600";
-                    else if (percentage < 40) gradeColor = "text-rose-600";
-
-                    return (
-                      <TableRow key={result.id} className="hover:bg-slate-50 transition-colors">
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium text-slate-800 line-clamp-1">{result.examName}</span>
-                            <span className="text-xs text-slate-500">{format(new Date(result.date), "MMM dd")} • {result.subject}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-col items-end">
-                            <span className={`font-bold ${gradeColor}`}>
-                              {percentage.toFixed(0)}%
-                            </span>
-                            <span className="text-xs text-slate-400">
-                              {result.score}/{result.totalMarks}
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            {data.recentResults.length > 6 && (
-              <div className="p-4 border-t border-slate-100 text-center">
-                <button className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline">
-                  View All Results
-                </button>
+          {/* 6. Recent Results Widget */}
+          <Card className="border-none shadow-sm rounded-3xl bg-white">
+            <CardHeader className="pb-3 border-b border-slate-50">
+              <CardTitle className="text-lg font-bold text-slate-800 flex items-center justify-between">
+                <span>Recent Results</span>
+                <span className="text-xs bg-slate-100 px-2 py-1 rounded-full text-slate-500 font-normal">History</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              {data.recentResults.slice(0, 5).map((result) => {
+                const percentage = (result.score / result.totalMarks) * 100;
+                return (
+                  <div key={result.id} className="flex items-center justify-between p-1">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${percentage >= 80 ? 'bg-green-100 text-green-600' : percentage >= 50 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800 line-clamp-1">{result.examName}</p>
+                        <p className="text-xs text-slate-500">{result.subject}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-slate-800">{percentage.toFixed(0)}%</p>
+                      <p className="text-[10px] text-slate-400">{format(new Date(result.date), "MMM dd")}</p>
+                    </div>
+                  </div>
+                )
+              })}
+              <div className="pt-2">
+                <p className="text-center text-xs text-slate-400">Average Score: <span className="text-slate-700 font-semibold">{data.overview.averageScore}%</span></p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+        </div>
       </div>
     </div>
   );
