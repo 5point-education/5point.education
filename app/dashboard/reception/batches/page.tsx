@@ -25,6 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Archive, Layers, Loader2, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { TimePicker } from "@/components/ui/time-picker";
 
 const DAYS_OF_WEEK = [
@@ -64,6 +65,8 @@ interface Batch {
   feeModel?: FeeModel;
   feeAmount?: number;
   installments?: InstallmentItem[];
+  daysWiseFeesEnabled?: boolean;
+  daysWiseFees?: Record<string, number>;
   _count: { admissions: number };
 }
 
@@ -86,6 +89,8 @@ export default function BatchesPage() {
   const [feeModel, setFeeModel] = useState<FeeModel>(null);
   const [feeAmount, setFeeAmount] = useState("");
   const [installments, setInstallments] = useState<InstallmentItem[]>([]);
+  const [daysWiseFeesEnabled, setDaysWiseFeesEnabled] = useState(false);
+  const [daysWiseFees, setDaysWiseFees] = useState<Record<string, string>>({});
 
   // Edit form state
   const [editFormData, setEditFormData] = useState({
@@ -100,6 +105,8 @@ export default function BatchesPage() {
   const [editFeeModel, setEditFeeModel] = useState<FeeModel>(null);
   const [editFeeAmount, setEditFeeAmount] = useState("");
   const [editInstallments, setEditInstallments] = useState<InstallmentItem[]>([]);
+  const [editDaysWiseFeesEnabled, setEditDaysWiseFeesEnabled] = useState(false);
+  const [editDaysWiseFees, setEditDaysWiseFees] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchData();
@@ -210,6 +217,18 @@ export default function BatchesPage() {
     setEditFeeModel(batch.feeModel || null);
     setEditFeeAmount(batch.feeAmount?.toString() || "");
     setEditInstallments(batch.installments || []);
+    // Load days-wise fees configuration
+    setEditDaysWiseFeesEnabled(batch.daysWiseFeesEnabled || false);
+    if (batch.daysWiseFees) {
+      // Convert number values to string for input fields
+      const daysFeesAsStrings: Record<string, string> = {};
+      Object.entries(batch.daysWiseFees).forEach(([key, value]) => {
+        daysFeesAsStrings[key] = value.toString();
+      });
+      setEditDaysWiseFees(daysFeesAsStrings);
+    } else {
+      setEditDaysWiseFees({});
+    }
     setEditOpen(true);
   };
 
@@ -232,12 +251,24 @@ export default function BatchesPage() {
       return;
     }
 
+    // Convert days-wise fees from string to number
+    const daysWiseFeesNumeric: Record<string, number> = {};
+    if (daysWiseFeesEnabled) {
+      Object.entries(daysWiseFees).forEach(([key, value]) => {
+        if (value) {
+          daysWiseFeesNumeric[key] = parseFloat(value);
+        }
+      });
+    }
+
     const payload = {
       ...data,
       schedule: JSON.stringify(scheduleItems),
       feeModel: feeModel,
       feeAmount: feeAmount,
       installments: feeModel === "CUSTOM" ? installments : null,
+      daysWiseFeesEnabled: daysWiseFeesEnabled,
+      daysWiseFees: daysWiseFeesEnabled ? daysWiseFeesNumeric : null,
     };
     
     try {
@@ -264,6 +295,8 @@ export default function BatchesPage() {
       setFeeModel(null);
       setFeeAmount("");
       setInstallments([]);
+      setDaysWiseFeesEnabled(false);
+      setDaysWiseFees({});
       fetchData();
     } catch (error: any) {
         toast({
@@ -295,6 +328,16 @@ export default function BatchesPage() {
       return;
     }
 
+    // Convert days-wise fees from string to number
+    const editDaysWiseFeesNumeric: Record<string, number> = {};
+    if (editDaysWiseFeesEnabled) {
+      Object.entries(editDaysWiseFees).forEach(([key, value]) => {
+        if (value) {
+          editDaysWiseFeesNumeric[key] = parseFloat(value);
+        }
+      });
+    }
+
     const payload = {
       id: editingBatch.id,
       ...editFormData,
@@ -302,6 +345,8 @@ export default function BatchesPage() {
       feeModel: editFeeModel,
       feeAmount: editFeeAmount,
       installments: editFeeModel === "CUSTOM" ? editInstallments : null,
+      daysWiseFeesEnabled: editDaysWiseFeesEnabled,
+      daysWiseFees: editDaysWiseFeesEnabled ? editDaysWiseFeesNumeric : null,
     };
     
     try {
@@ -563,8 +608,18 @@ export default function BatchesPage() {
     instItems: InstallmentItem[],
     onAddInst: () => void,
     onRemoveInst: (index: number) => void,
-    onChangeInst: (index: number, field: keyof InstallmentItem, value: string | number) => void
-  ) => (
+    onChangeInst: (index: number, field: keyof InstallmentItem, value: string | number) => void,
+    scheduleItemsForDays: ScheduleItem[],
+    daysWiseEnabled: boolean,
+    setDaysWiseEnabled: (val: boolean) => void,
+    daysWiseFeesMap: Record<string, string>,
+    setDaysWiseFeesMap: (val: Record<string, string>) => void
+  ) => {
+    // Calculate unique days from schedule
+    const uniqueDays = new Set(scheduleItemsForDays.filter(item => item.day).map(item => item.day));
+    const totalScheduledDays = uniqueDays.size;
+
+    return (
     <div className="space-y-3 border rounded-md p-4 bg-muted/10">
       <div className="flex justify-between items-center">
         <Label className="text-base font-medium">Fee Configuration</Label>
@@ -665,8 +720,137 @@ export default function BatchesPage() {
           )}
         </div>
       )}
+
+      {/* Days-wise Fees Toggle - Only show for non-CUSTOM fee models */}
+      {currentModel && currentModel !== "CUSTOM" && (
+        <div className="space-y-3 pt-3 border-t">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Days-wise Fees</Label>
+              <p className="text-xs text-muted-foreground">
+                Set different fees based on attendance days per week
+              </p>
+            </div>
+            <Switch
+              checked={daysWiseEnabled}
+              onCheckedChange={(checked) => {
+                setDaysWiseEnabled(checked);
+                if (!checked) {
+                  setDaysWiseFeesMap({});
+                }
+              }}
+            />
+          </div>
+
+          {daysWiseEnabled && (
+            <div className="space-y-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              {totalScheduledDays === 0 ? (
+                <p className="text-sm text-amber-600">
+                  Please add schedule days first to configure days-wise fees.
+                </p>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs text-muted-foreground">
+                      Add fee options for different attendance days (max {totalScheduledDays} days)
+                    </p>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        // Find the first available day not yet added
+                        const usedDays = Object.keys(daysWiseFeesMap).map(Number);
+                        const availableDays = Array.from({ length: totalScheduledDays }, (_, i) => i + 1)
+                          .filter(d => !usedDays.includes(d));
+                        if (availableDays.length > 0) {
+                          const newMap = { ...daysWiseFeesMap };
+                          newMap[availableDays[0].toString()] = "";
+                          setDaysWiseFeesMap(newMap);
+                        }
+                      }}
+                      disabled={Object.keys(daysWiseFeesMap).length >= totalScheduledDays}
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Add Day Fee
+                    </Button>
+                  </div>
+                  
+                  {Object.keys(daysWiseFeesMap).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No day fees added yet. Click "Add Day Fee" to start.</p>
+                  )}
+
+                  <div className="space-y-2">
+                    {Object.entries(daysWiseFeesMap)
+                      .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                      .map(([days, fee]) => {
+                        // Get list of days already used (except current)
+                        const usedDays = Object.keys(daysWiseFeesMap).map(Number).filter(d => d !== parseInt(days));
+                        const availableDays = Array.from({ length: totalScheduledDays }, (_, i) => i + 1)
+                          .filter(d => !usedDays.includes(d));
+                        
+                        return (
+                          <div key={days} className="flex items-center gap-2 bg-white p-2 rounded border">
+                            <div className="w-32">
+                              <Select 
+                                value={days} 
+                                onValueChange={(newDays) => {
+                                  const newMap = { ...daysWiseFeesMap };
+                                  const currentFee = newMap[days];
+                                  delete newMap[days];
+                                  newMap[newDays] = currentFee;
+                                  setDaysWiseFeesMap(newMap);
+                                }}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableDays.map((dayCount) => (
+                                    <SelectItem key={dayCount} value={dayCount.toString()}>
+                                      {dayCount} day{dayCount > 1 ? 's' : ''}/week
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Input
+                              type="number"
+                              placeholder="₹0"
+                              value={fee}
+                              onChange={(e) => {
+                                const newMap = { ...daysWiseFeesMap };
+                                newMap[days] = e.target.value;
+                                setDaysWiseFeesMap(newMap);
+                              }}
+                              min="0"
+                              className="flex-1"
+                            />
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-9 w-9 text-destructive hover:text-destructive/90"
+                              onClick={() => {
+                                const newMap = { ...daysWiseFeesMap };
+                                delete newMap[days];
+                                setDaysWiseFeesMap(newMap);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
+  };
 
   return (
     <div className="space-y-6">
@@ -723,7 +907,7 @@ export default function BatchesPage() {
                   <Input id="capacity" name="capacity" type="number" required min="1" placeholder="30" />
                 </div>
 
-                {renderFeeEditor(feeModel, setFeeModel, feeAmount, setFeeAmount, installments, handleAddInstallment, handleRemoveInstallment, handleInstallmentChange)}
+                {renderFeeEditor(feeModel, setFeeModel, feeAmount, setFeeAmount, installments, handleAddInstallment, handleRemoveInstallment, handleInstallmentChange, scheduleItems, daysWiseFeesEnabled, setDaysWiseFeesEnabled, daysWiseFees, setDaysWiseFees)}
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={submitting}>
@@ -800,7 +984,7 @@ export default function BatchesPage() {
                   />
                 </div>
 
-                {renderFeeEditor(editFeeModel, setEditFeeModel, editFeeAmount, setEditFeeAmount, editInstallments, handleAddEditInstallment, handleRemoveEditInstallment, handleEditInstallmentChange)}
+                {renderFeeEditor(editFeeModel, setEditFeeModel, editFeeAmount, setEditFeeAmount, editInstallments, handleAddEditInstallment, handleRemoveEditInstallment, handleEditInstallmentChange, editScheduleItems, editDaysWiseFeesEnabled, setEditDaysWiseFeesEnabled, editDaysWiseFees, setEditDaysWiseFees)}
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>

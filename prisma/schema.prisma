@@ -178,6 +178,10 @@ model Batch {
   feeAmount    Float?    // Base fee amount
   installments Json?     // For CUSTOM: [{ name: "Installment 1", amount: 5000, dueDate: "2026-02-01" }]
 
+  // Days-wise Fee Configuration
+  daysWiseFeesEnabled Boolean @default(false)
+  daysWiseFees        Json?   // { "1": 500, "2": 900, "3": 1200, "4": 1500 }
+
   teacher    User        @relation(fields: [teacherId], references: [id])
   admissions Admission[]
   exams      Exam[]

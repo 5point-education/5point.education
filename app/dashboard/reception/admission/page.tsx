@@ -89,6 +89,10 @@ interface Batch {
     feeModel?: FeeModel;
     feeAmount?: number;
     installments?: InstallmentItem[];
+    schedule?: string;
+    daysWiseFeesEnabled?: boolean;
+    daysWiseFees?: Record<string, number>;
+    isActive?: boolean;
 }
 
 export default function AdmissionPage() {
@@ -156,17 +160,43 @@ export default function AdmissionPage() {
     });
 
     // Multiple Batch State
-    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, fee: number, paid: number, feeModel?: FeeModel }[]>([]);
+    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, fee: number, paid: number, feeModel?: FeeModel, selectedDays?: number }[]>([]);
     const [tempBatchId, setTempBatchId] = useState("");
     const [tempFee, setTempFee] = useState("");
     const [tempPaid, setTempPaid] = useState("");
+    const [tempSelectedDays, setTempSelectedDays] = useState<string>("");
+
+    // Helper function to get total scheduled days from batch
+    const getScheduledDaysCount = (batch: Batch): number => {
+        if (!batch.schedule) return 0;
+        try {
+            const schedule = JSON.parse(batch.schedule);
+            if (Array.isArray(schedule)) {
+                const uniqueDays = new Set(schedule.filter((item: any) => item.day).map((item: any) => item.day));
+                return uniqueDays.size;
+            }
+        } catch {
+            return 0;
+        }
+        return 0;
+    };
 
     // Auto-populate fee when batch is selected
     const handleBatchSelection = (batchId: string) => {
         setTempBatchId(batchId);
+        setTempSelectedDays(""); // Reset days selection
+        setTempPaid(""); // Reset paid amount when selecting a new batch
         const selectedBatch = batches.find(b => b.id === batchId);
         if (selectedBatch) {
-            if (selectedBatch.feeModel === "CUSTOM" && selectedBatch.installments && selectedBatch.installments.length > 0) {
+            // Check if days-wise fees is enabled and has configured options
+            const hasDaysWiseFees = selectedBatch.daysWiseFeesEnabled && 
+                selectedBatch.daysWiseFees && 
+                Object.keys(selectedBatch.daysWiseFees).length > 0;
+            
+            if (hasDaysWiseFees) {
+                // Don't auto-populate fee, wait for days selection
+                setTempFee("");
+            } else if (selectedBatch.feeModel === "CUSTOM" && selectedBatch.installments && selectedBatch.installments.length > 0) {
                 // For custom, sum all installments
                 const total = selectedBatch.installments.reduce((sum: number, i: InstallmentItem) => sum + (i.amount || 0), 0);
                 setTempFee(total.toString());
@@ -177,6 +207,15 @@ export default function AdmissionPage() {
             }
         } else {
             setTempFee("");
+        }
+    };
+
+    // Handle days selection for days-wise fees
+    const handleDaysSelection = (days: string) => {
+        setTempSelectedDays(days);
+        const batch = batches.find(b => b.id === tempBatchId);
+        if (batch?.daysWiseFees?.[days]) {
+            setTempFee(batch.daysWiseFees[days].toString());
         }
     };
 
@@ -205,6 +244,17 @@ export default function AdmissionPage() {
         const b = batches.find(x => x.id === tempBatchId);
         if (!b) return;
 
+        // Check if batch has days-wise fees configured
+        const hasDaysWiseFees = b.daysWiseFeesEnabled && 
+            b.daysWiseFees && 
+            Object.keys(b.daysWiseFees).length > 0;
+
+        // Validate days selection if days-wise fees is enabled and configured
+        if (hasDaysWiseFees && !tempSelectedDays) {
+            toast({ title: "Please select days per week", variant: "destructive" });
+            return;
+        }
+
         // Prevent duplicate
         if (selectedBatches.find(x => x.id === tempBatchId)) {
             toast({ title: "Batch already added", variant: "destructive" });
@@ -216,11 +266,13 @@ export default function AdmissionPage() {
             name: `${b.name} - ${b.subject}`,
             fee: parseFloat(tempFee),
             paid: tempPaid ? parseFloat(tempPaid) : 0,
-            feeModel: b.feeModel
+            feeModel: b.feeModel,
+            selectedDays: tempSelectedDays ? parseInt(tempSelectedDays) : undefined
         }]);
 
         setTempBatchId("");
         setTempFee("");
+        setTempSelectedDays("");
         setTempPaid("");
     };
 
@@ -249,8 +301,14 @@ export default function AdmissionPage() {
                 .catch(err => console.error(err));
         }
 
-        // Fetch batches for later
-        fetch("/api/batches").then(res => res.json()).then(setBatches);
+        // Fetch batches for later - only active batches
+        fetch("/api/batches")
+            .then(res => res.json())
+            .then((data: Batch[]) => {
+                // Filter to only show active batches
+                const activeBatches = data.filter(b => b.isActive !== false);
+                setBatches(activeBatches);
+            });
     }, [enquiryId]);
 
     // Handlers
@@ -325,6 +383,7 @@ export default function AdmissionPage() {
             }
 
             // 3. Create Payment (Single Receipt)
+            // Skip fees_pending update since it's already calculated correctly in admissions above
             if (totalPaid > 0) {
                 await fetch("/api/payments", {
                     method: "POST",
@@ -334,6 +393,7 @@ export default function AdmissionPage() {
                         amount: totalPaid,
                         mode: values.mode,
                         receipt_no: values.receipt_no,
+                        skipFeesPendingUpdate: true, // fees_pending already set during admission creation
                     }),
                 });
             }
@@ -626,24 +686,60 @@ export default function AdmissionPage() {
                                                             <SelectItem key={b.id} value={b.id}>
                                                                 {b.name} - {b.subject}
                                                                 {b.feeModel && <span className="text-muted-foreground ml-1">({b.feeModel === "ONE_TIME" ? "One-time" : b.feeModel === "MONTHLY" ? "Monthly" : b.feeModel === "QUARTERLY" ? "Quarterly" : "Custom"})</span>}
+                                                                {b.daysWiseFeesEnabled && <span className="text-green-600 ml-1">[Days-wise]</span>}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
                                             </div>
-                                            <div className="col-span-3">
-                                                <Label className="text-xs">Total Fee {tempBatchId && batches.find(b => b.id === tempBatchId)?.feeModel && <span className="text-muted-foreground">{getFeeModelLabel(batches.find(b => b.id === tempBatchId)?.feeModel as FeeModel)}</span>}</Label>
-                                                <Input type="number" placeholder="₹0" value={tempFee} onChange={e => setTempFee(e.target.value)} />
-                                            </div>
-                                            <div className="col-span-3">
-                                                <Label className="text-xs">Paying Now</Label>
-                                                <Input type="number" placeholder="₹0" value={tempPaid} onChange={e => setTempPaid(e.target.value)} />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <Button type="button" onClick={addBatch} disabled={!tempBatchId || !tempFee} className="w-full">
-                                                    <Plus className="h-4 w-4" /> Add
-                                                </Button>
-                                            </div>
+                                            {/* Days per week selector - only show if batch has days-wise fees with configured options */}
+                                            {tempBatchId && (() => {
+                                                const batch = batches.find(b => b.id === tempBatchId);
+                                                return batch?.daysWiseFeesEnabled && batch?.daysWiseFees && Object.keys(batch.daysWiseFees).length > 0;
+                                            })() && (
+                                                <div className="col-span-2">
+                                                    <Label className="text-xs">Days/Week</Label>
+                                                    <Select value={tempSelectedDays} onValueChange={handleDaysSelection}>
+                                                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                                                        <SelectContent>
+                                                            {(() => {
+                                                                const batch = batches.find(b => b.id === tempBatchId);
+                                                                if (!batch || !batch.daysWiseFees) return null;
+                                                                // Only show days that have been configured with fees
+                                                                const configuredDays = Object.keys(batch.daysWiseFees)
+                                                                    .map(Number)
+                                                                    .sort((a, b) => a - b);
+                                                                return configuredDays.map((dayCount) => (
+                                                                    <SelectItem key={dayCount} value={dayCount.toString()}>
+                                                                        {dayCount} day{dayCount > 1 ? 's' : ''} - ₹{batch.daysWiseFees![dayCount.toString()].toLocaleString()}
+                                                                    </SelectItem>
+                                                                ));
+                                                            })()}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
+                                            {(() => {
+                                                const batch = tempBatchId ? batches.find(b => b.id === tempBatchId) : null;
+                                                const hasDaysWiseFees = batch?.daysWiseFeesEnabled && batch?.daysWiseFees && Object.keys(batch.daysWiseFees).length > 0;
+                                                return (
+                                                    <>
+                                                        <div className={hasDaysWiseFees ? "col-span-2" : "col-span-3"}>
+                                                            <Label className="text-xs">Total Fee {batch?.feeModel && <span className="text-muted-foreground">{getFeeModelLabel(batch.feeModel as FeeModel)}</span>}</Label>
+                                                            <Input type="number" placeholder="₹0" value={tempFee} onChange={e => setTempFee(e.target.value)} />
+                                                        </div>
+                                                        <div className={hasDaysWiseFees ? "col-span-2" : "col-span-3"}>
+                                                            <Label className="text-xs">Paying Now</Label>
+                                                            <Input type="number" placeholder="₹0" value={tempPaid} onChange={e => setTempPaid(e.target.value)} />
+                                                        </div>
+                                                        <div className="col-span-2">
+                                                            <Button type="button" onClick={addBatch} disabled={!tempBatchId || !tempFee || (hasDaysWiseFees && !tempSelectedDays)} className="w-full">
+                                                                <Plus className="h-4 w-4" /> Add
+                                                            </Button>
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
 
                                         {/* Custom Installments Breakdown */}
@@ -673,6 +769,7 @@ export default function AdmissionPage() {
                                                         <div>
                                                             <span className="font-medium">{b.name}</span>
                                                             {b.feeModel && <span className="text-xs ml-2 text-blue-600">{getFeeModelLabel(b.feeModel)}</span>}
+                                                            {b.selectedDays && <span className="text-xs ml-2 text-green-600">({b.selectedDays} day{b.selectedDays > 1 ? 's' : ''}/week)</span>}
                                                             <div className="text-muted-foreground text-xs">Fee: ₹{b.fee.toLocaleString()} | Paid: ₹{b.paid.toLocaleString()}</div>
                                                         </div>
                                                         <Button type="button" variant="ghost" size="sm" onClick={() => removeBatch(b.id)}>

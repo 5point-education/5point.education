@@ -13,7 +13,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { studentId, amount, mode, receipt_no } = body;
+        const { studentId, amount, mode, receipt_no, skipFeesPendingUpdate } = body;
 
         const paymentAmount = parseFloat(amount);
 
@@ -27,22 +27,33 @@ export async function POST(req: Request) {
             }
         });
 
-        // Update Pending Fees on the latest admission
-        // Find latest admission for this student
-        const latestAdmission = await db.admission.findFirst({
-            where: { studentId },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        if (latestAdmission) {
-            // Calculate new pending amount, ensuring it doesn't go negative
-            const newPending = Math.max(0, latestAdmission.fees_pending - paymentAmount);
-            await db.admission.update({
-                where: { id: latestAdmission.id },
-                data: {
-                    fees_pending: newPending
-                }
+        // Update Pending Fees on admissions - skip if already calculated during admission creation
+        // skipFeesPendingUpdate is used during initial admission when fees_pending is already set correctly
+        if (!skipFeesPendingUpdate) {
+            // Find all admissions for this student with pending fees
+            const admissionsWithPending = await db.admission.findMany({
+                where: { 
+                    studentId,
+                    fees_pending: { gt: 0 }
+                },
+                orderBy: { createdAt: 'asc' }
             });
+
+            // Distribute payment across admissions in order
+            let remainingPayment = paymentAmount;
+            for (const admission of admissionsWithPending) {
+                if (remainingPayment <= 0) break;
+                
+                const amountToApply = Math.min(remainingPayment, admission.fees_pending);
+                const newPending = admission.fees_pending - amountToApply;
+                
+                await db.admission.update({
+                    where: { id: admission.id },
+                    data: { fees_pending: newPending }
+                });
+                
+                remainingPayment -= amountToApply;
+            }
         }
 
 
