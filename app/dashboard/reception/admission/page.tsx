@@ -43,12 +43,12 @@ const studentSchema = z.object({
     // Personal Details
     name: z.string().min(2, "Name is required"),
     email: z.string().email("Invalid email"),
-    phone: z.string().min(10, "Phone required"),
+    phone: z.string().regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
     gender: z.enum(["MALE", "FEMALE", "OTHER"]),
     dob: z.string().optional(), // YYYY-MM-DD
     fatherName: z.string().min(2, "Father's Name required"),
     motherName: z.string().optional(),
-    parentMobile: z.string().optional(),
+    parentMobile: z.string().refine((val) => !val || /^\d{10}$/.test(val), "Parent mobile number must be exactly 10 digits").optional(),
     aadharNo: z.string().optional(),
     nationality: z.string().default("Indian"),
 
@@ -300,10 +300,10 @@ export default function AdmissionPage() {
             // 2. Create Admission(s)
             // If TUITION_BATCH, iterate selected batches. If HOME_TUTOR, create one without batch.
             const admissionsToCreate = formData.service_type === "TUITION_BATCH"
-                ? selectedBatches.map(b => ({ 
-                    batchId: b.id, 
-                    total_fees: b.fee, 
-                    fees_pending: Math.max(0, b.fee - b.paid) 
+                ? selectedBatches.map(b => ({
+                    batchId: b.id,
+                    total_fees: b.fee,
+                    fees_pending: Math.max(0, b.fee - b.paid)
                 }))
                 : [{ batchId: null, total_fees: 0, fees_pending: 0 }]; // Home Tutor case? Logic might need check.
 
@@ -492,10 +492,10 @@ export default function AdmissionPage() {
                                             <FormItem><FormLabel>Mother&apos;s Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                                         )} />
                                         <FormField control={studentForm.control} name="parentMobile" render={({ field }) => (
-                                            <FormItem><FormLabel>Parent&apos;s Mob</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                                            <FormItem><FormLabel>Parent&apos;s Mob</FormLabel><FormControl><Input {...field} maxLength={10} inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <FormField control={studentForm.control} name="phone" render={({ field }) => (
-                                            <FormItem><FormLabel>Student Mob</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                            <FormItem><FormLabel>Student Mob</FormLabel><FormControl><Input {...field} maxLength={10} inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <FormField control={studentForm.control} name="email" render={({ field }) => (
                                             <FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>

@@ -56,7 +56,8 @@ export async function POST(req: Request) {
         }
 
         // Generate random 6-char password
-        const generatedPassword = Math.random().toString(36).slice(-8);
+        // const generatedPassword = Math.random().toString(36).slice(-8);
+        const generatedPassword = '123456';
 
         // 1. Create user in Supabase Auth
         const { data: authData, error: authError } = await supabase.auth.admin.createUser({

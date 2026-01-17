@@ -50,7 +50,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             return new NextResponse("Invalid data format", { status: 400 });
         }
 
-        // Use transaction to bulk upsert
+        // 1. Upsert all individual chapter scores
         await db.$transaction(
             scores.map((score: any) =>
                 db.examScore.upsert({
@@ -71,6 +71,50 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                 })
             )
         );
+
+        // 2. Aggregate scores and update the Result table for each student
+        // Get unique students involved in this update
+        const studentIds = Array.from(new Set(scores.map((s: any) => s.studentId))) as string[];
+
+        // We can do this in parallel or a second transaction
+        await db.$transaction(async (tx) => {
+            for (const studentId of studentIds) {
+                // Calculate total score for this student for this exam
+                const totalScore = await tx.examScore.aggregate({
+                    where: {
+                        studentId: studentId,
+                        chapter: {
+                            examId: params.id
+                        }
+                    },
+                    _sum: {
+                        marks: true
+                    }
+                });
+
+                const finalScore = totalScore._sum.marks || 0;
+
+                // Upsert the Result record
+                await tx.result.upsert({
+                    where: {
+                        examId_studentId: {
+                            examId: params.id,
+                            studentId: studentId
+                        }
+                    },
+                    create: {
+                        examId: params.id,
+                        studentId: studentId,
+                        score: finalScore,
+                        remarks: null // Default to null for new results
+                    },
+                    update: {
+                        score: finalScore
+                        // We do NOT update remarks here, preserving any existing remarks
+                    }
+                });
+            }
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

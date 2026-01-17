@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 
-
 export async function GET(req: Request) {
     try {
         const supabase = createClient();
@@ -13,23 +12,32 @@ export async function GET(req: Request) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
-        // 1. Get Student Profile ID
+        // 1. Get Student Profile & Active Batch
         const studentProfile = await db.studentProfile.findUnique({
-            where: { userId: user.id }
+            where: { userId: user.id },
+            include: {
+                admissions: {
+                    where: { fees_pending: { gte: 0 } }, // Get active/recent admissions
+                    orderBy: { createdAt: 'desc' },
+                    take: 1,
+                    include: { batch: true }
+                }
+            }
         });
 
         if (!studentProfile) {
             return new NextResponse("Student profile not found", { status: 404 });
         }
 
-
-        // 2. Fetch Analytics (Inlined logic)
+        // 2. Fetch All Scores (Inlined logic)
         const scores = await (db as any).examScore.findMany({
             where: { studentId: studentProfile.id },
             include: {
                 chapter: {
                     include: {
-                        exam: true
+                        exam: {
+                            include: { batch: true }
+                        }
                     }
                 }
             }
@@ -39,24 +47,50 @@ export async function GET(req: Request) {
             return NextResponse.json({
                 weakChapters: [],
                 performanceTrend: [],
-                subjectPerformance: []
+                subjectPerformance: [],
+                upcomingSchedule: studentProfile.admissions[0]?.batch?.schedule || "No active schedule"
             });
         }
 
-        // 1. Weak Chapters (Lowest %)
+        // --- Logic: Weak Chapters ---
+        // Filter out chapters with very low max marks (e.g., < 10) to avoid skewed data from mini-tests
+        const SIGNIFICANT_MARKS_THRESHOLD = 5;
+
         const chapterPerformance = scores.map((s: any) => ({
+            chapterId: s.chapter.id,
             chapterName: s.chapter.name,
             examName: s.chapter.exam.name,
-            percentage: (s.marks / s.chapter.max_marks) * 100,
+            subject: s.chapter.exam.batch?.subject || "General",
+            percentage: s.chapter.max_marks > 0 ? (s.marks / s.chapter.max_marks) * 100 : 0,
             marks: s.marks,
             max: s.chapter.max_marks
         }));
 
         const weakChapters = [...chapterPerformance]
-            .sort((a: any, b: any) => a.percentage - b.percentage)
-            .slice(0, 5);
+            .filter(c => c.max > SIGNIFICANT_MARKS_THRESHOLD)
+            .sort((a, b) => a.percentage - b.percentage)
+            .slice(0, 5); // Bottom 5
 
-        // 2. Trend (Exam vs Score %)
+        // --- Logic: Subject Mastery ---
+        const subjectMap = new Map<string, { obtained: number, total: number }>();
+
+        scores.forEach((s: any) => {
+            const subject = s.chapter.exam.batch?.subject || "General";
+            if (!subjectMap.has(subject)) {
+                subjectMap.set(subject, { obtained: 0, total: 0 });
+            }
+            const entry = subjectMap.get(subject)!;
+            entry.obtained += s.marks;
+            entry.total += s.chapter.max_marks;
+        });
+
+        const subjectPerformance = Array.from(subjectMap.entries()).map(([subject, data]) => ({
+            subject,
+            percentage: data.total > 0 ? Math.round((data.obtained / data.total) * 100) : 0,
+            totalExams: scores.filter((s: any) => (s.chapter.exam.batch?.subject || "General") === subject).length // Rough count of chapter-exams
+        }));
+
+        // --- Logic: Performance Trend ---
         const examMap = new Map<string, { totalObtained: number, totalMax: number, date: Date, name: string }>();
 
         scores.forEach((s: any) => {
@@ -78,13 +112,15 @@ export async function GET(req: Request) {
             .map(e => ({
                 examName: e.name,
                 date: e.date,
-                percentage: e.totalMax > 0 ? (e.totalObtained / e.totalMax) * 100 : 0
+                percentage: e.totalMax > 0 ? Number(((e.totalObtained / e.totalMax) * 100).toFixed(1)) : 0
             }))
-            .sort((a, b) => a.date.getTime() - b.date.getTime());
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         return NextResponse.json({
             weakChapters,
             performanceTrend,
+            subjectPerformance,
+            upcomingSchedule: studentProfile.admissions[0]?.batch?.schedule || "No active schedule"
         });
 
     } catch (error) {
