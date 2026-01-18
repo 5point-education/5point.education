@@ -1,29 +1,65 @@
 import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { addMonths, differenceInMonths } from "date-fns";
+import { addMonths, setDate, startOfDay } from "date-fns";
+
+// Fixed billing cycle day (fees are due on this day of each month)
+const BILLING_CYCLE_DAY = 5;
+
+// Get the next billing date from a given date
+function getNextBillingDate(fromDate: Date): Date {
+    const date = new Date(fromDate);
+    const currentDay = date.getDate();
+    
+    if (currentDay <= BILLING_CYCLE_DAY) {
+        // Billing date is in current month
+        return startOfDay(setDate(date, BILLING_CYCLE_DAY));
+    } else {
+        // Billing date is in next month
+        return startOfDay(setDate(addMonths(date, 1), BILLING_CYCLE_DAY));
+    }
+}
 
 // Calculate how many periods have elapsed since admission
 function calculatePeriodsElapsed(admissionDate: Date, feeModel: 'MONTHLY' | 'QUARTERLY'): number {
     const now = new Date();
-    const monthsElapsed = differenceInMonths(now, admissionDate) + 1; // Include current period
+    const firstPeriodEnd = getNextBillingDate(admissionDate);
     
-    if (feeModel === 'MONTHLY') {
-        return Math.max(1, monthsElapsed);
-    } else { // QUARTERLY
-        return Math.max(1, Math.ceil(monthsElapsed / 3));
+    // If we haven't even reached the first billing date yet
+    if (now < firstPeriodEnd) {
+        return 1; // Just the first period
     }
+    
+    // Count periods from first billing date to now
+    let periodCount = 1; // First period (admission to first billing date)
+    let currentBillingDate = firstPeriodEnd;
+    
+    const monthsIncrement = feeModel === 'MONTHLY' ? 1 : 3;
+    
+    while (currentBillingDate <= now) {
+        periodCount++;
+        currentBillingDate = addMonths(currentBillingDate, monthsIncrement);
+    }
+    
+    return periodCount;
 }
 
-// Get period start and end dates
+// Get period start and end dates based on fixed billing cycle
 function getPeriodDates(admissionDate: Date, periodNumber: number, feeModel: string) {
-    if (feeModel === 'MONTHLY') {
-        const start = addMonths(admissionDate, periodNumber - 1);
-        const end = addMonths(admissionDate, periodNumber);
-        return { start, end };
-    } else { // QUARTERLY
-        const start = addMonths(admissionDate, (periodNumber - 1) * 3);
-        const end = addMonths(admissionDate, periodNumber * 3);
+    const monthsIncrement = feeModel === 'MONTHLY' ? 1 : 3;
+    const firstPeriodEnd = getNextBillingDate(admissionDate);
+    
+    if (periodNumber === 1) {
+        // First period: from admission date to first billing date
+        return { 
+            start: startOfDay(new Date(admissionDate)), 
+            end: firstPeriodEnd 
+        };
+    } else {
+        // Subsequent periods: from billing date to next billing date
+        const periodsAfterFirst = periodNumber - 1;
+        const start = addMonths(firstPeriodEnd, (periodsAfterFirst - 1) * monthsIncrement);
+        const end = addMonths(firstPeriodEnd, periodsAfterFirst * monthsIncrement);
         return { start, end };
     }
 }
@@ -150,6 +186,24 @@ export async function GET(req: Request) {
                         amount: feeAmount
                     }
                 });
+            }
+
+            // Fix existing periods with incorrect dates (update to fixed billing cycle)
+            // Only fix unpaid periods to avoid confusion with already processed payments
+            for (const period of existingPeriods) {
+                if (!period.isPaid) {
+                    const { start, end } = getPeriodDates(admission.admission_date, period.periodNumber, feeModel);
+                    // Only update if dates are different
+                    if (period.periodStart.getTime() !== start.getTime() || period.periodEnd.getTime() !== end.getTime()) {
+                        await db.recurringFeePeriod.update({
+                            where: { id: period.id },
+                            data: {
+                                periodStart: start,
+                                periodEnd: end
+                            }
+                        });
+                    }
+                }
             }
 
             // Fetch all periods again after creating

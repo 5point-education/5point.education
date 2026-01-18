@@ -159,12 +159,16 @@ export default function AdmissionPage() {
         }
     });
 
-    // Multiple Batch State
-    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, fee: number, paid: number, feeModel?: FeeModel, selectedDays?: number }[]>([]);
+    // Multiple Batch State - now includes payment per batch
+    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, fee: number, feeModel?: FeeModel, selectedDays?: number, paying: number }[]>([]);
     const [tempBatchId, setTempBatchId] = useState("");
     const [tempFee, setTempFee] = useState("");
-    const [tempPaid, setTempPaid] = useState("");
     const [tempSelectedDays, setTempSelectedDays] = useState<string>("");
+    
+    // Admission charge (one-time, applies to entire admission, not per batch)
+    const [admissionCharge, setAdmissionCharge] = useState<string>("");
+    // Payment toward admission charge (separate from batch payments)
+    const [payingAdmissionCharge, setPayingAdmissionCharge] = useState<string>("");
 
     // Helper function to get total scheduled days from batch
     const getScheduledDaysCount = (batch: Batch): number => {
@@ -185,7 +189,6 @@ export default function AdmissionPage() {
     const handleBatchSelection = (batchId: string) => {
         setTempBatchId(batchId);
         setTempSelectedDays(""); // Reset days selection
-        setTempPaid(""); // Reset paid amount when selecting a new batch
         const selectedBatch = batches.find(b => b.id === batchId);
         if (selectedBatch) {
             // Check if days-wise fees is enabled and has configured options
@@ -265,23 +268,34 @@ export default function AdmissionPage() {
             id: tempBatchId,
             name: `${b.name} - ${b.subject}`,
             fee: parseFloat(tempFee),
-            paid: tempPaid ? parseFloat(tempPaid) : 0,
             feeModel: b.feeModel,
-            selectedDays: tempSelectedDays ? parseInt(tempSelectedDays) : undefined
+            selectedDays: tempSelectedDays ? parseInt(tempSelectedDays) : undefined,
+            paying: 0 // Initialize payment for this batch
         }]);
 
         setTempBatchId("");
         setTempFee("");
         setTempSelectedDays("");
-        setTempPaid("");
     };
 
     const removeBatch = (id: string) => {
         setSelectedBatches(prev => prev.filter(x => x.id !== id));
     };
 
-    const totalFees = selectedBatches.reduce((acc, curr) => acc + curr.fee, 0);
-    const totalPaid = selectedBatches.reduce((acc, curr) => acc + curr.paid, 0);
+    // Update payment for a specific batch
+    const updateBatchPayment = (batchId: string, amount: string) => {
+        setSelectedBatches(prev => prev.map(b => 
+            b.id === batchId ? { ...b, paying: parseFloat(amount) || 0 } : b
+        ));
+    };
+
+    const totalBatchFees = selectedBatches.reduce((acc, curr) => acc + curr.fee, 0);
+    const totalBatchPayments = selectedBatches.reduce((acc, curr) => acc + curr.paying, 0);
+    const admissionChargeAmount = admissionCharge ? parseFloat(admissionCharge) : 0;
+    const payingAdmissionChargeAmount = payingAdmissionCharge ? parseFloat(payingAdmissionCharge) : 0;
+    const totalFees = totalBatchFees + admissionChargeAmount; // Total = Batch Fees + Admission Charge
+    const totalPaid = totalBatchPayments + payingAdmissionChargeAmount; // Sum of all payments
+    const totalPending = Math.max(0, totalFees - totalPaid);
 
     useEffect(() => {
         if (enquiryId) {
@@ -356,18 +370,30 @@ export default function AdmissionPage() {
             setCredentials(newCreds);
 
             // 2. Create Admission(s)
-            // If TUITION_BATCH, iterate selected batches. If HOME_TUTOR, create one without batch.
+            // Now using per-batch payment allocation with separate admission charge tracking
             const admissionsToCreate = formData.service_type === "TUITION_BATCH"
-                ? selectedBatches.map(b => ({
-                    batchId: b.id,
-                    total_fees: b.fee,
-                    fees_pending: Math.max(0, b.fee - b.paid),
-                    selectedDays: b.selectedDays // Include selectedDays for days-wise fees
-                }))
-                : [{ batchId: null, total_fees: 0, fees_pending: 0, selectedDays: undefined }]; // Home Tutor case
-
-            // If Home tutor, we might need a fee input too? Assuming for now Home Tutor follows same flow or is custom.
-            // But let's stick to the multiple batch change logic.
+                ? selectedBatches.map((b, index) => {
+                    // Apply admission charge only to the first batch
+                    const batchAdmissionCharge = index === 0 ? admissionChargeAmount : 0;
+                    const batchAdmissionChargePending = index === 0 ? Math.max(0, admissionChargeAmount - payingAdmissionChargeAmount) : 0;
+                    
+                    return {
+                        batchId: b.id,
+                        total_fees: b.fee, // Store batch fee (used for recurring)
+                        admission_charge: batchAdmissionCharge, // One-time admission charge (only on first)
+                        admission_charge_pending: batchAdmissionChargePending, // Pending admission charge
+                        fees_pending: Math.max(0, b.fee - b.paying), // Pending batch fee only
+                        selectedDays: b.selectedDays
+                    };
+                })
+                : [{ 
+                    batchId: null, 
+                    total_fees: 0, 
+                    admission_charge: admissionChargeAmount, 
+                    admission_charge_pending: Math.max(0, admissionChargeAmount - payingAdmissionChargeAmount),
+                    fees_pending: 0, 
+                    selectedDays: undefined 
+                }];
 
             for (const adm of admissionsToCreate) {
                 const admissionRes = await fetch("/api/admissions", {
@@ -377,8 +403,10 @@ export default function AdmissionPage() {
                         studentId,
                         batchId: adm.batchId,
                         total_fees: adm.total_fees,
+                        admission_charge: adm.admission_charge,
+                        admission_charge_pending: adm.admission_charge_pending,
                         fees_pending: adm.fees_pending,
-                        selectedDays: adm.selectedDays, // Pass selectedDays to API
+                        selectedDays: adm.selectedDays,
                     }),
                 });
                 if (!admissionRes.ok) console.error("Failed to create admission for batch " + adm.batchId);
@@ -758,15 +786,19 @@ export default function AdmissionPage() {
                                                 const hasDaysWiseFees = batch?.daysWiseFeesEnabled && batch?.daysWiseFees && Object.keys(batch.daysWiseFees).length > 0;
                                                 return (
                                                     <>
-                                                        <div className={hasDaysWiseFees ? "col-span-2" : "col-span-3"}>
-                                                            <Label className="text-xs">Total Fee {batch?.feeModel && <span className="text-muted-foreground">{getFeeModelLabel(batch.feeModel as FeeModel)}</span>}</Label>
-                                                            <Input type="number" placeholder="₹0" value={tempFee} onChange={e => setTempFee(e.target.value)} />
-                                                        </div>
-                                                        <div className={hasDaysWiseFees ? "col-span-2" : "col-span-3"}>
-                                                            <Label className="text-xs">Paying Now</Label>
-                                                            <Input type="number" placeholder="₹0" value={tempPaid} onChange={e => setTempPaid(e.target.value)} />
+                                                        <div className={hasDaysWiseFees ? "col-span-4" : "col-span-8"}>
+                                                            <Label className="text-xs">Batch Fee {batch?.feeModel && <span className="text-muted-foreground">({getFeeModelLabel(batch.feeModel as FeeModel)})</span>}</Label>
+                                                            <Input 
+                                                                type="number" 
+                                                                placeholder="₹0" 
+                                                                value={tempFee} 
+                                                                readOnly 
+                                                                className="bg-gray-100 cursor-not-allowed"
+                                                                title="Batch fee is fixed and cannot be changed"
+                                                            />
                                                         </div>
                                                         <div className="col-span-2">
+                                                            <Label className="text-xs">&nbsp;</Label>
                                                             <Button type="button" onClick={addBatch} disabled={!tempBatchId || !tempFee || (hasDaysWiseFees && !tempSelectedDays)} className="w-full">
                                                                 <Plus className="h-4 w-4" /> Add
                                                             </Button>
@@ -797,23 +829,102 @@ export default function AdmissionPage() {
 
                                         {/* Selected Batches List */}
                                         {selectedBatches.length > 0 && (
-                                            <div className="space-y-2">
-                                                {selectedBatches.map(b => (
-                                                    <div key={b.id} className="flex justify-between items-center bg-white p-2 border rounded text-sm">
-                                                        <div>
-                                                            <span className="font-medium">{b.name}</span>
-                                                            {b.feeModel && <span className="text-xs ml-2 text-blue-600">{getFeeModelLabel(b.feeModel)}</span>}
-                                                            {b.selectedDays && <span className="text-xs ml-2 text-green-600">({b.selectedDays} day{b.selectedDays > 1 ? 's' : ''}/week)</span>}
-                                                            <div className="text-muted-foreground text-xs">Fee: ₹{b.fee.toLocaleString()} | Paid: ₹{b.paid.toLocaleString()}</div>
+                                            <div className="space-y-3">
+                                                {/* Fee Breakdown Section */}
+                                                <div className="p-3 bg-gray-50 border rounded-md space-y-3">
+                                                    <h5 className="text-sm font-semibold text-gray-700">Fee Breakdown</h5>
+                                                    
+                                                    {/* Batch Fees */}
+                                                    {selectedBatches.map(b => (
+                                                        <div key={b.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-medium text-sm">{b.name}</span>
+                                                                    {b.feeModel && <span className="text-xs text-blue-600">{getFeeModelLabel(b.feeModel)}</span>}
+                                                                    {b.selectedDays && <span className="text-xs text-green-600">({b.selectedDays} day{b.selectedDays > 1 ? 's' : ''}/week)</span>}
+                                                                    <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeBatch(b.id)}>
+                                                                        <Trash2 className="h-3 w-3 text-red-500" />
+                                                                    </Button>
+                                                                </div>
+                                                                <div className="text-xs text-muted-foreground">
+                                                                    Fee: ₹{b.fee.toLocaleString()} (recurring)
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <Label className="text-xs whitespace-nowrap">Paying:</Label>
+                                                                <Input 
+                                                                    type="number" 
+                                                                    placeholder="₹0" 
+                                                                    value={b.paying || ''} 
+                                                                    onChange={e => updateBatchPayment(b.id, e.target.value)}
+                                                                    className="w-24 text-right"
+                                                                />
+                                                            </div>
                                                         </div>
-                                                        <Button type="button" variant="ghost" size="sm" onClick={() => removeBatch(b.id)}>
-                                                            <Trash2 className="h-4 w-4 text-red-500" />
-                                                        </Button>
+                                                    ))}
+                                                    
+                                                    <div className="flex justify-between text-sm pt-2 border-t">
+                                                        <span>Subtotal (Batch Fees):</span>
+                                                        <span className="font-medium">₹{totalBatchFees.toLocaleString()}</span>
                                                     </div>
-                                                ))}
-                                                <div className="flex justify-between font-bold pt-2 border-t">
-                                                    <span>Total</span>
-                                                    <span>Fee: ₹{totalFees.toLocaleString()} | Paid: ₹{totalPaid.toLocaleString()}</span>
+                                                </div>
+                                                
+                                                {/* Admission Charge Section */}
+                                                <div className="p-3 bg-orange-50 border border-orange-200 rounded-md space-y-3">
+                                                    <h5 className="text-sm font-semibold text-orange-800">Admission Charge (one-time)</h5>
+                                                    
+                                                    <div className="flex items-center justify-between">
+                                                        <Label className="text-sm">Charge Amount:</Label>
+                                                        <Input 
+                                                            type="number" 
+                                                            placeholder="₹0" 
+                                                            value={admissionCharge} 
+                                                            onChange={e => setAdmissionCharge(e.target.value)}
+                                                            className="w-28 text-right"
+                                                        />
+                                                    </div>
+                                                    
+                                                    {admissionChargeAmount > 0 && (
+                                                        <div className="flex items-center justify-between">
+                                                            <Label className="text-sm">Paying Now:</Label>
+                                                            <Input 
+                                                                type="number" 
+                                                                placeholder="₹0" 
+                                                                value={payingAdmissionCharge} 
+                                                                onChange={e => setPayingAdmissionCharge(e.target.value)}
+                                                                className="w-28 text-right"
+                                                                max={admissionChargeAmount}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Summary Section */}
+                                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md space-y-2">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span>Total Batch Fees:</span>
+                                                        <span>₹{totalBatchFees.toLocaleString()}</span>
+                                                    </div>
+                                                    {admissionChargeAmount > 0 && (
+                                                        <div className="flex justify-between text-sm">
+                                                            <span>Admission Charge:</span>
+                                                            <span>₹{admissionChargeAmount.toLocaleString()}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex justify-between text-sm font-bold pt-2 border-t border-blue-200">
+                                                        <span>Grand Total:</span>
+                                                        <span>₹{totalFees.toLocaleString()}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm pt-2 border-t border-blue-200">
+                                                        <span className="text-green-700">Total Paying Now:</span>
+                                                        <span className="text-green-700 font-medium">₹{totalPaid.toLocaleString()}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className={totalPending > 0 ? 'text-red-600' : 'text-green-600'}>Pending:</span>
+                                                        <span className={`font-bold ${totalPending > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                            ₹{totalPending.toLocaleString()}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}

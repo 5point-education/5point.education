@@ -191,15 +191,17 @@ model Batch {
 }
 
 model Admission {
-  id             String   @id @default(cuid())
-  studentId      String
-  batchId        String?
-  admission_date DateTime @default(now())
-  total_fees     Float
-  fees_pending   Float
-  selectedDays   Int?     // For days-wise fees: number of days per week selected
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  studentId                String
+  batchId                  String?
+  admission_date           DateTime @default(now())
+  total_fees               Float    // Batch fee (used for recurring)
+  admission_charge         Float    @default(0) // One-time extra charge during admission
+  admission_charge_pending Float    @default(0) // Pending amount of admission charge
+  fees_pending             Float    // Pending batch fees only (not including admission charge)
+  selectedDays             Int?     // For days-wise fees: number of days per week selected
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   batch            Batch?               @relation(fields: [batchId], references: [id])

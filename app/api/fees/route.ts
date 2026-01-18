@@ -48,8 +48,14 @@ export async function GET(req: Request) {
 
         // Transform data to include calculated fields
         const feesData = students.map(student => {
-            const totalFees = student.admissions.reduce((sum, adm) => sum + adm.total_fees, 0);
-            const totalPending = student.admissions.reduce((sum, adm) => sum + adm.fees_pending, 0);
+            // Total = batch fees + admission charges
+            const totalBatchFees = student.admissions.reduce((sum, adm) => sum + adm.total_fees, 0);
+            const totalAdmissionCharge = student.admissions.reduce((sum, adm) => sum + (adm.admission_charge || 0), 0);
+            const totalFees = totalBatchFees + totalAdmissionCharge;
+            // Pending = batch fees pending + admission charge pending (now tracked separately)
+            const totalBatchFeesPending = student.admissions.reduce((sum, adm) => sum + adm.fees_pending, 0);
+            const totalAdmissionChargePending = student.admissions.reduce((sum, adm) => sum + (adm.admission_charge_pending || 0), 0);
+            const totalPending = totalBatchFeesPending + totalAdmissionChargePending;
             const totalPaid = student.payments.reduce((sum, pay) => sum + pay.amount, 0);
 
             return {
@@ -61,8 +67,10 @@ export async function GET(req: Request) {
                     id: adm.id,
                     batchId: adm.batchId,
                     batchName: adm.batch ? `${adm.batch.name} - ${adm.batch.subject}` : 'No Batch',
-                    total_fees: adm.total_fees,
-                    fees_pending: adm.fees_pending,
+                    total_fees: adm.total_fees, // Batch fee (recurring)
+                    admission_charge: adm.admission_charge || 0, // One-time admission charge
+                    admission_charge_pending: adm.admission_charge_pending || 0, // Pending admission charge
+                    fees_pending: adm.fees_pending, // Pending batch fees only
                     feeModel: adm.batch?.feeModel || null,
                     admission_date: adm.admission_date,
                 })),
@@ -74,8 +82,12 @@ export async function GET(req: Request) {
                     receipt_no: pay.receipt_no,
                 })),
                 totalFees,
+                totalBatchFees,
+                totalAdmissionCharge,
                 totalPaid,
                 totalPending,
+                totalBatchFeesPending,
+                totalAdmissionChargePending,
             };
         });
 
