@@ -59,7 +59,7 @@ interface Batch {
   teacherId: string;
   teacher?: { name: string };
   schedule: string;
-  capacity: number;
+  capacity: number | null;
   isActive: boolean;
   createdAt: string;
   feeModel?: FeeModel;
@@ -205,7 +205,7 @@ export default function BatchesPage() {
       name: batch.name,
       subject: batch.subject,
       teacherId: batch.teacherId,
-      capacity: batch.capacity.toString(),
+      capacity: batch.capacity?.toString() || "",
     });
     try {
       const schedule = JSON.parse(batch.schedule);
@@ -488,7 +488,7 @@ export default function BatchesPage() {
               <TableCell>{batch.teacher?.name}</TableCell>
               <TableCell>{formatSchedule(batch.schedule)}</TableCell>
               <TableCell>
-                {batch._count.admissions} / {batch.capacity}
+                {batch._count.admissions} / {batch.capacity ?? "—"}
               </TableCell>
               <TableCell>{new Date(batch.createdAt).toLocaleDateString()}</TableCell>
               <TableCell className="text-right">
@@ -903,8 +903,8 @@ export default function BatchesPage() {
                 {renderScheduleEditor(scheduleItems, handleAddScheduleItem, handleRemoveScheduleItem, handleScheduleChange)}
 
                 <div className="space-y-2">
-                  <Label htmlFor="capacity">Capacity</Label>
-                  <Input id="capacity" name="capacity" type="number" required min="1" placeholder="30" />
+                  <Label htmlFor="capacity">Capacity (Optional)</Label>
+                  <Input id="capacity" name="capacity" type="number" min="1" placeholder="30" />
                 </div>
 
                 {renderFeeEditor(feeModel, setFeeModel, feeAmount, setFeeAmount, installments, handleAddInstallment, handleRemoveInstallment, handleInstallmentChange, scheduleItems, daysWiseFeesEnabled, setDaysWiseFeesEnabled, daysWiseFees, setDaysWiseFees)}
@@ -972,13 +972,12 @@ export default function BatchesPage() {
                 {renderScheduleEditor(editScheduleItems, handleAddEditScheduleItem, handleRemoveEditScheduleItem, handleEditScheduleChange)}
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-capacity">Capacity</Label>
+                  <Label htmlFor="edit-capacity">Capacity (Optional)</Label>
                   <Input 
                     id="edit-capacity" 
                     type="number" 
                     value={editFormData.capacity}
                     onChange={(e) => setEditFormData({...editFormData, capacity: e.target.value})}
-                    required 
                     min="1" 
                     placeholder="30" 
                   />

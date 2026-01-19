@@ -15,22 +15,22 @@ const prisma = new PrismaClient();
 
 async function main() {
     // Create Master Admin
-    const masterEmail = "master_admin@5point.com";
-    const masterPassword = "masterpassword123";
-    const masterName = "Master Admin";
+    const masterEmail = "reception@gmail.com";
+    const masterPassword = "123456";
+    const masterName = "Reception Desk";
 
-    console.log(`Seeding Master Admin: ${masterEmail}`);
+    console.log(`Seeding Reception Desk: ${masterEmail}`);
 
     // 1. Create Master Admin User in Supabase Auth
     const { data: masterData, error: masterError } = await supabase.auth.admin.createUser({
         email: masterEmail,
         password: masterPassword,
         email_confirm: true,
-        user_metadata: { name: masterName, role: Role.ADMIN },
+        user_metadata: { name: masterName, role: Role.RECEPTIONIST },
     });
 
     if (masterError) {
-        console.log("Master Admin creation failed/exists:", masterError.message);
+        console.log("Reception Desk creation failed/exists:", masterError.message);
 
         // Try to find the user if they exist
         const { data: userList, error: listError } = await supabase.auth.admin.listUsers();

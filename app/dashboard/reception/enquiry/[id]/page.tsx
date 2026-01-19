@@ -167,6 +167,10 @@ export default function EnquiryEditPage({ params }: { params: { id: string } }) 
                                 <p className="text-lg">{enquiry.phone}</p>
                             </div>
                             <div>
+                                <span className="text-sm font-medium text-muted-foreground">Email</span>
+                                <p className="text-lg">{enquiry.email || "-"}</p>
+                            </div>
+                            <div>
                                 <span className="text-sm font-medium text-muted-foreground">Class</span>
                                 <p className="text-lg">{enquiry.class_level}</p>
                             </div>

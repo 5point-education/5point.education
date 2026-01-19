@@ -15,6 +15,7 @@ import { GraduationCap, ArrowLeft } from "lucide-react";
 const enquirySchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   phone: z.string().regex(/^[0-9]{10}$/, "Phone number must be 10 digits"),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
   class_level: z.number().min(1).max(12),
   subjects: z.string().min(2, "Please specify subjects"),
   service_type: z.enum(["HOME_TUTOR", "TUITION_BATCH"]),
@@ -45,10 +46,15 @@ function EnquiryForm() {
   const onSubmit = async (data: EnquiryFormData) => {
     setIsSubmitting(true);
     try {
+      // Convert empty string to undefined for email
+      const payload = {
+        ...data,
+        email: data.email && data.email.trim() !== "" ? data.email : undefined,
+      };
       const response = await fetch("/api/enquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -132,6 +138,20 @@ function EnquiryForm() {
             />
             {errors.phone && (
               <p className="text-sm text-red-600 mt-1">{errors.phone.message}</p>
+            )}
+          </div>
+
+          {/* Email */}
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              {...register("email")}
+              placeholder="student@example.com"
+            />
+            {errors.email && (
+              <p className="text-sm text-red-600 mt-1">{errors.email.message}</p>
             )}
           </div>
 

@@ -49,7 +49,7 @@ const studentSchema = z.object({
     fatherName: z.string().min(2, "Father's Name required"),
     motherName: z.string().optional(),
     parentMobile: z.string().refine((val) => !val || /^\d{10}$/.test(val), "Parent mobile number must be exactly 10 digits").optional(),
-    aadharNo: z.string().optional(),
+    aadharNo: z.string().regex(/^\d{10}$/, "Phone number must be exactly 12 digits").optional(),
     nationality: z.string().default("Indian"),
 
     permanentAddress: z.string().optional(),
@@ -306,6 +306,7 @@ export default function AdmissionPage() {
                         ...studentForm.getValues(),
                         name: data.name,
                         phone: data.phone,
+                        email: data.email || "",
                         class_level: data.class_level.toString(),
                         subjects: data.subjects,
                         service_type: data.service_type,

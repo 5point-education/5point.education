@@ -2,6 +2,12 @@ import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
+import {
+  generateDateRange,
+  validateMonthSelection,
+  getMonthlyFee,
+  calculatePendingFees,
+} from "@/lib/fees-utils";
 
 export async function GET(req: Request) {
     try {
@@ -14,14 +20,26 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url);
         const studentId = searchParams.get("studentId");
+        const admissionId = searchParams.get("admissionId");
 
-        if (!studentId) {
-            return new NextResponse("Student ID is required", { status: 400 });
+        if (!studentId && !admissionId) {
+            return new NextResponse("Student ID or Admission ID is required", { status: 400 });
         }
 
+        const where: any = {};
+        if (studentId) where.studentId = studentId;
+        if (admissionId) where.admissionId = admissionId;
+
         const payments = await db.payment.findMany({
-            where: { studentId },
-            orderBy: { date: 'desc' }
+            where,
+            orderBy: { date: 'desc' },
+            include: {
+                admission: {
+                    include: {
+                        batch: true
+                    }
+                }
+            }
         });
 
         return NextResponse.json(payments);
@@ -42,24 +60,125 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { studentId, amount, mode, receipt_no, skipFeesPendingUpdate } = body;
+        const { 
+            studentId, 
+            admissionId, 
+            amount, 
+            mode, 
+            receipt_no, 
+            months, // NEW: Array of month strings ["2025-01", "2025-02"]
+            notes,  // NEW: Optional notes
+            skipFeesPendingUpdate 
+        } = body;
 
         const paymentAmount = parseFloat(amount);
 
-        // Create Payment
+        // NEW: Month-based payment flow
+        if (admissionId && months && Array.isArray(months) && months.length > 0) {
+            // Get admission with batch
+            const admission = await db.admission.findUnique({
+                where: { id: admissionId },
+                include: {
+                    batch: true,
+                    payments: {
+                        select: {
+                            coveredMonths: true
+                        }
+                    }
+                }
+            });
+
+            if (!admission) {
+                return new NextResponse("Admission not found", { status: 404 });
+            }
+
+            if (!admission.batch) {
+                return new NextResponse("Admission has no batch", { status: 400 });
+            }
+
+            // Validate month selection
+            const validation = validateMonthSelection(months, admission.payments);
+            if (!validation.isValid) {
+                return new NextResponse(validation.error, { status: 400 });
+            }
+
+            // Calculate expected amount
+            const monthlyFee = getMonthlyFee(admission.batch, admission);
+            const expectedAmount = months.length * monthlyFee;
+
+            // Allow small rounding differences (0.01)
+            if (Math.abs(paymentAmount - expectedAmount) > 0.01) {
+                return new NextResponse(
+                    `Amount mismatch. Expected ₹${expectedAmount} for ${months.length} month(s) at ₹${monthlyFee}/month`,
+                    { status: 400 }
+                );
+            }
+
+            // Generate date range from months
+            const { from, to } = generateDateRange(months);
+
+            // Create payment with month-based data
+            const payment = await db.payment.create({
+                data: {
+                    studentId: admission.studentId,
+                    admissionId,
+                    amount: paymentAmount,
+                    mode,
+                    receipt_no,
+                    coveredMonths: months,
+                    coveredFromDate: from,
+                    coveredToDate: to,
+                    notes: notes || null,
+                }
+            });
+
+            // Recalculate pending fees for this admission
+            // Get updated admission with new payment
+            const updatedAdmission = await db.admission.findUnique({
+                where: { id: admissionId },
+                include: {
+                    batch: true,
+                    payments: {
+                        select: {
+                            coveredMonths: true
+                        }
+                    }
+                }
+            });
+
+            if (updatedAdmission && updatedAdmission.batch) {
+                const pendingData = await calculatePendingFees(
+                    updatedAdmission,
+                    admission.selectedDays
+                );
+
+                await db.admission.update({
+                    where: { id: admissionId },
+                    data: { fees_pending: pendingData.pendingAmount }
+                });
+            }
+
+            return NextResponse.json(payment);
+        }
+
+        // LEGACY: Old payment flow (for backward compatibility)
+        if (!studentId) {
+            return new NextResponse("Student ID is required for legacy payments", { status: 400 });
+        }
+
+        // Create Payment (legacy - no months)
         const payment = await db.payment.create({
             data: {
                 studentId,
                 amount: paymentAmount,
                 mode,
                 receipt_no,
+                coveredMonths: [],
             }
         });
 
         // Update Pending Fees on admissions - skip if already calculated during admission creation
-        // skipFeesPendingUpdate is used during initial admission when fees_pending is already set correctly
         if (!skipFeesPendingUpdate) {
-            // Find all admissions for this student with pending fees
             const admissionsWithPending = await db.admission.findMany({
                 where: { 
                     studentId,
@@ -68,7 +187,6 @@ export async function POST(req: Request) {
                 orderBy: { createdAt: 'asc' }
             });
 
-            // Distribute payment across admissions in order
             let remainingPayment = paymentAmount;
             for (const admission of admissionsWithPending) {
                 if (remainingPayment <= 0) break;
@@ -85,12 +203,11 @@ export async function POST(req: Request) {
             }
         }
 
-
         return NextResponse.json(payment);
 
-    } catch (error) {
+    } catch (error: any) {
         console.log("[PAYMENTS_POST]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return new NextResponse(error.message || "Internal Error", { status: 500 });
     }
 }
 

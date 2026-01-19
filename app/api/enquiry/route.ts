@@ -5,6 +5,7 @@ import { z } from "zod";
 const enquirySchema = z.object({
   name: z.string().min(2),
   phone: z.string().regex(/^[0-9]{10}$/),
+  email: z.string().email().optional(),
   class_level: z.number().min(1).max(12),
   subjects: z.string().min(2),
   service_type: z.enum(["HOME_TUTOR", "TUITION_BATCH"]),
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
       data: {
         name: validatedData.name,
         phone: validatedData.phone,
+        email: validatedData.email,
         class_level: validatedData.class_level,
         subjects: validatedData.subjects,
         service_type: validatedData.service_type,

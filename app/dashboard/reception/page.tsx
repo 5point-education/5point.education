@@ -12,6 +12,7 @@ interface Enquiry {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
   class_level: number;
   subjects: string;
   service_type: string;
@@ -199,6 +200,7 @@ export default function ReceptionDashboard() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableHead>Class</TableHead>
                   <TableHead>Subjects</TableHead>
                   <TableHead>Service</TableHead>
@@ -210,7 +212,7 @@ export default function ReceptionDashboard() {
               <TableBody>
                 {filteredEnquiries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No enquiries found
                     </TableCell>
                   </TableRow>
@@ -219,6 +221,7 @@ export default function ReceptionDashboard() {
                     <TableRow key={enquiry.id}>
                       <TableCell className="font-medium">{enquiry.name}</TableCell>
                       <TableCell>{enquiry.phone}</TableCell>
+                      <TableCell>{enquiry.email || "-"}</TableCell>
                       <TableCell>{enquiry.class_level}</TableCell>
                       <TableCell className="max-w-xs truncate">{enquiry.subjects}</TableCell>
                       <TableCell>

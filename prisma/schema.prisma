@@ -43,6 +43,13 @@ enum LostReason {
   OTHER
 }
 
+enum AdmissionStatus {
+  ACTIVE      // Student is active
+  COMPLETED   // Batch ended, student completed
+  WITHDRAWN   // Student left before batch ended
+  CANCELLED   // Admission cancelled
+}
+
 // Models
 model User {
   id            String    @id @default(cuid())
@@ -140,6 +147,7 @@ model Enquiry {
   id                    String        @id @default(cuid())
   name                  String
   phone                 String
+  email                 String?
   class_level           Int
   subjects              String
   service_type          ServiceType
@@ -168,10 +176,14 @@ model Batch {
   subject   String
   teacherId String
   schedule  String
-  capacity  Int
+  capacity  Int?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // NEW: Start and end dates
+  startDate DateTime? // Batch start date
+  endDate   DateTime? // When batch ends/archived
 
   // Fee Configuration
   feeModel     FeeModel? // Type of fee structure
@@ -203,9 +215,13 @@ model Admission {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
+  // NEW: End date and status
+  endDate        DateTime?        // When student left or batch ended
+  status         AdmissionStatus @default(ACTIVE)
+
   student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   batch            Batch?               @relation(fields: [batchId], references: [id])
-  recurringPeriods RecurringFeePeriod[]
+  payments         Payment[]           // Direct relation to payments
 
   @@map("admissions")
 }
@@ -213,37 +229,24 @@ model Admission {
 model Payment {
   id         String   @id @default(cuid())
   studentId  String
+  admissionId String? // NEW: Link to specific admission
   amount     Float
   date       DateTime @default(now())
   mode       String // Cash/UPI/Bank
   receipt_no String   @unique
   createdAt  DateTime @default(now())
 
+  // NEW: Month-based coverage
+  coveredMonths   String[] // Array of month strings: ["2025-01", "2025-02"]
+  coveredFromDate DateTime? // Auto-generated from coveredMonths
+  coveredToDate   DateTime? // Auto-generated from coveredMonths
+  
+  notes           String?  // Optional notes
+
   student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  recurringPeriods RecurringFeePeriod[]
+  admission        Admission?           @relation(fields: [admissionId], references: [id])
 
   @@map("payments")
-}
-
-model RecurringFeePeriod {
-  id           String    @id @default(cuid())
-  admissionId  String
-  periodNumber Int       // 1, 2, 3... (1st month, 2nd month, etc.)
-  periodType   String    // "MONTHLY" or "QUARTERLY"
-  periodStart  DateTime  // Start date of this period
-  periodEnd    DateTime  // End date of this period
-  amount       Float     // Fee amount for this period
-  isPaid       Boolean   @default(false)
-  paidAt       DateTime?
-  paymentId    String?   // Reference to payment that covered this
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
-  payment   Payment?  @relation(fields: [paymentId], references: [id])
-
-  @@unique([admissionId, periodNumber])
-  @@map("recurring_fee_periods")
 }
 
 model Exam {
