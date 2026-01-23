@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
+import { calculatePendingFees } from "@/lib/fees-utils";
 
 export async function GET(req: Request) {
   try {
@@ -21,17 +22,74 @@ export async function GET(req: Request) {
       return new NextResponse("Student profile not found", { status: 404 });
     }
 
-    // 2. Get Admissions (for Fees & Batch info)
+    // 2. Get Admissions (for Fees & Batch info) with payments
     const admissions = await db.admission.findMany({
       where: { studentId: studentProfile.id },
       include: {
-        batch: true
+        batch: true,
+        payments: {
+          select: {
+            coveredMonths: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' } // Latest first
     });
 
-    // Calculate Pending Fees & Next Class
-    const pendingFees = admissions.reduce((sum, adm) => sum + adm.fees_pending, 0);
+    // Calculate actual pending fees using calculatePendingFees for each admission
+    let totalCalculatedFeesPending = 0;
+    let totalAdmissionChargePending = 0;
+    const feesBreakdown = [];
+
+    for (const adm of admissions) {
+      let calculatedPendingAmount = 0;
+      let monthlyFee = 0;
+      let pendingMonths: string[] = [];
+      
+      // Calculate pending fees if batch exists and is not ONE_TIME/CUSTOM
+      if (adm.batch && adm.batch.feeModel !== "ONE_TIME" && adm.batch.feeModel !== "CUSTOM") {
+        try {
+          const pendingData = await calculatePendingFees(
+            {
+              ...adm,
+              batch: adm.batch,
+            },
+            adm.selectedDays
+          );
+          calculatedPendingAmount = pendingData.pendingAmount;
+          monthlyFee = pendingData.monthlyFee;
+          pendingMonths = pendingData.pendingMonths;
+        } catch (error) {
+          console.error(`Error calculating pending fees for admission ${adm.id}:`, error);
+          // Fallback to database value if calculation fails
+          calculatedPendingAmount = adm.fees_pending;
+        }
+      } else {
+        // For ONE_TIME/CUSTOM, use database value
+        calculatedPendingAmount = adm.fees_pending;
+      }
+
+      const admissionChargePending = adm.admission_charge_pending || 0;
+      const totalPending = calculatedPendingAmount + admissionChargePending;
+
+      totalCalculatedFeesPending += calculatedPendingAmount;
+      totalAdmissionChargePending += admissionChargePending;
+
+      if (totalPending > 0) {
+        feesBreakdown.push({
+          admissionId: adm.id,
+          batchName: adm.batch ? `${adm.batch.name} - ${adm.batch.subject}` : 'No Batch',
+          feesPending: calculatedPendingAmount,
+          admissionChargePending,
+          totalPending,
+          monthlyFee,
+          pendingMonths: pendingMonths.length,
+          status: adm.status,
+        });
+      }
+    }
+
+    const pendingFees = totalCalculatedFeesPending + totalAdmissionChargePending;
 
     // Simplistic Logic for "Next Class": Take schedule from latest batch
     let nextClass = "Not Assigned";
@@ -89,8 +147,11 @@ export async function GET(req: Request) {
         totalExams,
         averageScore,
         pendingFees,
+        totalFeesPending: totalCalculatedFeesPending,
+        totalAdmissionChargePending,
         nextClass
       },
+      feesBreakdown,
       performanceData,
       recentResults
     });

@@ -210,6 +210,55 @@ export function validateMonthSelection(
 }
 
 /**
+ * Get future months for advance payment
+ * @param startDate Start date (usually today)
+ * @param monthsAhead Number of months ahead to generate (default: 12)
+ * @param feeModel Fee model
+ * @param batchEndDate Optional batch end date to limit future months
+ * @returns Array of month strings for future months
+ */
+export function getFutureMonths(
+  startDate: Date,
+  monthsAhead: number = 12,
+  feeModel: FeeModel | null,
+  batchEndDate: Date | null = null
+): string[] {
+  if (feeModel === "ONE_TIME" || feeModel === "CUSTOM") {
+    return [];
+  }
+
+  const futureMonths: string[] = [];
+  const current = new Date(startDate);
+  current.setDate(1); // Start from first day of month
+  current.setMonth(current.getMonth() + 1); // Start from next month
+  current.setHours(0, 0, 0, 0);
+
+  const endDate = batchEndDate || new Date();
+  endDate.setHours(23, 59, 59, 999);
+
+  // Calculate end date for future months (startDate + monthsAhead)
+  const futureEndDate = new Date(startDate);
+  futureEndDate.setMonth(futureEndDate.getMonth() + monthsAhead);
+  futureEndDate.setHours(23, 59, 59, 999);
+
+  // Use the earlier of: batch end date or monthsAhead limit
+  const actualEndDate = batchEndDate && batchEndDate < futureEndDate 
+    ? batchEndDate 
+    : futureEndDate;
+
+  let count = 0;
+  while (current <= actualEndDate && count < monthsAhead) {
+    const year = current.getFullYear();
+    const month = String(current.getMonth() + 1).padStart(2, "0");
+    futureMonths.push(`${year}-${month}`);
+    current.setMonth(current.getMonth() + 1);
+    count++;
+  }
+
+  return futureMonths;
+}
+
+/**
  * Calculate pending fees for an admission
  * This is a helper function that can be used directly in API routes
  */
@@ -238,6 +287,7 @@ export async function calculatePendingFees(
   pendingAmount: number;
   monthlyFee: number;
   calculationEndDate: Date;
+  futureMonths: string[]; // NEW: Months available for advance payment
 }> {
   if (!admission.batch) {
     throw new Error("Admission has no batch");
@@ -255,6 +305,7 @@ export async function calculatePendingFees(
       pendingAmount: 0,
       monthlyFee: 0,
       calculationEndDate: new Date(),
+      futureMonths: [],
     };
   }
 
@@ -286,14 +337,35 @@ export async function calculatePendingFees(
     });
   });
 
-  // 4. Calculate pending months
+  // 4. Calculate pending months (only up to calculation end date)
   const pendingMonths = allMonths.filter(
     (month) => !coveredMonthsSet.has(month)
   );
 
-  // 5. Calculate pending amount
+  // 5. Calculate pending amount (only for pending months up to today)
   const monthlyFee = getMonthlyFee(admission.batch, { selectedDays });
   const pendingAmount = pendingMonths.length * monthlyFee;
+
+  // 6. Get future months for advance payment (only if batch is active and not withdrawn)
+  let futureMonths: string[] = [];
+  if (
+    admission.status !== "WITHDRAWN" &&
+    admission.batch.isActive &&
+    !admission.batch.endDate // Only show future months if batch doesn't have an end date
+  ) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    futureMonths = getFutureMonths(
+      today,
+      12, // Allow up to 12 months ahead
+      admission.batch.feeModel,
+      admission.batch.endDate
+    );
+    // Filter out already paid future months
+    futureMonths = futureMonths.filter(
+      (month) => !coveredMonthsSet.has(month)
+    );
+  }
 
   return {
     totalMonths: allMonths.length,
@@ -302,5 +374,6 @@ export async function calculatePendingFees(
     pendingAmount,
     monthlyFee,
     calculationEndDate,
+    futureMonths, // NEW: Available for advance payment
   };
 }

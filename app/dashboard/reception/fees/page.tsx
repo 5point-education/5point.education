@@ -364,7 +364,8 @@ export default function FeesManagementPage() {
         <CardHeader>
           <CardTitle>Student Fees</CardTitle>
           <CardDescription>
-            View and manage fees for all students. Use month-based payment system for accurate tracking.
+            View and manage fees for all students. Total fees are calculated based on months from admission date. 
+            Pending fees = (Monthly Fee × Unpaid Months) + Admission Charge Pending.
           </CardDescription>
         </CardHeader>
         <CardContent>

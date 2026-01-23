@@ -91,6 +91,7 @@ export async function GET(req: Request) {
           admission.batch.feeModel
         ) : [],
       coveredMonthsList: Array.from(coveredMonthsSet),
+      futureMonths: pendingData.futureMonths || [], // Include future months for advance payment
     });
   } catch (error: any) {
     console.log("[FEES_PENDING_GET]", error);

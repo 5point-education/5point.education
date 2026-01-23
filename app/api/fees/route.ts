@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
+import { calculatePendingFees } from "@/lib/fees-utils";
 
 export async function GET(req: Request) {
     try {
@@ -29,6 +30,17 @@ export async function GET(req: Request) {
                                 name: true,
                                 subject: true,
                                 feeModel: true,
+                                feeAmount: true,
+                                daysWiseFeesEnabled: true,
+                                daysWiseFees: true,
+                                endDate: true,
+                                isActive: true,
+                                updatedAt: true,
+                            }
+                        },
+                        payments: {
+                            select: {
+                                coveredMonths: true
                             }
                         }
                     }
@@ -47,15 +59,80 @@ export async function GET(req: Request) {
         });
 
         // Transform data to include calculated fields
-        const feesData = students.map(student => {
-            // Total = batch fees + admission charges
-            const totalBatchFees = student.admissions.reduce((sum, adm) => sum + adm.total_fees, 0);
-            const totalAdmissionCharge = student.admissions.reduce((sum, adm) => sum + (adm.admission_charge || 0), 0);
-            const totalFees = totalBatchFees + totalAdmissionCharge;
-            // Pending = batch fees pending + admission charge pending (now tracked separately)
-            const totalBatchFeesPending = student.admissions.reduce((sum, adm) => sum + adm.fees_pending, 0);
-            const totalAdmissionChargePending = student.admissions.reduce((sum, adm) => sum + (adm.admission_charge_pending || 0), 0);
-            const totalPending = totalBatchFeesPending + totalAdmissionChargePending;
+        const feesData = await Promise.all(students.map(async (student) => {
+            // Calculate actual pending fees and total fees for each admission
+            let totalCalculatedFees = 0; // Total fees that should be paid (calculated from months)
+            let totalCalculatedFeesPending = 0; // Calculated pending fees
+            let totalAdmissionCharge = 0;
+            let totalAdmissionChargePending = 0;
+
+            const admissionsWithCalculations = await Promise.all(
+                student.admissions.map(async (adm) => {
+                    let calculatedTotalFees = 0; // Total fees for this admission (months * monthlyFee)
+                    let calculatedPendingAmount = 0;
+                    let monthlyFee = 0;
+                    let totalMonths = 0;
+                    let pendingMonths = 0;
+
+                    // Calculate fees if batch exists and is not ONE_TIME/CUSTOM
+                    if (adm.batch && adm.batch.feeModel !== "ONE_TIME" && adm.batch.feeModel !== "CUSTOM") {
+                        try {
+                            // Get payments for this admission
+                            const admissionPayments = adm.payments || [];
+                            const pendingData = await calculatePendingFees(
+                                {
+                                    ...adm,
+                                    batch: adm.batch,
+                                    payments: admissionPayments,
+                                },
+                                adm.selectedDays
+                            );
+                            calculatedPendingAmount = pendingData.pendingAmount;
+                            monthlyFee = pendingData.monthlyFee;
+                            totalMonths = pendingData.totalMonths;
+                            pendingMonths = pendingData.pendingMonths.length;
+                            // Total fees = all months * monthly fee
+                            calculatedTotalFees = totalMonths * monthlyFee;
+                        } catch (error) {
+                            console.error(`Error calculating fees for admission ${adm.id}:`, error);
+                            // Fallback to database values
+                            calculatedTotalFees = adm.total_fees;
+                            calculatedPendingAmount = adm.fees_pending;
+                        }
+                    } else {
+                        // For ONE_TIME/CUSTOM, use database values
+                        calculatedTotalFees = adm.total_fees;
+                        calculatedPendingAmount = adm.fees_pending;
+                    }
+
+                    const admissionCharge = adm.admission_charge || 0;
+                    const admissionChargePending = adm.admission_charge_pending || 0;
+
+                    totalCalculatedFees += calculatedTotalFees;
+                    totalCalculatedFeesPending += calculatedPendingAmount;
+                    totalAdmissionCharge += admissionCharge;
+                    totalAdmissionChargePending += admissionChargePending;
+
+                    return {
+                        id: adm.id,
+                        batchId: adm.batchId,
+                        batchName: adm.batch ? `${adm.batch.name} - ${adm.batch.subject}` : 'No Batch',
+                        total_fees: calculatedTotalFees, // Calculated total fees
+                        calculatedPendingFees: calculatedPendingAmount, // Calculated pending fees
+                        admission_charge: admissionCharge,
+                        admission_charge_pending: admissionChargePending,
+                        fees_pending: calculatedPendingAmount, // Use calculated value
+                        feeModel: adm.batch?.feeModel || null,
+                        admission_date: adm.admission_date,
+                        monthlyFee,
+                        totalMonths,
+                        pendingMonths,
+                    };
+                })
+            );
+
+            const totalFees = totalCalculatedFees + totalAdmissionCharge;
+            const totalPending = totalCalculatedFeesPending + totalAdmissionChargePending;
             const totalPaid = student.payments.reduce((sum, pay) => sum + pay.amount, 0);
 
             return {
@@ -63,17 +140,7 @@ export async function GET(req: Request) {
                 studentName: student.user.name,
                 email: student.user.email,
                 phone: student.phone,
-                admissions: student.admissions.map(adm => ({
-                    id: adm.id,
-                    batchId: adm.batchId,
-                    batchName: adm.batch ? `${adm.batch.name} - ${adm.batch.subject}` : 'No Batch',
-                    total_fees: adm.total_fees, // Batch fee (recurring)
-                    admission_charge: adm.admission_charge || 0, // One-time admission charge
-                    admission_charge_pending: adm.admission_charge_pending || 0, // Pending admission charge
-                    fees_pending: adm.fees_pending, // Pending batch fees only
-                    feeModel: adm.batch?.feeModel || null,
-                    admission_date: adm.admission_date,
-                })),
+                admissions: admissionsWithCalculations,
                 payments: student.payments.map(pay => ({
                     id: pay.id,
                     amount: pay.amount,
@@ -81,15 +148,15 @@ export async function GET(req: Request) {
                     mode: pay.mode,
                     receipt_no: pay.receipt_no,
                 })),
-                totalFees,
-                totalBatchFees,
+                totalFees, // Total fees (calculated + admission charges)
+                totalCalculatedFees, // Calculated batch fees only
                 totalAdmissionCharge,
                 totalPaid,
-                totalPending,
-                totalBatchFeesPending,
+                totalPending, // Total pending (calculated + admission charges)
+                totalBatchFeesPending: totalCalculatedFeesPending, // Calculated pending batch fees
                 totalAdmissionChargePending,
             };
-        });
+        }));
 
         return NextResponse.json(feesData);
 

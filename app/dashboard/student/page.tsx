@@ -17,8 +17,20 @@ interface DashboardData {
     totalExams: number;
     averageScore: number;
     pendingFees: number;
+    totalFeesPending: number;
+    totalAdmissionChargePending: number;
     nextClass: string;
   };
+  feesBreakdown: Array<{
+    admissionId: string;
+    batchName: string;
+    feesPending: number;
+    admissionChargePending: number;
+    totalPending: number;
+    monthlyFee: number;
+    pendingMonths: number;
+    status: string;
+  }>;
   performanceData: Array<{
     examName: string;
     score: number;
@@ -183,17 +195,24 @@ export default function StudentDashboard() {
             <div className="flex flex-col gap-4">
 
               {/* Stat 1: Pending Fees */}
-              <Card className="flex-1 border-none shadow-sm rounded-2xl flex items-center p-4 hover:shadow-md transition-shadow">
-                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mr-4 ${data.overview.pendingFees > 0 ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-green-600'}`}>
-                  <IndianRupee className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-800">
-                    {data.overview.pendingFees > 0 ? `₹${data.overview.pendingFees}` : 'Clear'}
-                  </p>
-                  <p className="text-sm text-slate-500 font-medium">
-                    {data.overview.pendingFees > 0 ? 'Pending Fees' : 'Dues Cleared'}
-                  </p>
+              <Card className="flex-1 border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-center mb-3">
+                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mr-4 ${data.overview.pendingFees > 0 ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-green-600'}`}>
+                      <IndianRupee className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-2xl font-bold text-slate-800">
+                        {data.overview.pendingFees > 0 ? `₹${data.overview.pendingFees.toLocaleString('en-IN')}` : 'Clear'}
+                      </p>
+                      <p className="text-sm text-slate-500 font-medium">
+                        {data.overview.pendingFees > 0 ? 'Pending Fees' : 'Dues Cleared'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Detailed Breakdown */}
+                  
                 </div>
               </Card>
               {/* Stat 2: Total Exams */}

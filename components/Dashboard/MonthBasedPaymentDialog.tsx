@@ -45,6 +45,7 @@ interface PendingFeesData {
   calculationEndDate: string;
   allMonths: string[];
   coveredMonthsList: string[];
+  futureMonths?: string[]; // Months available for advance payment
 }
 
 interface MonthBasedPaymentDialogProps {
@@ -123,6 +124,20 @@ export function MonthBasedPaymentDialog({
     setSelectedMonths(new Set(pendingData.pendingMonths));
   };
 
+  const handleSelectAllFuture = () => {
+    if (!pendingData || !pendingData.futureMonths) return;
+    setSelectedMonths(new Set(pendingData.futureMonths));
+  };
+
+  const handleSelectAll = () => {
+    if (!pendingData) return;
+    const allSelectable = [
+      ...pendingData.pendingMonths,
+      ...(pendingData.futureMonths || []),
+    ];
+    setSelectedMonths(new Set(allSelectable));
+  };
+
   const handleClearSelection = () => {
     setSelectedMonths(new Set());
   };
@@ -195,6 +210,7 @@ export function MonthBasedPaymentDialog({
 
   const paidMonths = pendingData?.coveredMonthsList || [];
   const pendingMonths = pendingData?.pendingMonths || [];
+  const futureMonths = pendingData?.futureMonths || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -278,19 +294,40 @@ export function MonthBasedPaymentDialog({
               )}
 
               {/* Month Selection */}
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label>Select Months to Pay</Label>
                   <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSelectAllPending}
-                      disabled={pendingMonths.length === 0}
-                    >
-                      Select All Pending
-                    </Button>
+                    {pendingMonths.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAllPending}
+                      >
+                        Select All Pending
+                      </Button>
+                    )}
+                    {futureMonths.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAllFuture}
+                      >
+                        Select All Future
+                      </Button>
+                    )}
+                    {(pendingMonths.length > 0 || futureMonths.length > 0) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAll}
+                      >
+                        Select All
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="outline"
@@ -303,33 +340,88 @@ export function MonthBasedPaymentDialog({
                   </div>
                 </div>
 
-                {pendingMonths.length === 0 ? (
+                {pendingMonths.length === 0 && futureMonths.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-4 text-center">
                     All months are paid! 🎉
                   </p>
                 ) : (
-                  <div className="border rounded-lg p-4 max-h-60 overflow-y-auto space-y-2">
-                    {pendingMonths.map((month) => (
-                      <div
-                        key={month}
-                        className="flex items-center space-x-2 p-2 hover:bg-muted/50 rounded"
-                      >
-                        <Checkbox
-                          id={month}
-                          checked={selectedMonths.has(month)}
-                          onCheckedChange={() => handleMonthToggle(month)}
-                        />
-                        <Label
-                          htmlFor={month}
-                          className="flex-1 cursor-pointer flex items-center justify-between"
-                        >
-                          <span>{formatMonth(month)}</span>
-                          <span className="text-sm text-muted-foreground">
-                            ₹{pendingData.monthlyFee.toLocaleString()}
-                          </span>
-                        </Label>
+                  <div className="space-y-4">
+                    {/* Pending Months Section */}
+                    {pendingMonths.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-red-600 font-semibold">
+                            Pending Months (Due)
+                          </Label>
+                          <Badge variant="outline" className="bg-red-50 text-red-700">
+                            {pendingMonths.length} month{pendingMonths.length !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                        <div className="border border-red-200 rounded-lg p-4 max-h-60 overflow-y-auto space-y-2 bg-red-50/30">
+                          {pendingMonths.map((month) => (
+                            <div
+                              key={month}
+                              className="flex items-center space-x-2 p-2 hover:bg-red-100/50 rounded"
+                            >
+                              <Checkbox
+                                id={`pending-${month}`}
+                                checked={selectedMonths.has(month)}
+                                onCheckedChange={() => handleMonthToggle(month)}
+                              />
+                              <Label
+                                htmlFor={`pending-${month}`}
+                                className="flex-1 cursor-pointer flex items-center justify-between"
+                              >
+                                <span className="font-medium">{formatMonth(month)}</span>
+                                <span className="text-sm text-red-600 font-semibold">
+                                  ₹{pendingData.monthlyFee.toLocaleString()}
+                                </span>
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Future Months Section (Advance Payment) */}
+                    {futureMonths.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-blue-600 font-semibold">
+                            Future Months (Advance Payment)
+                          </Label>
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                            {futureMonths.length} month{futureMonths.length !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                        <div className="border border-blue-200 rounded-lg p-4 max-h-60 overflow-y-auto space-y-2 bg-blue-50/30">
+                          {futureMonths.map((month) => (
+                            <div
+                              key={month}
+                              className="flex items-center space-x-2 p-2 hover:bg-blue-100/50 rounded"
+                            >
+                              <Checkbox
+                                id={`future-${month}`}
+                                checked={selectedMonths.has(month)}
+                                onCheckedChange={() => handleMonthToggle(month)}
+                              />
+                              <Label
+                                htmlFor={`future-${month}`}
+                                className="flex-1 cursor-pointer flex items-center justify-between"
+                              >
+                                <span className="font-medium">{formatMonth(month)}</span>
+                                <span className="text-sm text-blue-600 font-semibold">
+                                  ₹{pendingData.monthlyFee.toLocaleString()}
+                                </span>
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground italic">
+                          💡 You can pay for future months in advance. These months will be marked as paid and won't appear as pending when they arrive.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -341,9 +433,29 @@ export function MonthBasedPaymentDialog({
                     <span className="text-muted-foreground">Selected Months:</span>
                     <span className="font-medium">{selectedMonths.size}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Amount:</span>
-                    <span className="font-bold text-lg">
+                  {(() => {
+                    const selectedPending = Array.from(selectedMonths).filter(m => pendingMonths.includes(m)).length;
+                    const selectedFuture = Array.from(selectedMonths).filter(m => futureMonths.includes(m)).length;
+                    return (
+                      <>
+                        {selectedPending > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Pending:</span>
+                            <span className="text-red-600 font-medium">{selectedPending}</span>
+                          </div>
+                        )}
+                        {selectedFuture > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Advance Payment:</span>
+                            <span className="text-blue-600 font-medium">{selectedFuture}</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <div className="flex justify-between text-sm pt-1 border-t">
+                    <span className="text-muted-foreground font-semibold">Total Amount:</span>
+                    <span className="font-bold text-lg text-blue-700">
                       ₹{calculateTotalAmount().toLocaleString()}
                     </span>
                   </div>
