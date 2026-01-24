@@ -20,7 +20,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, CheckCircle2, Copy, Plus, Trash2 } from "lucide-react";
+import { Loader2, CheckCircle2, Copy, Plus, Trash2, GraduationCap, X, CreditCard, Receipt } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
@@ -49,7 +50,7 @@ const studentSchema = z.object({
     fatherName: z.string().min(2, "Father's Name required"),
     motherName: z.string().optional(),
     parentMobile: z.string().refine((val) => !val || /^\d{10}$/.test(val), "Parent mobile number must be exactly 10 digits").optional(),
-    aadharNo: z.string().regex(/^\d{10}$/, "Phone number must be exactly 12 digits").optional(),
+    aadharNo: z.string().regex(/^\d{12}$/, "Phone number must be exactly 12 digits").optional(),
     nationality: z.string().default("Indian"),
 
     permanentAddress: z.string().optional(),
@@ -103,10 +104,12 @@ export default function AdmissionPage() {
 
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
-    const [batches, setBatches] = useState<any[]>([]);
+    const [batches, setBatches] = useState<Batch[]>([]);
 
     // Data Store
-    const [formData, setFormData] = useState<any>({});
+    const [formData, setFormData] = useState<any>({
+        service_type: "TUITION_BATCH"
+    });
     const [credentials, setCredentials] = useState<any>(null);
 
     // --- Form 1: Comprehensive Details ---
@@ -160,11 +163,11 @@ export default function AdmissionPage() {
     });
 
     // Multiple Batch State - now includes payment per batch
-    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, fee: number, feeModel?: FeeModel, selectedDays?: number, paying: number }[]>([]);
+    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, subject: string, fee: number, feeModel?: FeeModel, selectedDays?: number, paying: number }[]>([]);
     const [tempBatchId, setTempBatchId] = useState("");
     const [tempFee, setTempFee] = useState("");
     const [tempSelectedDays, setTempSelectedDays] = useState<string>("");
-    
+
     // Admission charge (one-time, applies to entire admission, not per batch)
     const [admissionCharge, setAdmissionCharge] = useState<string>("");
     // Payment toward admission charge (separate from batch payments)
@@ -185,44 +188,39 @@ export default function AdmissionPage() {
         return 0;
     };
 
-    // Auto-populate fee when batch is selected
-    const handleBatchSelection = (batchId: string) => {
-        setTempBatchId(batchId);
-        setTempSelectedDays(""); // Reset days selection
-        const selectedBatch = batches.find(b => b.id === batchId);
-        if (selectedBatch) {
-            // Check if days-wise fees is enabled and has configured options
-            const hasDaysWiseFees = selectedBatch.daysWiseFeesEnabled &&
-                selectedBatch.daysWiseFees &&
-                Object.keys(selectedBatch.daysWiseFees).length > 0;
+    // Effect to auto-populate fee when batch/days selected
+    useEffect(() => {
+        const batch = batches.find(b => b.id === tempBatchId);
+        if (!batch) {
+            setTempFee("");
+            return;
+        }
 
-            if (hasDaysWiseFees) {
-                // Don't auto-populate fee, wait for days selection
-                setTempFee("");
-            } else if (selectedBatch.feeModel === "CUSTOM" && selectedBatch.installments && selectedBatch.installments.length > 0) {
-                // For custom, sum all installments
-                const total = selectedBatch.installments.reduce((sum: number, i: InstallmentItem) => sum + (i.amount || 0), 0);
-                setTempFee(total.toString());
-            } else if (selectedBatch.feeAmount) {
-                setTempFee(selectedBatch.feeAmount.toString());
+        if (batch.daysWiseFeesEnabled && batch.daysWiseFees && Object.keys(batch.daysWiseFees).length > 0) {
+            if (tempSelectedDays && batch.daysWiseFees[tempSelectedDays]) {
+                setTempFee(batch.daysWiseFees[tempSelectedDays].toString());
             } else {
                 setTempFee("");
             }
+        } else if (batch.feeModel === "CUSTOM" && batch.installments && batch.installments.length > 0) {
+            const total = batch.installments.reduce((sum: number, i: InstallmentItem) => sum + (i.amount || 0), 0);
+            setTempFee(total.toString());
+        } else if (batch.feeAmount) {
+            setTempFee(batch.feeAmount.toString());
         } else {
             setTempFee("");
         }
-    };
+    }, [tempBatchId, tempSelectedDays, batches]);
 
-    // Handle days selection for days-wise fees
-    const handleDaysSelection = (days: string) => {
-        setTempSelectedDays(days);
-        const batch = batches.find(b => b.id === tempBatchId);
-        if (batch?.daysWiseFees?.[days]) {
-            setTempFee(batch.daysWiseFees[days].toString());
-        }
-    };
+    // Derived state for UI
+    const selectedBatchDetails = batches.find(b => b.id === tempBatchId);
+    const hasDaysWiseFees = selectedBatchDetails?.daysWiseFeesEnabled &&
+        selectedBatchDetails?.daysWiseFees &&
+        Object.keys(selectedBatchDetails.daysWiseFees).length > 0;
 
-    // Get selected batch's installments for display
+    const calculatedFee = tempFee ? parseFloat(tempFee) : 0;
+
+    // Helper to get installments if needed (though new UI might not use it, we keep logic available if referenced or used implicitly)
     const getSelectedBatchInstallments = () => {
         if (!tempBatchId) return null;
         const batch = batches.find(b => b.id === tempBatchId);
@@ -266,7 +264,8 @@ export default function AdmissionPage() {
 
         setSelectedBatches(prev => [...prev, {
             id: tempBatchId,
-            name: `${b.name} - ${b.subject}`,
+            name: b.name,
+            subject: b.subject,
             fee: parseFloat(tempFee),
             feeModel: b.feeModel,
             selectedDays: tempSelectedDays ? parseInt(tempSelectedDays) : undefined,
@@ -284,7 +283,7 @@ export default function AdmissionPage() {
 
     // Update payment for a specific batch
     const updateBatchPayment = (batchId: string, amount: string) => {
-        setSelectedBatches(prev => prev.map(b => 
+        setSelectedBatches(prev => prev.map(b =>
             b.id === batchId ? { ...b, paying: parseFloat(amount) || 0 } : b
         ));
     };
@@ -377,26 +376,34 @@ export default function AdmissionPage() {
                     // Apply admission charge only to the first batch
                     const batchAdmissionCharge = index === 0 ? admissionChargeAmount : 0;
                     const batchAdmissionChargePending = index === 0 ? Math.max(0, admissionChargeAmount - payingAdmissionChargeAmount) : 0;
-                    
+
                     return {
                         batchId: b.id,
                         total_fees: b.fee, // Store batch fee (used for recurring)
                         admission_charge: batchAdmissionCharge, // One-time admission charge (only on first)
                         admission_charge_pending: batchAdmissionChargePending, // Pending admission charge
                         fees_pending: Math.max(0, b.fee - b.paying), // Pending batch fee only
-                        selectedDays: b.selectedDays
+                        selectedDays: b.selectedDays,
+                        // Pass through for payment creation
+                        feeModel: b.feeModel,
+                        paying: b.paying,
+                        index
                     };
                 })
-                : [{ 
-                    batchId: null, 
-                    total_fees: 0, 
-                    admission_charge: admissionChargeAmount, 
+                : [{
+                    batchId: null,
+                    total_fees: 0,
+                    admission_charge: admissionChargeAmount,
                     admission_charge_pending: Math.max(0, admissionChargeAmount - payingAdmissionChargeAmount),
-                    fees_pending: 0, 
-                    selectedDays: undefined 
+                    fees_pending: 0,
+                    selectedDays: undefined,
+                    feeModel: "ONE_TIME", // Default for non-batch
+                    paying: 0,
+                    index: 0
                 }];
 
             for (const adm of admissionsToCreate) {
+                // 2a. Create Admission
                 const admissionRes = await fetch("/api/admissions", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -410,23 +417,60 @@ export default function AdmissionPage() {
                         selectedDays: adm.selectedDays,
                     }),
                 });
-                if (!admissionRes.ok) console.error("Failed to create admission for batch " + adm.batchId);
-            }
 
-            // 3. Create Payment (Single Receipt)
-            // Skip fees_pending update since it's already calculated correctly in admissions above
-            if (totalPaid > 0) {
-                await fetch("/api/payments", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        studentId,
-                        amount: totalPaid,
-                        mode: values.mode,
-                        receipt_no: values.receipt_no,
-                        skipFeesPendingUpdate: true, // fees_pending already set during admission creation
-                    }),
-                });
+                if (!admissionRes.ok) {
+                    console.error("Failed to create admission for batch " + adm.batchId);
+                    continue;
+                }
+
+                const admissionData = await admissionRes.json();
+                const admissionId = admissionData.id;
+
+                // 2b. Create Payment linked to this admission
+                // Calculate amount to pay for this specific admission context
+                // adm.paying (Tuition) + (index===0 ? payingAdmissionChargeAmount : 0)
+                const tuitionPayment = adm.paying || 0;
+                const admChargePayment = adm.index === 0 ? payingAdmissionChargeAmount : 0;
+                const totalPaymentForThisBatch = tuitionPayment + admChargePayment;
+
+                if (totalPaymentForThisBatch > 0) {
+                    // Check if tuition is fully paid for one or more months
+                    let months: string[] = [];
+                    // Only applicable for Monthly/Quarterly batches where fee > 0
+                    if ((adm.feeModel === "MONTHLY" || adm.feeModel === "QUARTERLY") && adm.total_fees > 0) {
+                        const monthlyFee = adm.feeModel === "QUARTERLY" ? adm.total_fees / 3 : adm.total_fees;
+
+                        // Calculate how many months are covered
+                        // Use 0.01 tolerance for floating point math
+                        const monthsCovered = Math.floor((tuitionPayment + 0.01) / monthlyFee);
+
+                        if (monthsCovered > 0) {
+                            const today = new Date();
+                            for (let i = 0; i < monthsCovered; i++) {
+                                const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+                                const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                                months.push(mStr);
+                            }
+                        }
+                    }
+
+                    // Handle generic receipt number - unique if multiple batches
+                    const receiptSuffix = admissionsToCreate.length > 1 ? `-${adm.index + 1}` : "";
+
+                    await fetch("/api/payments", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            studentId,
+                            admissionId, // Link to admission!
+                            amount: totalPaymentForThisBatch,
+                            mode: values.mode,
+                            receipt_no: values.receipt_no + receiptSuffix,
+                            months: months, // Pass calculated months
+                            skipFeesPendingUpdate: true, // Fees pending is already set correctly during admission creation
+                        }),
+                    });
+                }
             }
 
             // 4. Update Enquiry
@@ -624,7 +668,14 @@ export default function AdmissionPage() {
                                             <FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <FormField control={studentForm.control} name="aadharNo" render={({ field }) => (
-                                            <FormItem><FormLabel>Aadhar No</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                                            <FormItem><FormLabel>Aadhar No</FormLabel><FormControl><Input {...field} maxLength={12}
+                                                inputMode="numeric" 
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    if (value === "" || /^\d+$/.test(value)) {
+                                                        field.onChange(value);
+                                                    }
+                                                }} /></FormControl></FormItem>
                                         )} />
                                         <FormField control={studentForm.control} name="nationality" render={({ field }) => (
                                             <FormItem><FormLabel>Nationality</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
@@ -723,248 +774,288 @@ export default function AdmissionPage() {
             )}
 
             {step === 3 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>3. Fees & Payment</CardTitle>
-                        <CardDescription>Finalize admission</CardDescription>
+                <Card className="w-full max-w-2xl mx-auto shadow-lg">
+                    <CardHeader className="bg-primary/5 border-b">
+                        <CardTitle className="flex items-center gap-3 text-xl">
+                            <GraduationCap className="h-6 w-6 text-primary" />
+                            Student Admission
+                        </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <Form {...paymentForm}>
-                            <form onSubmit={paymentForm.handleSubmit(onFinalSubmit)} className="space-y-4">
-                                <div className="p-4 bg-muted/50 rounded-lg mb-4">
-                                    <h4 className="font-semibold text-sm text-muted-foreground uppercase mb-1">Service Type</h4>
-                                    <p className="font-medium text-lg">{formData.service_type === "TUITION_BATCH" ? "Tuition Batch" : "Home Tutor"}</p>
-                                </div>
 
-                                {formData.service_type === "TUITION_BATCH" && (
-                                    <div className="space-y-4 border p-4 rounded-md bg-slate-50">
-                                        <h4 className="font-semibold text-sm">Batch Assignment</h4>
-                                        <div className="grid grid-cols-12 gap-2 items-end">
-                                            <div className="col-span-4">
-                                                <Label className="text-xs">Batch</Label>
-                                                <Select value={tempBatchId} onValueChange={handleBatchSelection}>
-                                                    <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
+                    <CardContent className="p-6 space-y-6">
+                        {/* Section 1: Batch Selection */}
+                        <section>
+                            <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
+                                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
+                                Select Batches
+                            </h3>
+
+                            <div className="space-y-4">
+                                {/* Batch Selector */}
+                                <div className="p-4 bg-muted/30 rounded-lg border border-dashed">
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-medium">Choose Batch</Label>
+                                            <Select value={tempBatchId} onValueChange={(v) => { setTempBatchId(v); setTempSelectedDays(""); }}>
+                                                <SelectTrigger className="h-11">
+                                                    <SelectValue placeholder="Select a batch..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {batches.filter(b => !selectedBatches.some(sb => sb.id === b.id)).map(b => (
+                                                        <SelectItem key={b.id} value={b.id} className="py-3">
+                                                            <div className="flex flex-col text-left">
+                                                                <span className="font-medium">{b.name}</span>
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    {b.subject} • ₹{(b.feeAmount || 0).toLocaleString()}/{getFeeModelLabel(b.feeModel!)}
+                                                                    {b.daysWiseFeesEnabled && " • Days-wise pricing"}
+                                                                </span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {hasDaysWiseFees && (
+                                            <div className="space-y-2">
+                                                <Label className="text-sm font-medium">Days per Week</Label>
+                                                <Select value={tempSelectedDays} onValueChange={setTempSelectedDays}>
+                                                    <SelectTrigger className="h-11">
+                                                        <SelectValue placeholder="Select days..." />
+                                                    </SelectTrigger>
                                                     <SelectContent>
-                                                        {batches.map(b => (
-                                                            <SelectItem key={b.id} value={b.id}>
-                                                                {b.name} - {b.subject}
-                                                                {b.feeModel && <span className="text-muted-foreground ml-1">({b.feeModel === "ONE_TIME" ? "One-time" : b.feeModel === "MONTHLY" ? "Monthly" : b.feeModel === "QUARTERLY" ? "Quarterly" : "Custom"})</span>}
-                                                                {b.daysWiseFeesEnabled && <span className="text-green-600 ml-1">[Days-wise]</span>}
-                                                            </SelectItem>
-                                                        ))}
+                                                        {Object.entries(selectedBatchDetails?.daysWiseFees || {})
+                                                            .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                                                            .map(([days, fee]) => (
+                                                                <SelectItem key={days} value={days} className="py-3">
+                                                                    <span className="font-medium">{days} days/week</span>
+                                                                    <span className="text-muted-foreground ml-2">— ₹{fee.toLocaleString()}</span>
+                                                                </SelectItem>
+                                                            ))}
                                                     </SelectContent>
                                                 </Select>
                                             </div>
-                                            {/* Days per week selector - only show if batch has days-wise fees with configured options */}
-                                            {tempBatchId && (() => {
-                                                const batch = batches.find(b => b.id === tempBatchId);
-                                                return batch?.daysWiseFeesEnabled && batch?.daysWiseFees && Object.keys(batch.daysWiseFees).length > 0;
-                                            })() && (
-                                                    <div className="col-span-2">
-                                                        <Label className="text-xs">Days/Week</Label>
-                                                        <Select value={tempSelectedDays} onValueChange={handleDaysSelection}>
-                                                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                                                            <SelectContent>
-                                                                {(() => {
-                                                                    const batch = batches.find(b => b.id === tempBatchId);
-                                                                    if (!batch || !batch.daysWiseFees) return null;
-                                                                    // Only show days that have been configured with fees
-                                                                    const configuredDays = Object.keys(batch.daysWiseFees)
-                                                                        .map(Number)
-                                                                        .sort((a, b) => a - b);
-                                                                    return configuredDays.map((dayCount) => (
-                                                                        <SelectItem key={dayCount} value={dayCount.toString()}>
-                                                                            {dayCount} day{dayCount > 1 ? 's' : ''} - ₹{batch.daysWiseFees![dayCount.toString()].toLocaleString()}
-                                                                        </SelectItem>
-                                                                    ));
-                                                                })()}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                )}
-                                            {(() => {
-                                                const batch = tempBatchId ? batches.find(b => b.id === tempBatchId) : null;
-                                                const hasDaysWiseFees = batch?.daysWiseFeesEnabled && batch?.daysWiseFees && Object.keys(batch.daysWiseFees).length > 0;
-                                                return (
-                                                    <>
-                                                        <div className={hasDaysWiseFees ? "col-span-4" : "col-span-8"}>
-                                                            <Label className="text-xs">Batch Fee {batch?.feeModel && <span className="text-muted-foreground">({getFeeModelLabel(batch.feeModel as FeeModel)})</span>}</Label>
-                                                            <Input 
-                                                                type="number" 
-                                                                placeholder="₹0" 
-                                                                value={tempFee} 
-                                                                readOnly 
-                                                                className="bg-gray-100 cursor-not-allowed"
-                                                                title="Batch fee is fixed and cannot be changed"
-                                                            />
-                                                        </div>
-                                                        <div className="col-span-2">
-                                                            <Label className="text-xs">&nbsp;</Label>
-                                                            <Button type="button" onClick={addBatch} disabled={!tempBatchId || !tempFee || (hasDaysWiseFees && !tempSelectedDays)} className="w-full">
-                                                                <Plus className="h-4 w-4" /> Add
-                                                            </Button>
-                                                        </div>
-                                                    </>
-                                                );
-                                            })()}
+                                        )}
+                                    </div>
+
+                                    {selectedBatchDetails && (
+                                        <div className="mt-4 flex items-center justify-between">
+                                            <div className="text-sm">
+                                                <span className="text-muted-foreground">Batch Fee:</span>
+                                                <span className="font-semibold text-lg ml-2">₹{calculatedFee.toLocaleString()}</span>
+                                                <Badge variant="secondary" className="ml-2">{getFeeModelLabel(selectedBatchDetails.feeModel!)}</Badge>
+                                            </div>
+                                            <Button
+                                                onClick={addBatch}
+                                                disabled={!tempBatchId || (hasDaysWiseFees && !tempSelectedDays)}
+                                                className="gap-2"
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                                Add Batch
+                                            </Button>
                                         </div>
+                                    )}
+                                </div>
 
-                                        {/* Custom Installments Breakdown */}
-                                        {getSelectedBatchInstallments() && (
-                                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                                <h5 className="text-xs font-semibold text-blue-800 mb-2">Installment Breakdown</h5>
-                                                <div className="space-y-1">
-                                                    {getSelectedBatchInstallments()!.map((inst: InstallmentItem, idx: number) => (
-                                                        <div key={idx} className="flex justify-between text-xs">
-                                                            <span>{inst.name}</span>
-                                                            <span className="font-medium">₹{inst.amount?.toLocaleString() || 0} {inst.dueDate && <span className="text-muted-foreground ml-1">(Due: {new Date(inst.dueDate).toLocaleDateString()})</span>}</span>
-                                                        </div>
-                                                    ))}
-                                                    <div className="flex justify-between text-xs font-bold pt-1 border-t border-blue-200">
-                                                        <span>Total</span>
-                                                        <span>₹{getSelectedBatchInstallments()!.reduce((sum: number, i: InstallmentItem) => sum + (i.amount || 0), 0).toLocaleString()}</span>
+                                {/* Selected Batches */}
+                                {selectedBatches.length > 0 && (
+                                    <div className="space-y-3">
+                                        {selectedBatches.map((batch) => (
+                                            <div
+                                                key={batch.id}
+                                                className="flex items-center gap-4 p-4 bg-card border rounded-lg shadow-sm"
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h4 className="font-medium truncate">{batch.name}</h4>
+                                                        <Badge variant="outline" className="text-xs">{getFeeModelLabel(batch.feeModel!)}</Badge>
+                                                        {batch.selectedDays && (
+                                                            <Badge variant="secondary" className="text-xs">{batch.selectedDays} days/week</Badge>
+                                                        )}
                                                     </div>
+                                                    <p className="text-sm text-muted-foreground mt-0.5">
+                                                        {batch.subject} • Fee: ₹{batch.fee.toLocaleString()}
+                                                    </p>
                                                 </div>
-                                            </div>
-                                        )}
-
-                                        {/* Selected Batches List */}
-                                        {selectedBatches.length > 0 && (
-                                            <div className="space-y-3">
-                                                {/* Fee Breakdown Section */}
-                                                <div className="p-3 bg-gray-50 border rounded-md space-y-3">
-                                                    <h5 className="text-sm font-semibold text-gray-700">Fee Breakdown</h5>
-                                                    
-                                                    {/* Batch Fees */}
-                                                    {selectedBatches.map(b => (
-                                                        <div key={b.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0">
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-medium text-sm">{b.name}</span>
-                                                                    {b.feeModel && <span className="text-xs text-blue-600">{getFeeModelLabel(b.feeModel)}</span>}
-                                                                    {b.selectedDays && <span className="text-xs text-green-600">({b.selectedDays} day{b.selectedDays > 1 ? 's' : ''}/week)</span>}
-                                                                    <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeBatch(b.id)}>
-                                                                        <Trash2 className="h-3 w-3 text-red-500" />
-                                                                    </Button>
-                                                                </div>
-                                                                <div className="text-xs text-muted-foreground">
-                                                                    Fee: ₹{b.fee.toLocaleString()} (recurring)
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Label className="text-xs whitespace-nowrap">Paying:</Label>
-                                                                <Input 
-                                                                    type="number" 
-                                                                    placeholder="₹0" 
-                                                                    value={b.paying || ''} 
-                                                                    onChange={e => updateBatchPayment(b.id, e.target.value)}
-                                                                    className="w-24 text-right"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                    
-                                                    <div className="flex justify-between text-sm pt-2 border-t">
-                                                        <span>Subtotal (Batch Fees):</span>
-                                                        <span className="font-medium">₹{totalBatchFees.toLocaleString()}</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                {/* Admission Charge Section */}
-                                                <div className="p-3 bg-orange-50 border border-orange-200 rounded-md space-y-3">
-                                                    <h5 className="text-sm font-semibold text-orange-800">Admission Charge (one-time)</h5>
-                                                    
-                                                    <div className="flex items-center justify-between">
-                                                        <Label className="text-sm">Charge Amount:</Label>
-                                                        <Input 
-                                                            type="number" 
-                                                            placeholder="₹0" 
-                                                            value={admissionCharge} 
-                                                            onChange={e => setAdmissionCharge(e.target.value)}
-                                                            className="w-28 text-right"
-                                                        />
-                                                    </div>
-                                                    
-                                                    {admissionChargeAmount > 0 && (
-                                                        <div className="flex items-center justify-between">
-                                                            <Label className="text-sm">Paying Now:</Label>
-                                                            <Input 
-                                                                type="number" 
-                                                                placeholder="₹0" 
-                                                                value={payingAdmissionCharge} 
-                                                                onChange={e => setPayingAdmissionCharge(e.target.value)}
-                                                                className="w-28 text-right"
-                                                                max={admissionChargeAmount}
+                                                <div className="flex items-center gap-3">
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs text-muted-foreground">Paying Now</Label>
+                                                        <div className="relative">
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                                                            <Input
+                                                                type="number"
+                                                                value={batch.paying || ""}
+                                                                onChange={(e) => updateBatchPayment(batch.id, e.target.value)}
+                                                                className="w-28 h-10 pl-7 text-right font-medium"
                                                             />
                                                         </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Summary Section */}
-                                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md space-y-2">
-                                                    <div className="flex justify-between text-sm">
-                                                        <span>Total Batch Fees:</span>
-                                                        <span>₹{totalBatchFees.toLocaleString()}</span>
                                                     </div>
-                                                    {admissionChargeAmount > 0 && (
-                                                        <div className="flex justify-between text-sm">
-                                                            <span>Admission Charge:</span>
-                                                            <span>₹{admissionChargeAmount.toLocaleString()}</span>
-                                                        </div>
-                                                    )}
-                                                    <div className="flex justify-between text-sm font-bold pt-2 border-t border-blue-200">
-                                                        <span>Grand Total:</span>
-                                                        <span>₹{totalFees.toLocaleString()}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-sm pt-2 border-t border-blue-200">
-                                                        <span className="text-green-700">Total Paying Now:</span>
-                                                        <span className="text-green-700 font-medium">₹{totalPaid.toLocaleString()}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className={totalPending > 0 ? 'text-red-600' : 'text-green-600'}>Pending:</span>
-                                                        <span className={`font-bold ${totalPending > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                            ₹{totalPending.toLocaleString()}
-                                                        </span>
-                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => removeBatch(batch.id)}
+                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10 mt-5"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
                                                 </div>
                                             </div>
-                                        )}
+                                        ))}
                                     </div>
                                 )}
+                            </div>
+                        </section>
 
-                                {/* Global Payment Details */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    {/* Removed separate Amount input as it is calculated */}
-                                    <div className="space-y-2">
-                                        <Label>Total Paying Now</Label>
-                                        <Input disabled value={`₹${totalPaid.toLocaleString()}`} />
+                        <Separator />
+
+                        {/* Section 2: Admission Charge */}
+                        <section>
+                            <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
+                                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
+                                Admission Charge
+                                <Badge variant="outline" className="font-normal text-xs ml-1">One-time</Badge>
+                            </h3>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Charge Amount</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                                        <Input
+                                            type="number"
+                                            value={admissionCharge}
+                                            onChange={(e) => setAdmissionCharge(e.target.value)}
+                                            className="h-11 pl-7 text-lg font-medium"
+                                        />
                                     </div>
-                                    <FormField control={paymentForm.control} name="mode" render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Payment Mode</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                                <SelectContent>
-                                                    <SelectItem value="CASH">Cash</SelectItem>
-                                                    <SelectItem value="UPI">UPI</SelectItem>
-                                                    <SelectItem value="BANK">Bank Transfer</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </FormItem>
-                                    )} />
                                 </div>
-                                <FormField control={paymentForm.control} name="receipt_no" render={({ field }) => (
-                                    <FormItem><FormLabel>Receipt No</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                                )} />
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Paying Now</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                                        <Input
+                                            type="number"
+                                            value={payingAdmissionCharge}
+                                            onChange={(e) => setPayingAdmissionCharge(e.target.value)}
+                                            className="h-11 pl-7 text-lg font-medium"
+                                            max={admissionChargeAmount}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
 
-                                <div className="flex gap-4">
-                                    <Button type="button" variant="ghost" onClick={() => setStep(2)}>Back</Button>
-                                    <Button type="submit" className="flex-1" disabled={loading}>
-                                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Complete Admission
-                                    </Button>
+                        <Separator />
+
+                        {/* Section 3: Payment Summary */}
+                        <section>
+                            <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
+                                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
+                                Payment Summary
+                            </h3>
+
+                            {/* Summary Card */}
+                            <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-muted-foreground">Batch Fees ({selectedBatches.length} batch{selectedBatches.length !== 1 ? "es" : ""})</span>
+                                    <span className="font-medium">₹{totalBatchFees.toLocaleString()}</span>
                                 </div>
-                            </form>
-                        </Form>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-muted-foreground">Admission Charge</span>
+                                    <span className="font-medium">₹{admissionChargeAmount.toLocaleString()}</span>
+                                </div>
+                                <Separator />
+                                <div className="flex justify-between items-center">
+                                    <span className="font-semibold">Grand Total</span>
+                                    <span className="font-bold text-xl">₹{totalFees.toLocaleString()}</span>
+                                </div>
+                                <Separator />
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-green-600 font-medium flex items-center gap-1">
+                                        <CreditCard className="h-4 w-4" />
+                                        Paying Now
+                                    </span>
+                                    <span className="font-semibold text-green-600 text-lg">₹{totalPaid.toLocaleString()}</span>
+                                </div>
+                                {totalPending > 0 && (
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-amber-600 font-medium">Pending Amount</span>
+                                        <span className="font-semibold text-amber-600">₹{totalPending.toLocaleString()}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Payment Details */}
+                            <Form {...paymentForm}>
+                                <div className="grid gap-4 md:grid-cols-2 mt-4">
+                                    <FormField
+                                        control={paymentForm.control}
+                                        name="mode"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-2">
+                                                <FormLabel className="text-sm font-medium">Payment Mode</FormLabel>
+                                                <Select value={field.value} onValueChange={field.onChange}>
+                                                    <SelectTrigger className="h-11">
+                                                        <SelectValue placeholder="Select Mode" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="CASH">Cash</SelectItem>
+                                                        <SelectItem value="UPI">UPI</SelectItem>
+                                                        <SelectItem value="BANK">Bank Transfer</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={paymentForm.control}
+                                        name="receipt_no"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-2">
+                                                <FormLabel className="text-sm font-medium flex items-center gap-1">
+                                                    <Receipt className="h-3.5 w-3.5" />
+                                                    Receipt Number
+                                                </FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="Enter receipt no."
+                                                        className="h-11"
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            </Form>
+                        </section>
+
+                        {/* Submit Button */}
+                        <div className="flex gap-4">
+                            <Button type="button" variant="outline" size="lg" className="px-6" onClick={() => setStep(2)}>
+                                Back
+                            </Button>
+                            <Button
+                                onClick={paymentForm.handleSubmit(onFinalSubmit)}
+                                disabled={loading || (formData.service_type === "TUITION_BATCH" && selectedBatches.length === 0)}
+                                className="w-full h-12 text-base font-semibold gap-2"
+                                size="lg"
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <GraduationCap className="h-5 w-5" />
+                                        Complete Admission
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
             )}

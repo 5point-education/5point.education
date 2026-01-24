@@ -106,10 +106,10 @@ export async function POST(req: Request) {
             const monthlyFee = getMonthlyFee(admission.batch, admission);
             const expectedAmount = months.length * monthlyFee;
 
-            // Allow small rounding differences (0.01)
-            if (Math.abs(paymentAmount - expectedAmount) > 0.01) {
+            // Allow overpayment (e.g. including admission charge) but not underpayment
+            if (paymentAmount < expectedAmount - 0.01) {
                 return new NextResponse(
-                    `Amount mismatch. Expected ₹${expectedAmount} for ${months.length} month(s) at ₹${monthlyFee}/month`,
+                    `Amount mismatch. Minimum expected ₹${expectedAmount} for ${months.length} month(s) at ₹${monthlyFee}/month`,
                     { status: 400 }
                 );
             }

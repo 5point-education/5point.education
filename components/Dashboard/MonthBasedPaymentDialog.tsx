@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -20,9 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { IndianRupee, Loader2, Calendar } from "lucide-react";
+import { Loader2, Calendar, CheckCircle2, Clock, Receipt } from "lucide-react";
 import { formatMonth } from "@/lib/fees-utils";
 
 interface Admission {
@@ -73,41 +73,43 @@ export function MonthBasedPaymentDialog({
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showAdvancePayment, setShowAdvancePayment] = useState(false);
   const { toast } = useToast();
 
   const selectedAdmission = admissions.find((a) => a.id === selectedAdmissionId);
 
   // Fetch pending fees when admission is selected
   useEffect(() => {
+    const fetchPendingFees = async () => {
+      if (!selectedAdmissionId) return;
+
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/fees/pending?admissionId=${selectedAdmissionId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch pending fees");
+        }
+        const data = await response.json();
+        setPendingData(data);
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to fetch pending fees",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (selectedAdmissionId && open) {
       fetchPendingFees();
     } else {
       setPendingData(null);
       setSelectedMonths(new Set());
+      setShowAdvancePayment(false);
     }
-  }, [selectedAdmissionId, open]);
-
-  const fetchPendingFees = async () => {
-    if (!selectedAdmissionId) return;
-
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/fees/pending?admissionId=${selectedAdmissionId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch pending fees");
-      }
-      const data = await response.json();
-      setPendingData(data);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to fetch pending fees",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [selectedAdmissionId, open, toast]);
 
   const handleMonthToggle = (month: string) => {
     const newSelected = new Set(selectedMonths);
@@ -119,23 +121,12 @@ export function MonthBasedPaymentDialog({
     setSelectedMonths(newSelected);
   };
 
-  const handleSelectAllPending = () => {
+  const handleSelectAllDue = () => {
     if (!pendingData) return;
-    setSelectedMonths(new Set(pendingData.pendingMonths));
-  };
-
-  const handleSelectAllFuture = () => {
-    if (!pendingData || !pendingData.futureMonths) return;
-    setSelectedMonths(new Set(pendingData.futureMonths));
-  };
-
-  const handleSelectAll = () => {
-    if (!pendingData) return;
-    const allSelectable = [
-      ...pendingData.pendingMonths,
-      ...(pendingData.futureMonths || []),
-    ];
-    setSelectedMonths(new Set(allSelectable));
+    // Keep future months if already selected, but ensure all pending are selected
+    const futureSelected = Array.from(selectedMonths).filter(m => pendingData.futureMonths?.includes(m));
+    const newSelection = new Set([...pendingData.pendingMonths, ...futureSelected]);
+    setSelectedMonths(newSelection);
   };
 
   const handleClearSelection = () => {
@@ -145,6 +136,12 @@ export function MonthBasedPaymentDialog({
   const calculateTotalAmount = () => {
     if (!pendingData || selectedMonths.size === 0) return 0;
     return selectedMonths.size * pendingData.monthlyFee;
+  };
+
+  const handleAdmissionChange = (val: string) => {
+    setSelectedAdmissionId(val);
+    setPendingData(null);
+    setSelectedMonths(new Set());
   };
 
   const handleSubmit = async () => {
@@ -182,14 +179,15 @@ export function MonthBasedPaymentDialog({
         title: "Success",
         description: "Payment recorded successfully",
       });
-      
+
       // Reset form
       setSelectedAdmissionId("");
       setSelectedMonths(new Set());
       setReceiptNo("");
       setNotes("");
       setPaymentMode("CASH");
-      
+      setShowAdvancePayment(false);
+
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -211,291 +209,286 @@ export function MonthBasedPaymentDialog({
   const paidMonths = pendingData?.coveredMonthsList || [];
   const pendingMonths = pendingData?.pendingMonths || [];
   const futureMonths = pendingData?.futureMonths || [];
+  const allSelectableMonths = [...pendingMonths, ...futureMonths];
+
+  const selectedPendingCount = Array.from(selectedMonths).filter(m => pendingMonths.includes(m)).length;
+  const selectedFutureCount = Array.from(selectedMonths).filter(m => futureMonths.includes(m)).length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Record Payment - Month Selection</DialogTitle>
-          <DialogDescription>
-            Record payment for {studentName} by selecting specific months
-          </DialogDescription>
+      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
+          <DialogTitle className="text-xl">Record Payment</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Recording payment for{" "}
+            <span className="font-medium text-foreground">{studentName}</span>
+          </p>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Admission Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="admission">Select Admission</Label>
-            <Select value={selectedAdmissionId} onValueChange={setSelectedAdmissionId}>
-              <SelectTrigger id="admission">
-                <SelectValue placeholder="Select an admission" />
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          {/* Step 1: Select Admission */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                1
+              </div>
+              <Label className="text-base font-medium">Select Admission</Label>
+            </div>
+            <Select
+              value={selectedAdmissionId}
+              onValueChange={handleAdmissionChange}
+            >
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Choose a batch..." />
               </SelectTrigger>
               <SelectContent>
                 {eligibleAdmissions.map((adm) => (
-                  <SelectItem key={adm.id} value={adm.id}>
-                    {adm.batchName} ({adm.feeModel})
+                  <SelectItem key={adm.id} value={adm.id} className="py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{adm.batchName}</span>
+                      <Badge variant="outline" className="text-xs font-normal ml-2">{adm.feeModel}</Badge>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {eligibleAdmissions.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No admissions with MONTHLY or QUARTERLY fee model found
-              </p>
+              <p className="text-xs text-muted-foreground ml-8">No eligible admissions found (Monthly/Quarterly only).</p>
             )}
           </div>
 
-          {/* Pending Fees Info */}
           {loading && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin" />
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           )}
 
           {pendingData && !loading && (
             <>
-              <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Monthly Fee:</span>
-                  <span className="font-medium">₹{pendingData.monthlyFee.toLocaleString()}</span>
+              {/* Fee Summary Card */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Monthly Fee
+                  </p>
+                  <p className="font-semibold">
+                    Rs. {pendingData.monthlyFee.toLocaleString()}
+                  </p>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Months:</span>
-                  <span className="font-medium">{pendingData.totalMonths}</span>
+                <div className="bg-muted/50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Total Months
+                  </p>
+                  <p className="font-semibold">{pendingData.totalMonths}</p>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Paid Months:</span>
-                  <span className="font-medium text-green-600">{pendingData.coveredMonths}</span>
+                <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-emerald-600 mb-1">Paid</p>
+                  <p className="font-semibold text-emerald-700">
+                    {pendingData.coveredMonths}
+                  </p>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Pending Months:</span>
-                  <span className="font-medium text-red-600">{pendingMonths.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Pending:</span>
-                  <span className="font-medium text-red-600">
-                    ₹{pendingData.pendingAmount.toLocaleString()}
-                  </span>
+                <div className="bg-amber-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-amber-600 mb-1">Pending</p>
+                  <p className="font-semibold text-amber-700">
+                    {pendingMonths.length}
+                  </p>
                 </div>
               </div>
 
-              {/* Paid Months Display */}
-              {paidMonths.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Paid Months</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {paidMonths.map((month) => (
-                      <Badge key={month} variant="outline" className="bg-green-50 text-green-700">
-                        ✅ {formatMonth(month)}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Month Selection */}
-              <div className="space-y-4">
+              {/* Step 2: Select Months */}
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label>Select Months to Pay</Label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                      2
+                    </div>
+                    <Label className="text-base font-medium">
+                      Select Months
+                    </Label>
+                  </div>
                   <div className="flex gap-2">
                     {pendingMonths.length > 0 && (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handleSelectAllPending}
+                        onClick={handleSelectAllDue}
+                        className="text-xs h-8 bg-transparent"
                       >
-                        Select All Pending
+                        Select Due ({pendingMonths.length})
                       </Button>
                     )}
-                    {futureMonths.length > 0 && (
+                    {selectedMonths.size > 0 && (
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={handleSelectAllFuture}
+                        onClick={handleClearSelection}
+                        className="text-xs h-8"
                       >
-                        Select All Future
+                        Clear
                       </Button>
                     )}
-                    {(pendingMonths.length > 0 || futureMonths.length > 0) && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleSelectAll}
-                      >
-                        Select All
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleClearSelection}
-                      disabled={selectedMonths.size === 0}
-                    >
-                      Clear
-                    </Button>
                   </div>
                 </div>
 
-                {pendingMonths.length === 0 && futureMonths.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    All months are paid! 🎉
-                  </p>
+                {/* Paid Months - Compact Display */}
+                {paidMonths.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap ml-8">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                      Paid:
+                    </span>
+                    {paidMonths.map((month) => (
+                      <div
+                        key={month}
+                        className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-100"
+                      >
+                        {formatMonth(month)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Selectable Months */}
+                {allSelectableMonths.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-500" />
+                    <p className="font-medium">All months are paid!</p>
+                  </div>
                 ) : (
-                  <div className="space-y-4">
-                    {/* Pending Months Section */}
+                  <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                    {/* Pending Months */}
                     {pendingMonths.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-red-600 font-semibold">
-                            Pending Months (Due)
-                          </Label>
-                          <Badge variant="outline" className="bg-red-50 text-red-700">
-                            {pendingMonths.length} month{pendingMonths.length !== 1 ? 's' : ''}
-                          </Badge>
+                      <div className="p-3 bg-amber-50/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Clock className="w-4 h-4 text-amber-600" />
+                          <span className="text-sm font-medium text-amber-700">
+                            Due Months
+                          </span>
                         </div>
-                        <div className="border border-red-200 rounded-lg p-4 max-h-60 overflow-y-auto space-y-2 bg-red-50/30">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {pendingMonths.map((month) => (
-                            <div
+                            <label
                               key={month}
-                              className="flex items-center space-x-2 p-2 hover:bg-red-100/50 rounded"
+                              className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${selectedMonths.has(month)
+                                ? "bg-amber-100 border-amber-300"
+                                : "bg-background border-transparent hover:bg-amber-100/50"
+                                }`}
                             >
                               <Checkbox
-                                id={`pending-${month}`}
                                 checked={selectedMonths.has(month)}
                                 onCheckedChange={() => handleMonthToggle(month)}
+                                className="data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
                               />
-                              <Label
-                                htmlFor={`pending-${month}`}
-                                className="flex-1 cursor-pointer flex items-center justify-between"
-                              >
-                                <span className="font-medium">{formatMonth(month)}</span>
-                                <span className="text-sm text-red-600 font-semibold">
-                                  ₹{pendingData.monthlyFee.toLocaleString()}
-                                </span>
-                              </Label>
-                            </div>
+                              <span className="text-sm font-medium">
+                                {formatMonth(month)}
+                              </span>
+                            </label>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Future Months Section (Advance Payment) */}
+                    {/* Future Months */}
                     {futureMonths.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-blue-600 font-semibold">
-                            Future Months (Advance Payment)
-                          </Label>
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                            {futureMonths.length} month{futureMonths.length !== 1 ? 's' : ''}
-                          </Badge>
+                      <div className="p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-muted-foreground">
+                              Advance Payment
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="advance-toggle" className="text-xs text-muted-foreground cursor-pointer">Show Future Months</Label>
+                            <Switch id="advance-toggle" checked={showAdvancePayment} onCheckedChange={setShowAdvancePayment} className="scale-75 origin-right" />
+                          </div>
                         </div>
-                        <div className="border border-blue-200 rounded-lg p-4 max-h-60 overflow-y-auto space-y-2 bg-blue-50/30">
-                          {futureMonths.map((month) => (
-                            <div
-                              key={month}
-                              className="flex items-center space-x-2 p-2 hover:bg-blue-100/50 rounded"
-                            >
-                              <Checkbox
-                                id={`future-${month}`}
-                                checked={selectedMonths.has(month)}
-                                onCheckedChange={() => handleMonthToggle(month)}
-                              />
-                              <Label
-                                htmlFor={`future-${month}`}
-                                className="flex-1 cursor-pointer flex items-center justify-between"
+
+                        {showAdvancePayment && (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                            {futureMonths.map((month) => (
+                              <label
+                                key={month}
+                                className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${selectedMonths.has(month)
+                                  ? "bg-primary/10 border-primary/30"
+                                  : "bg-background border-transparent hover:bg-muted/50"
+                                  }`}
                               >
-                                <span className="font-medium">{formatMonth(month)}</span>
-                                <span className="text-sm text-blue-600 font-semibold">
-                                  ₹{pendingData.monthlyFee.toLocaleString()}
+                                <Checkbox
+                                  checked={selectedMonths.has(month)}
+                                  onCheckedChange={() => handleMonthToggle(month)}
+                                />
+                                <span className="text-sm">
+                                  {formatMonth(month)}
                                 </span>
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-xs text-muted-foreground italic">
-                          💡 You can pay for future months in advance. These months will be marked as paid and won't appear as pending when they arrive.
-                        </p>
+                              </label>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Selected Months Summary */}
-              {selectedMonths.size > 0 && (
-                <div className="bg-blue-50 p-3 rounded-lg space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Selected Months:</span>
-                    <span className="font-medium">{selectedMonths.size}</span>
+              {/* Step 3: Payment Details */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                    3
                   </div>
-                  {(() => {
-                    const selectedPending = Array.from(selectedMonths).filter(m => pendingMonths.includes(m)).length;
-                    const selectedFuture = Array.from(selectedMonths).filter(m => futureMonths.includes(m)).length;
-                    return (
-                      <>
-                        {selectedPending > 0 && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">Pending:</span>
-                            <span className="text-red-600 font-medium">{selectedPending}</span>
-                          </div>
-                        )}
-                        {selectedFuture > 0 && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-muted-foreground">Advance Payment:</span>
-                            <span className="text-blue-600 font-medium">{selectedFuture}</span>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                  <div className="flex justify-between text-sm pt-1 border-t">
-                    <span className="text-muted-foreground font-semibold">Total Amount:</span>
-                    <span className="font-bold text-lg text-blue-700">
-                      ₹{calculateTotalAmount().toLocaleString()}
+                  <Label className="text-base font-medium">
+                    Payment Details
+                  </Label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mode" className="text-sm">
+                      Payment Mode
+                    </Label>
+                    <Select value={paymentMode} onValueChange={setPaymentMode}>
+                      <SelectTrigger id="mode" className="h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CASH">Cash</SelectItem>
+                        <SelectItem value="UPI">UPI</SelectItem>
+                        <SelectItem value="BANK">Bank Transfer</SelectItem>
+                        <SelectItem value="CHEQUE">Cheque</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="receipt" className="text-sm">
+                      Receipt No. <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="receipt"
+                      value={receiptNo}
+                      onChange={(e) => setReceiptNo(e.target.value)}
+                      placeholder="REC-001"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes" className="text-sm">
+                    Notes{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (optional)
                     </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Payment Details */}
-              <div className="space-y-4 border-t pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="mode">Payment Mode</Label>
-                  <Select value={paymentMode} onValueChange={setPaymentMode}>
-                    <SelectTrigger id="mode">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CASH">Cash</SelectItem>
-                      <SelectItem value="UPI">UPI</SelectItem>
-                      <SelectItem value="BANK">Bank Transfer</SelectItem>
-                      <SelectItem value="CHEQUE">Cheque</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="receipt">Receipt Number *</Label>
-                  <Input
-                    id="receipt"
-                    value={receiptNo}
-                    onChange={(e) => setReceiptNo(e.target.value)}
-                    placeholder="REC-001"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes (Optional)</Label>
+                  </Label>
                   <Input
                     id="notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Optional notes about this payment"
+                    placeholder="Any additional notes..."
+                    className="h-10"
                   />
                 </div>
               </div>
@@ -503,24 +496,66 @@ export function MonthBasedPaymentDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={submitting || selectedMonths.size === 0}>
-            {submitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Recording...
-              </>
-            ) : (
-              <>
-                <IndianRupee className="mr-2 h-4 w-4" />
-                Record Payment
-              </>
-            )}
-          </Button>
-        </DialogFooter>
+        {/* Footer with Summary */}
+        <div className="border-t bg-muted/30 px-6 py-4">
+          {selectedMonths.size > 0 && (
+            <div className="flex items-center justify-between mb-4 pb-4 border-b border-border/50">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  {selectedMonths.size} month
+                  {selectedMonths.size !== 1 ? "s" : ""} selected
+                  {selectedPendingCount > 0 && (
+                    <span className="text-amber-600 font-medium">
+                      {" "}
+                      ({selectedPendingCount} due)
+                    </span>
+                  )}
+                  {selectedFutureCount > 0 && (
+                    <span className="text-primary font-medium">
+                      {" "}
+                      ({selectedFutureCount} advance)
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Total Amount</p>
+                <p className="text-2xl font-bold">
+                  Rs. {calculateTotalAmount().toLocaleString()}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                submitting || selectedMonths.size === 0 || !receiptNo.trim()
+              }
+              className="min-w-32"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Recording...
+                </>
+              ) : (
+                <>
+                  <Receipt className="mr-2 h-4 w-4" />
+                  Record Payment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
