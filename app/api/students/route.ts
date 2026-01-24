@@ -158,7 +158,25 @@ export async function GET(req: Request) {
                 role: Role.STUDENT
             },
             include: {
-                studentProfile: true
+                studentProfile: {
+                    include: {
+                        admissions: {
+                            include: {
+                                batch: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        subject: true,
+                                        isActive: true
+                                    }
+                                }
+                            },
+                            where: {
+                                status: 'ACTIVE'
+                            }
+                        }
+                    }
+                }
             },
             orderBy: {
                 createdAt: 'desc'
@@ -174,7 +192,15 @@ export async function GET(req: Request) {
                 email: u.email,
                 phone: u.studentProfile!.phone,
                 parentName: u.studentProfile!.fatherName,
-                joinDate: u.createdAt
+                joinDate: u.createdAt,
+                batches: u.studentProfile!.admissions
+                    .filter(adm => adm.batch)
+                    .map(adm => ({
+                        id: adm.batch!.id,
+                        name: adm.batch!.name,
+                        subject: adm.batch!.subject,
+                        isActive: adm.batch!.isActive
+                    }))
             }));
 
         return NextResponse.json(formattedStudents);

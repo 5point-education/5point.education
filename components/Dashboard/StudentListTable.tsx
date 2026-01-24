@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -20,8 +21,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, User, Phone, GraduationCap, PlusCircle } from "lucide-react";
+import { Search, User, Phone, Eye, PlusCircle } from "lucide-react";
 import { AddStudentToBatchModal } from "./AddStudentToBatchModal";
+import { StudentDetailsModal } from "./StudentDetailsModal";
+
+interface BatchInfo {
+  id: string;
+  name: string;
+  subject: string;
+  isActive: boolean;
+}
 
 interface Student {
   admissionId: string;
@@ -31,6 +40,7 @@ interface Student {
   phone: string;
   parentName: string;
   joinDate: string;
+  batches?: BatchInfo[];
 }
 
 interface Batch {
@@ -68,6 +78,15 @@ export default function StudentListTable({
   // Modal State
   const [isAddBatchOpen, setIsAddBatchOpen] = useState(false);
   const [selectedStudentForBatch, setSelectedStudentForBatch] = useState<{ id: string, name: string } | null>(null);
+
+  // Details Modal State
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [selectedStudentDetails, setSelectedStudentDetails] = useState<Student | null>(null);
+
+  const openDetailsModal = (student: Student) => {
+    setSelectedStudentDetails(student);
+    setIsDetailsOpen(true);
+  };
 
   // Fetch students when batch is selected
   useEffect(() => {
@@ -207,8 +226,7 @@ export default function StudentListTable({
                           <TableHead>Photo</TableHead>
                           <TableHead>Name</TableHead>
                           <TableHead>Phone</TableHead>
-                          <TableHead>Parent/Guardian</TableHead>
-                          <TableHead>Email</TableHead>
+                          <TableHead>Batches</TableHead>
                           <TableHead>Join Date</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -228,11 +246,22 @@ export default function StudentListTable({
                                 {student.phone}
                               </div>
                             </TableCell>
-                            <TableCell>{student.parentName || "-"}</TableCell>
                             <TableCell>
-                              <div className="flex items-center">
-                                <GraduationCap className="mr-2 h-4 w-4 text-muted-foreground" />
-                                {student.email}
+                              <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                {student.batches && student.batches.length > 0 ? (
+                                  student.batches.slice(0, 2).map((batch) => (
+                                    <Badge key={batch.id} variant="secondary" className="text-xs">
+                                      {batch.name}
+                                    </Badge>
+                                  ))
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">—</span>
+                                )}
+                                {student.batches && student.batches.length > 2 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{student.batches.length - 2}
+                                  </Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>{formatDate(student.joinDate)}</TableCell>
@@ -252,9 +281,9 @@ export default function StudentListTable({
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => alert(`Student details would be shown here for: ${student.name}`)}
-                                  disabled
+                                  onClick={() => openDetailsModal(student)}
                                 >
+                                  <Eye className="h-4 w-4 mr-1" />
                                   View
                                 </Button>
                               </div>
@@ -340,6 +369,13 @@ export default function StudentListTable({
           }}
         />
       )}
+
+      {/* Student Details Modal */}
+      <StudentDetailsModal
+        student={selectedStudentDetails}
+        isOpen={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
     </>
   );
 }

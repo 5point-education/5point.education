@@ -12,13 +12,14 @@ import {
     GraduationCap,
     BookOpen,
     Calendar,
-    Settings,
     UserPlus,
     Layers,
     LogOut,
     Menu,
     X,
     IndianRupee,
+    FileText,
+    UserCog,
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -82,8 +83,14 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 return (
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/admin" exact onClick={closeMobileSidebar} />
-                        <SidebarItem icon={Users} label="Users" href="/dashboard/admin/register" onClick={closeMobileSidebar} />
-                        <SidebarItem icon={Settings} label="Settings" href="/dashboard/admin/settings" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={UserCog} label="Register" href="/dashboard/admin/register" onClick={closeMobileSidebar} />
+                        <div className="px-3 pt-4 pb-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Operations</div>
+                        <SidebarItem icon={FileText} label="Enquiries" href="/dashboard/reception" exact onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Users} label="Students" href="/dashboard/reception/students" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Layers} label="Batches" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={IndianRupee} label="Fees" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={UserPlus} label="Teachers" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
                     </>
                 );
             case "RECEPTIONIST":

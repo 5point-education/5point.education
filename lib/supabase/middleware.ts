@@ -65,7 +65,7 @@ export async function updateSession(request: NextRequest) {
             return NextResponse.redirect(url);
         }
 
-        if (path.startsWith("/dashboard/reception") && role !== "RECEPTIONIST") {
+        if (path.startsWith("/dashboard/reception") && role !== "RECEPTIONIST" && role !== "ADMIN") {
             const url = request.nextUrl.clone();
             url.pathname = "/dashboard";
             return NextResponse.redirect(url);
