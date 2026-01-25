@@ -41,7 +41,7 @@ export default function TeacherStudentListPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-20 md:pt-0">
       <div>
         <h1 className="text-3xl font-bold">My Students</h1>
         <p className="text-muted-foreground">View and manage students in your assigned batches</p>

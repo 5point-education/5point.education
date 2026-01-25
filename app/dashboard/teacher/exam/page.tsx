@@ -8,8 +8,8 @@ import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
-import { ExamFilter } from "@/components/Dashboard/exams/ExamFilter";
-import { CreateExamDialog } from "@/components/Dashboard/exams/CreateExamDialog";
+import { ExamFilter } from "@/components/dashboard/exams/ExamFilter";
+import { CreateExamDialog } from "@/components/dashboard/exams/CreateExamDialog";
 
 export default async function TeacherExamListPage({ searchParams }: { searchParams: { batchId?: string } }) {
     const supabase = createClient();
@@ -57,7 +57,7 @@ export default async function TeacherExamListPage({ searchParams }: { searchPara
     });
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pt-20 md:pt-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold">All Exams</h1>

@@ -58,7 +58,7 @@ export default function StudentAttendancePage() {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 pt-20 md:pt-0">
             <div>
                 <h1 className="text-2xl font-bold">My Attendance</h1>
                 <p className="text-muted-foreground">Track your class attendance and punctuality</p>

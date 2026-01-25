@@ -109,7 +109,7 @@ export default function StudentDashboard() {
   }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="p-4 pt-20 md:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 bg-slate-50/50 min-h-screen">
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
@@ -119,10 +119,10 @@ export default function StudentDashboard() {
           {/* 1. Welcome Banner */}
           <div className="relative overflow-hidden rounded-3xl bg-[#2563eb] p-8 text-white shadow-xl shadow-blue-200">
             <div className="relative z-10 flex flex-col justify-center h-full max-w-2xl">
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-2">
+              <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white mb-2">
                 Good {timeOfDay}, Student! 👋
               </h1>
-              <p className="text-blue-100 text-lg md:text-xl font-light leading-relaxed">
+              <p className="text-blue-100 text-base md:text-xl font-light leading-relaxed">
                 You've completed <span className="font-semibold text-white">{data.overview.totalExams} exams</span> so far.
                 Keep pushing your limits!
               </p>
@@ -142,7 +142,7 @@ export default function StudentDashboard() {
             <Card className="lg:col-span-2 border-none shadow-sm rounded-3xl bg-white">
               <CardHeader className="flex flex-row items-center justify-between pb-2 bg-transparent">
                 <div className="space-y-1">
-                  <CardTitle className="text-xl font-bold text-slate-800">Overall Performance</CardTitle>
+                  <CardTitle className="text-lg md:text-xl font-bold text-slate-800">Overall Performance</CardTitle>
                   <CardDescription>Score trajectory over time</CardDescription>
                 </div>
                 <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-bold shadow-sm">
@@ -150,7 +150,7 @@ export default function StudentDashboard() {
                 </div>
               </CardHeader>
               <CardContent className="pl-0">
-                <div className="h-[400px] w-full mt-4">
+                <div className="h-[250px] md:h-[400px] w-full mt-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                       <defs>
@@ -202,7 +202,7 @@ export default function StudentDashboard() {
                       <IndianRupee className="h-6 w-6" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-2xl font-bold text-slate-800">
+                      <p className="text-xl md:text-2xl font-bold text-slate-800">
                         {data.overview.pendingFees > 0 ? `₹${data.overview.pendingFees.toLocaleString('en-IN')}` : 'Clear'}
                       </p>
                       <p className="text-sm text-slate-500 font-medium">
@@ -210,9 +210,9 @@ export default function StudentDashboard() {
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Detailed Breakdown */}
-                  
+
                 </div>
               </Card>
               {/* Stat 2: Total Exams */}
@@ -221,7 +221,7 @@ export default function StudentDashboard() {
                   <BookOpen className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-800">{data.overview.totalExams}</p>
+                  <p className="text-xl md:text-2xl font-bold text-slate-800">{data.overview.totalExams}</p>
                   <p className="text-sm text-slate-500 font-medium">Total Exams</p>
                 </div>
               </Card>
@@ -232,7 +232,7 @@ export default function StudentDashboard() {
                   <TrendingUp className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-800">{data.overview.averageScore}%</p>
+                  <p className="text-xl md:text-2xl font-bold text-slate-800">{data.overview.averageScore}%</p>
                   <p className="text-sm text-slate-500 font-medium">Average Score</p>
                 </div>
               </Card>

@@ -31,27 +31,27 @@ export function WeeklySchedule({ scheduleString }: WeeklyScheduleProps) {
   });
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
       {schedule.map((item, index) => (
         <Card key={index} className="shadow-sm">
-          <CardContent className="p-4 flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-primary" />
-              <span className="font-semibold">{item.day}</span>
+          <CardContent className="p-3 flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span className="font-semibold text-sm">{item.day}</span>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Clock className="h-4 w-4" />
+            <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground text-xs">
+              <Clock className="h-3.5 w-3.5" />
               <span>
-                {item.startTime} - {item.endTime}
+                {item.startTime}-{item.endTime}
               </span>
             </div>
           </CardContent>
         </Card>
       ))}
       {schedule.length === 0 && (
-         <div className="col-span-full text-muted-foreground text-sm italic">
-            No schedule available.
-         </div>
+        <div className="col-span-full text-muted-foreground text-sm italic">
+          No schedule available.
+        </div>
       )}
     </div>
   );

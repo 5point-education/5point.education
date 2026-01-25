@@ -177,15 +177,25 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
 
     return (
         <>
-            {/* Mobile Menu Button */}
-            <Button
-                variant="ghost"
-                size="icon"
-                className="fixed top-4 left-4 z-50 md:hidden"
-                onClick={() => setIsMobileOpen(!isMobileOpen)}
-            >
-                {isMobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </Button>
+            {/* Mobile Top Navbar */}
+            <div className="fixed top-0 left-0 right-0 h-16 bg-background border-b z-50 flex items-center justify-between px-4 md:hidden">
+                {/* Logo */}
+                <Link href="/" className="flex items-center gap-2">
+                    <div className="bg-primary/10 p-1.5 rounded-lg">
+                        <GraduationCap className="h-5 w-5 text-primary" />
+                    </div>
+                    <span className="text-lg font-bold tracking-tight text-foreground">5 Point</span>
+                </Link>
+
+                {/* Hamburger Button */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsMobileOpen(!isMobileOpen)}
+                >
+                    {isMobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </Button>
+            </div>
 
             {/* Mobile Sidebar Overlay */}
             {isMobileOpen && (
@@ -195,11 +205,11 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 />
             )}
 
-            {/* Mobile Sidebar */}
+            {/* Mobile Sidebar - Slides from Right */}
             <div
                 className={cn(
-                    "fixed top-0 left-0 w-72 bg-background h-screen z-50 flex flex-col transition-transform duration-300 md:hidden border-r shadow-lg",
-                    isMobileOpen ? "translate-x-0" : "-translate-x-full"
+                    "fixed top-0 right-0 w-72 bg-background h-screen z-50 flex flex-col transition-transform duration-300 md:hidden border-l shadow-lg",
+                    isMobileOpen ? "translate-x-0" : "translate-x-full"
                 )}
             >
                 {sidebarContent}

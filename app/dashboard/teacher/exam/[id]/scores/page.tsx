@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { MarksEntryTable } from "@/components/Dashboard/exams/MarksEntryTable";
+import { MarksEntryTable } from "@/components/dashboard/exams/MarksEntryTable";
 import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +40,7 @@ export default async function ScoreEntryPage({ params }: { params: { id: string 
     // Types need to align.
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pt-20 md:pt-0">
             <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-sm py-1 px-3 border-primary/20 bg-primary/5 text-primary">

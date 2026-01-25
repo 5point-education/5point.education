@@ -69,7 +69,7 @@ export default function TeacherDashboard() {
   const pendingExams = batches.reduce((sum, b) => sum + b.upcomingExams, 0);
 
   return (
-    <div className="space-y-8 p-6 md:p-8 pt-6 max-w-7xl mx-auto">
+    <div className="space-y-8 p-6 md:p-8 pt-20 max-w-7xl mx-auto pb-20">
       {/* Header */}
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Teacher Dashboard</h1>
@@ -118,7 +118,7 @@ export default function TeacherDashboard() {
           <h2 className="text-xl font-semibold tracking-tight">My Classes</h2>
         </div>
 
-        <div className="border rounded-xl bg-card shadow-sm overflow-hidden">
+        <div className="border rounded-xl bg-card shadow-sm overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center p-12 text-muted-foreground">
               <Clock className="h-5 w-5 mr-2 animate-spin" /> Loading classes...
@@ -176,7 +176,7 @@ export default function TeacherDashboard() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-foreground">{batch.studentCount}</span>
-                
+
                             Students
                           </div>
                         </TableCell>

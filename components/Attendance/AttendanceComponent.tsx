@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -86,11 +86,11 @@ const AttendanceComponent = ({
     try {
       const dateStr = selectedDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
       const response = await fetch(`/api/attendance?batchId=${selectedBatch}&date=${dateStr}`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch students');
       }
-      
+
       const data = await response.json();
       setStudents(data);
     } catch (error) {
@@ -106,7 +106,7 @@ const AttendanceComponent = ({
   };
 
   const handleAttendanceChange = (studentId: string, isPresent: boolean) => {
-    setStudents(prev => prev.map(student => 
+    setStudents(prev => prev.map(student =>
       student.studentId === studentId ? { ...student, isPresent } : student
     ));
   };
@@ -168,13 +168,13 @@ const AttendanceComponent = ({
   };
 
   return (
-    <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <div className="container mx-auto py-4 px-4 sm:px-6 lg:px-8">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
+        <p className="text-muted-foreground">{description}</p>
+      </div>
       <Card className="shadow-lg rounded-xl border-0 bg-white overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 pb-4">
-          <CardTitle className="text-2xl font-bold text-gray-900">{title}</CardTitle>
-          <CardDescription className="text-gray-600">{description}</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           {/* Filters Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 pt-4">
             <div className="space-y-2">
@@ -193,7 +193,7 @@ const AttendanceComponent = ({
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">Date</Label>
               <Popover>
@@ -251,8 +251,8 @@ const AttendanceComponent = ({
           {/* Action Buttons */}
           {selectedBatch && selectedDate && (
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => handleMarkAll(true)}
                 disabled={loading}
                 className="flex-1 flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
@@ -260,8 +260,8 @@ const AttendanceComponent = ({
                 <UserRoundCheck className="h-4 w-4" />
                 Mark All Present
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => handleMarkAll(false)}
                 disabled={loading}
                 className="flex-1 flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
@@ -285,11 +285,10 @@ const AttendanceComponent = ({
               {/* Mobile View - Card Layout */}
               <div className="md:hidden space-y-4">
                 {students.map((student, index) => (
-                  <div 
-                    key={student.studentId} 
-                    className={`p-4 rounded-lg border ${
-                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    }`}
+                  <div
+                    key={student.studentId}
+                    className={`p-4 rounded-lg border ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      }`}
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -297,25 +296,23 @@ const AttendanceComponent = ({
                         <p className="text-sm text-gray-600 mt-1">Contact: {student.phone || 'N/A'}</p>
                         <p className="text-sm text-gray-600">Parent: {student.parentName || 'N/A'}</p>
                       </div>
-                      
+
                       <div className="flex flex-col gap-2">
                         <button
                           onClick={() => handleAttendanceChange(student.studentId, true)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            student.isPresent 
-                              ? 'bg-green-500 text-white' 
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${student.isPresent
+                              ? 'bg-green-500 text-white'
                               : 'bg-gray-100 text-gray-700 hover:bg-green-100'
-                          }`}
+                            }`}
                         >
                           Present
                         </button>
                         <button
                           onClick={() => handleAttendanceChange(student.studentId, false)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            !student.isPresent 
-                              ? 'bg-red-500 text-white' 
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!student.isPresent
+                              ? 'bg-red-500 text-white'
                               : 'bg-gray-100 text-gray-700 hover:bg-red-100'
-                          }`}
+                            }`}
                         >
                           Absent
                         </button>
@@ -324,7 +321,7 @@ const AttendanceComponent = ({
                   </div>
                 ))}
               </div>
-              
+
               {/* Desktop View - Table Layout */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -346,8 +343,8 @@ const AttendanceComponent = ({
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {students.map((student, index) => (
-                      <tr 
-                        key={student.studentId} 
+                      <tr
+                        key={student.studentId}
                         className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -368,8 +365,8 @@ const AttendanceComponent = ({
                                 onCheckedChange={(checked) => handleAttendanceChange(student.studentId, checked as boolean)}
                                 className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 h-5 w-5"
                               />
-                              <Label 
-                                htmlFor={`present-${student.studentId}`} 
+                              <Label
+                                htmlFor={`present-${student.studentId}`}
                                 className="text-sm font-medium text-gray-700"
                               >
                                 Present
@@ -382,8 +379,8 @@ const AttendanceComponent = ({
                                 onCheckedChange={(checked) => handleAttendanceChange(student.studentId, !checked as boolean)}
                                 className="data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500 h-5 w-5"
                               />
-                              <Label 
-                                htmlFor={`absent-${student.studentId}`} 
+                              <Label
+                                htmlFor={`absent-${student.studentId}`}
                                 className="text-sm font-medium text-gray-700"
                               >
                                 Absent
@@ -402,8 +399,8 @@ const AttendanceComponent = ({
           {/* Save Button */}
           {selectedBatch && selectedDate && students.length > 0 && (
             <div className="mt-6 flex justify-end">
-              <Button 
-                onClick={saveAttendance} 
+              <Button
+                onClick={saveAttendance}
                 disabled={loading}
                 className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg transition-all transform hover:scale-105 shadow-md"
               >

@@ -61,16 +61,16 @@ export default function StudentCoursesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-20 md:pt-0">
       <div>
-        <h1 className="text-3xl font-bold">My Courses</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">My Courses</h1>
         <p className="text-muted-foreground">View your enrolled batches and schedules</p>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
         {batches.map((batch) => (
           <Card key={batch.id} className="overflow-hidden">
-            <CardHeader className="bg-muted/30 pb-4">
+            <CardHeader className="bg-muted/30 p-3 md:p-6 pb-3 md:pb-4">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
@@ -78,15 +78,15 @@ export default function StudentCoursesPage() {
                       {batch.subject}
                     </Badge>
                   </div>
-                  <CardTitle className="text-2xl">{batch.name}</CardTitle>
+                  <CardTitle className="text-lg md:text-2xl">{batch.name}</CardTitle>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground bg-white px-3 py-1.5 rounded-full border shadow-sm">
                   <UserIcon className="h-4 w-4" />
-                  <span>{batch.teacher.name}</span>
+                  <span className="text-xs md:text-sm">{batch.teacher.name}</span>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 md:pt-6 p-3 md:p-6">
               <h3 className="text-sm font-medium mb-3 text-muted-foreground uppercase tracking-wider">Weekly Schedule</h3>
               <WeeklySchedule scheduleString={batch.schedule} />
             </CardContent>
