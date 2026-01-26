@@ -24,7 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { Archive, Layers, Loader2, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Archive, Layers, Loader2, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { TimePicker } from "@/components/ui/time-picker";
 
@@ -79,6 +80,12 @@ export default function BatchesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
   const { toast } = useToast();
+
+  // Search and Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [teacherFilter, setTeacherFilter] = useState<string>("all");
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
+  const [feeModelFilter, setFeeModelFilter] = useState<string>("all");
 
   // Schedule State
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([
@@ -457,78 +464,229 @@ export default function BatchesPage() {
     }
   };
 
-  const activeBatches = batches.filter(b => b.isActive !== false);
-  const archivedBatches = batches.filter(b => b.isActive === false);
+  // Get unique subjects for filter dropdown
+  const uniqueSubjects = Array.from(new Set(batches.map(b => b.subject).filter(Boolean))).sort();
+
+  // Filter batches based on search and filters
+  const filterBatches = (batchList: Batch[]) => {
+    return batchList.filter(batch => {
+      // Search filter - search by name, subject, or teacher name
+      const matchesSearch = searchQuery === "" || 
+        batch.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        batch.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        batch.teacher?.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // Teacher filter
+      const matchesTeacher = teacherFilter === "all" || batch.teacherId === teacherFilter;
+
+      // Subject filter
+      const matchesSubject = subjectFilter === "all" || batch.subject === subjectFilter;
+
+      // Fee model filter
+      const matchesFeeModel = feeModelFilter === "all" || batch.feeModel === feeModelFilter;
+
+      return matchesSearch && matchesTeacher && matchesSubject && matchesFeeModel;
+    });
+  };
+
+  const activeBatches = filterBatches(batches.filter(b => b.isActive !== false));
+  const archivedBatches = filterBatches(batches.filter(b => b.isActive === false));
 
   const renderBatchTable = (batchList: Batch[], isArchived: boolean = false) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Batch Name</TableHead>
-          <TableHead>Subject</TableHead>
-          <TableHead>Teacher</TableHead>
-          <TableHead>Schedule</TableHead>
-          <TableHead>Capacity</TableHead>
-          <TableHead>Created</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {batchList.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-              {isArchived ? "No archived batches" : "No active batches found"}
-            </TableCell>
-          </TableRow>
-        ) : (
-          batchList.map((batch) => (
-            <TableRow key={batch.id}>
-              <TableCell className="font-medium">{batch.name}</TableCell>
-              <TableCell>{batch.subject}</TableCell>
-              <TableCell>{batch.teacher?.name}</TableCell>
-              <TableCell>{formatSchedule(batch.schedule)}</TableCell>
-              <TableCell>
-                {batch._count.admissions} / {batch.capacity ?? "—"}
-              </TableCell>
-              <TableCell>{new Date(batch.createdAt).toLocaleDateString()}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-2">
-                  {!isArchived ? (
-                    <>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        onClick={() => handleEditClick(batch)}
-                        title="Edit batch"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        onClick={() => handleArchiveBatch(batch)}
-                        title="Archive batch"
-                      >
-                        <Archive className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      size="icon"
-                      onClick={() => handleRestoreBatch(batch)}
-                      title="Restore batch"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </TableCell>
+    <div className="rounded-md border overflow-hidden">
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Batch Name</TableHead>
+              <TableHead>Subject</TableHead>
+              <TableHead>Teacher</TableHead>
+              <TableHead>Schedule</TableHead>
+              <TableHead>Capacity</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
-          ))
+          </TableHeader>
+          <TableBody>
+            {batchList.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Layers className="h-10 w-10 opacity-50" />
+                    <p className="text-sm font-medium">
+                      {isArchived ? "No archived batches" : "No batches found"}
+                    </p>
+                    <p className="text-xs">
+                      {searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all"
+                        ? "Try adjusting your filters"
+                        : isArchived 
+                          ? "Archived batches will appear here"
+                          : "Create your first batch to get started"}
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              batchList.map((batch) => (
+                <TableRow key={batch.id} className="hover:bg-muted/50">
+                  <TableCell className="font-medium">{batch.name}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="font-normal">
+                      {batch.subject}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm">{batch.teacher?.name || "—"}</TableCell>
+                  <TableCell className="text-sm">{formatSchedule(batch.schedule)}</TableCell>
+                  <TableCell className="text-sm">
+                    {batch._count.admissions} / {batch.capacity ?? "∞"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {new Date(batch.createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric"
+                    })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      {!isArchived ? (
+                        <>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleEditClick(batch)}
+                            title="Edit batch"
+                            className="h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleArchiveBatch(batch)}
+                            title="Archive batch"
+                            className="h-8 w-8"
+                          >
+                            <Archive className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleRestoreBatch(batch)}
+                          title="Restore batch"
+                          className="h-8 w-8"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden">
+        {batchList.length === 0 ? (
+          <div className="text-center py-12 px-4">
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <Layers className="h-10 w-10 opacity-50" />
+              <p className="text-sm font-medium">
+                {isArchived ? "No archived batches" : "No batches found"}
+              </p>
+              <p className="text-xs">
+                {searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all"
+                  ? "Try adjusting your filters"
+                  : isArchived 
+                    ? "Archived batches will appear here"
+                    : "Create your first batch to get started"}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {batchList.map((batch) => (
+              <div key={batch.id} className="p-4 space-y-3 hover:bg-muted/50">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-sm truncate">{batch.name}</h3>
+                    <div className="mt-1">
+                      <Badge variant="outline" className="font-normal text-xs">
+                        {batch.subject}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    {!isArchived ? (
+                      <>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleEditClick(batch)}
+                          title="Edit batch"
+                          className="h-8 w-8"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleArchiveBatch(batch)}
+                          title="Archive batch"
+                          className="h-8 w-8"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleRestoreBatch(batch)}
+                        title="Restore batch"
+                        className="h-8 w-8"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Teacher</p>
+                    <p className="mt-0.5">{batch.teacher?.name || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Capacity</p>
+                    <p className="mt-0.5">{batch._count.admissions} / {batch.capacity ?? "∞"}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-muted-foreground text-xs">Schedule</p>
+                    <p className="mt-0.5">{formatSchedule(batch.schedule)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Created</p>
+                    <p className="mt-0.5 text-muted-foreground">
+                      {new Date(batch.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric"
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-      </TableBody>
-    </Table>
+      </div>
+    </div>
   );
 
   const renderScheduleEditor = (
@@ -854,15 +1012,15 @@ export default function BatchesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Batches</h1>
-          <p className="text-muted-foreground">Manage student batches and schedules</p>
+          <h1 className="text-3xl font-bold tracking-tight">Batches</h1>
+          <p className="text-muted-foreground mt-1">Manage student batches and schedules</p>
         </div>
         
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Layers className="mr-2 h-4 w-4" />
               Create Batch
             </Button>
@@ -999,29 +1157,141 @@ export default function BatchesPage() {
         </Dialog>
       </div>
 
+      {/* Search and Filters */}
+      <Card className="border-border/50">
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search Bar */}
+            <div className="flex-1 min-w-[250px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by batch name, subject, or teacher..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-10 h-10"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 hover:bg-transparent"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Filters Row */}
+            <div className="flex flex-wrap gap-3">
+              {/* Teacher Filter */}
+              <div className="w-full sm:w-[180px]">
+                <Select value={teacherFilter} onValueChange={setTeacherFilter}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="All Teachers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Teachers</SelectItem>
+                    {teachers.map(teacher => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Subject Filter */}
+              <div className="w-full sm:w-[160px]">
+                <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="All Subjects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Subjects</SelectItem>
+                    {uniqueSubjects.map(subject => (
+                      <SelectItem key={subject} value={subject}>
+                        {subject}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Fee Model Filter */}
+              <div className="w-full sm:w-[160px]">
+                <Select value={feeModelFilter} onValueChange={setFeeModelFilter}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="All Fee Models" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Fee Models</SelectItem>
+                    <SelectItem value="ONE_TIME">One-time</SelectItem>
+                    <SelectItem value="MONTHLY">Monthly</SelectItem>
+                    <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                    <SelectItem value="CUSTOM">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Clear Filters Button */}
+              {(searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all") && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setTeacherFilter("all");
+                    setSubjectFilter("all");
+                    setFeeModelFilter("all");
+                  }}
+                  className="h-10 px-4"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="active" className="w-full">
-        <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+        <TabsList className="grid w-full max-w-[420px] grid-cols-2 mb-6">
           <TabsTrigger value="active" className="flex items-center gap-2">
             <Layers className="h-4 w-4" />
-            Active ({activeBatches.length})
+            <span>Active</span>
+            <Badge variant="secondary" className="ml-1">
+              {activeBatches.length}
+              {(searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all") && 
+                ` / ${batches.filter(b => b.isActive !== false).length}`}
+            </Badge>
           </TabsTrigger>
           <TabsTrigger value="archived" className="flex items-center gap-2">
             <Archive className="h-4 w-4" />
-            Archived ({archivedBatches.length})
+            <span>Archived</span>
+            <Badge variant="secondary" className="ml-1">
+              {archivedBatches.length}
+              {(searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all") && 
+                ` / ${batches.filter(b => b.isActive === false).length}`}
+            </Badge>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Batches</CardTitle>
+        <TabsContent value="active" className="mt-0">
+          <Card className="border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl">Active Batches</CardTitle>
               <CardDescription>
-                List of all active batches and their occupancy
+                Manage and view all active batches
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {loading ? (
-                <div className="text-center py-8">Loading...</div>
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
               ) : (
                 renderBatchTable(activeBatches, false)
               )}
@@ -1029,17 +1299,19 @@ export default function BatchesPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="archived">
-          <Card>
-            <CardHeader>
-              <CardTitle>Archived Batches</CardTitle>
+        <TabsContent value="archived" className="mt-0">
+          <Card className="border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl">Archived Batches</CardTitle>
               <CardDescription>
-                List of archived batches that are no longer active
+                View and restore archived batches
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {loading ? (
-                <div className="text-center py-8">Loading...</div>
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
               ) : (
                 renderBatchTable(archivedBatches, true)
               )}
