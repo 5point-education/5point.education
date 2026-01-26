@@ -9,7 +9,8 @@ export async function POST(req: Request) {
         const { data: { user }, error } = await supabase.auth.getUser();
 
         // Only Admin or Receptionist can create teachers
-        if (error || !user || (user.user_metadata.role !== Role.ADMIN && user.user_metadata.role !== Role.RECEPTIONIST)) {
+        const userRole = user?.user_metadata?.role as string;
+        if (error || !user || (userRole !== Role.ADMIN && userRole !== Role.RECEPTIONIST)) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
@@ -93,6 +94,65 @@ export async function GET(req: Request) {
 
     } catch (error) {
         console.log("[TEACHERS_GET]", error);
+        return new NextResponse("Internal Error", { status: 500 });
+    }
+}
+
+export async function PATCH(req: Request) {
+    try {
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        const userRole = user?.user_metadata?.role as string;
+        if (error || !user || (userRole !== Role.ADMIN && userRole !== Role.RECEPTIONIST)) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const body = await req.json();
+        const { id, name, email, qualifications, experience_years, subjects_specialization, isActive } = body;
+
+        if (!id) {
+            return new NextResponse("Teacher ID is required", { status: 400 });
+        }
+
+        // Check if teacher exists
+        const existingTeacher = await db.user.findUnique({
+            where: { id },
+            include: { teacherProfile: true },
+        });
+
+        if (!existingTeacher || existingTeacher.role !== Role.TEACHER) {
+            return new NextResponse("Teacher not found", { status: 404 });
+        }
+
+        const updateData: any = {};
+        if (name !== undefined) updateData.name = name;
+        if (email !== undefined) updateData.email = email;
+
+        const profileUpdateData: any = {};
+        if (qualifications !== undefined) profileUpdateData.qualifications = qualifications;
+        if (experience_years !== undefined) profileUpdateData.experience_years = parseInt(experience_years);
+        if (subjects_specialization !== undefined) profileUpdateData.subjects_specialization = subjects_specialization;
+        if (isActive !== undefined) profileUpdateData.isActive = isActive;
+
+        // If teacherProfile doesn't exist, create it; otherwise update it
+        const teacher = await db.user.update({
+            where: { id },
+            data: {
+                ...updateData,
+                teacherProfile: existingTeacher.teacherProfile 
+                    ? { update: profileUpdateData }
+                    : { create: profileUpdateData },
+            },
+            include: {
+                teacherProfile: true,
+            },
+        });
+
+        return NextResponse.json(teacher);
+
+    } catch (error) {
+        console.log("[TEACHERS_PATCH]", error);
         return new NextResponse("Internal Error", { status: 500 });
     }
 }

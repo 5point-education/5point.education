@@ -464,6 +464,12 @@ export default function BatchesPage() {
     }
   };
 
+  // Extract class from batch name (e.g., "Class 12 Physics - Batch A" -> "Class 12")
+  const getBatchClass = (batchName: string) => {
+    const classMatch = batchName.match(/Class\s+(\d+)/i);
+    return classMatch ? `Class ${classMatch[1]}` : "—";
+  };
+
   // Get unique subjects for filter dropdown
   const uniqueSubjects = Array.from(new Set(batches.map(b => b.subject).filter(Boolean))).sort();
 
@@ -500,6 +506,7 @@ export default function BatchesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Batch Name</TableHead>
+              <TableHead>Class</TableHead>
               <TableHead>Subject</TableHead>
               <TableHead>Teacher</TableHead>
               <TableHead>Schedule</TableHead>
@@ -511,7 +518,7 @@ export default function BatchesPage() {
           <TableBody>
             {batchList.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12">
+                <TableCell colSpan={8} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <Layers className="h-10 w-10 opacity-50" />
                     <p className="text-sm font-medium">
@@ -531,6 +538,11 @@ export default function BatchesPage() {
               batchList.map((batch) => (
                 <TableRow key={batch.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">{batch.name}</TableCell>
+                  <TableCell className="text-sm">
+                    <Badge variant="secondary" className="font-normal">
+                      {getBatchClass(batch.name)}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="font-normal">
                       {batch.subject}
@@ -616,7 +628,10 @@ export default function BatchesPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-sm truncate">{batch.name}</h3>
-                    <div className="mt-1">
+                    <div className="mt-1 flex gap-2">
+                      <Badge variant="secondary" className="font-normal text-xs">
+                        {getBatchClass(batch.name)}
+                      </Badge>
                       <Badge variant="outline" className="font-normal text-xs">
                         {batch.subject}
                       </Badge>
