@@ -35,9 +35,8 @@ export default function DashboardLayout({
     checkUser();
   }, [router, supabase]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.replace("/auth/login");
+  const handleLogout = () => {
+    router.push("/auth/logout");
   };
 
   // Show loading state while checking authentication
