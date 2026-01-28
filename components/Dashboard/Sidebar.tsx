@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,16 +42,16 @@ const SidebarItem = ({ icon: Icon, label, href, exact, onClick }: SidebarItemPro
             href={href}
             onClick={onClick}
             className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group mx-2",
+                "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group mx-2",
                 isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    ? "bg-gradient-to-r from-primary to-primary-light text-white shadow-lg shadow-primary/25"
+                    : "text-gray-600 hover:bg-primary/5 hover:text-primary"
             )}
         >
             <Icon
                 className={cn(
                     "h-4 w-4 transition-colors",
-                    isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                    isActive ? "text-white" : "text-gray-500 group-hover:text-primary"
                 )}
             />
             <span className={cn("font-medium text-sm", isActive ? "font-semibold" : "")}>{label}</span>
@@ -84,7 +85,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/admin" exact onClick={closeMobileSidebar} />
                         <SidebarItem icon={UserCog} label="Register" href="/dashboard/admin/register" onClick={closeMobileSidebar} />
-                        <div className="px-3 pt-4 pb-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Operations</div>
+                        <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Operations</div>
                         <SidebarItem icon={FileText} label="Enquiries" href="/dashboard/reception" exact onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="Students" href="/dashboard/reception/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Layers} label="Batches" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
@@ -110,7 +111,6 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/teacher" exact onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="My Students" href="/dashboard/teacher/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={ClipboardList} label="Exams" href="/dashboard/teacher/exam" onClick={closeMobileSidebar} />
-                        {/* <SidebarItem icon={Calendar} label="Schedule" href="/dashboard/teacher/schedule" onClick={closeMobileSidebar} /> */}
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/teacher/attendance" onClick={closeMobileSidebar} />
                     </>
                 );
@@ -129,43 +129,44 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
     };
 
     const sidebarContent = (
-        <div className="flex flex-col h-full bg-background border-r">
+        <div className="flex flex-col h-full bg-white border-r border-gray-100">
             {/* Branding */}
-            <div className="p-6">
-                <Link href="/" className="flex items-center gap-2.5">
-                    <div className="bg-primary/10 p-2 rounded-lg">
-                        <GraduationCap className="h-6 w-6 text-primary" />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-lg font-bold tracking-tight text-foreground">5 Point</span>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Education Hub</span>
-                    </div>
+            <div className="p-5 border-b border-gray-100">
+                <Link href="/" className="flex items-center gap-3">
+                    <Image
+                        src="/5pointlogo.png"
+                        alt="5 Point Education"
+                        width={150}
+                        height={40}
+                        className="h-10 w-auto object-contain"
+                        priority
+                    />
                 </Link>
             </div>
 
             {/* Navigation */}
-            <div className="flex-1 py-4 overflow-y-auto">
-                <div className="space-y-1 px-2">
+            <div className="flex-1 py-6 overflow-y-auto">
+                <div className="space-y-1">
                     {renderLinks()}
                 </div>
             </div>
 
             {/* User Profile & Logout */}
-            <div className="p-4 border-t bg-card/50">
+            <div className="p-4 border-t border-gray-100 bg-gradient-to-r from-gray-50 to-white">
                 <div className="flex items-center gap-3 mb-4 px-2">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border ring-2 ring-background">
-                        <span className="font-semibold text-sm text-primary">{userInitial}</span>
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-lg shadow-primary/25">
+                        <span className="font-semibold text-sm text-white">{userInitial}</span>
                     </div>
                     <div className="flex-1 overflow-hidden">
-                        <p className="text-sm font-medium truncate text-foreground">{userName}</p>
-                        <p className="text-xs text-muted-foreground capitalize truncate">
+                        <p className="text-sm font-medium truncate text-gray-900">{userName}</p>
+                        <p className="text-xs text-gray-500 capitalize truncate">
                             {user?.role?.toLowerCase() || "student"}
                         </p>
                     </div>
                 </div>
                 <Button
                     variant="ghost"
-                    className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-2"
+                    className="w-full justify-start text-gray-500 hover:text-red-600 hover:bg-red-50 px-3 rounded-xl transition-all duration-200"
                     onClick={onLogout}
                 >
                     <LogOut className="h-4 w-4 mr-2" />
@@ -178,29 +179,34 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
     return (
         <>
             {/* Mobile Top Navbar */}
-            <div className="fixed top-0 left-0 right-0 h-16 bg-background border-b z-50 flex items-center justify-between px-4 md:hidden">
+            <div className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 z-50 flex items-center justify-between px-4 md:hidden shadow-sm">
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-2">
-                    <div className="bg-primary/10 p-1.5 rounded-lg">
-                        <GraduationCap className="h-5 w-5 text-primary" />
-                    </div>
-                    <span className="text-lg font-bold tracking-tight text-foreground">5 Point</span>
+                    <Image
+                        src="/5pointlogo.png"
+                        alt="5 Point Education"
+                        width={120}
+                        height={32}
+                        className="h-8 w-auto object-contain"
+                        priority
+                    />
                 </Link>
 
                 {/* Hamburger Button */}
                 <Button
                     variant="ghost"
                     size="icon"
+                    className="hover:bg-primary/5"
                     onClick={() => setIsMobileOpen(!isMobileOpen)}
                 >
-                    {isMobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                    {isMobileOpen ? <X className="h-6 w-6 text-gray-700" /> : <Menu className="h-6 w-6 text-gray-700" />}
                 </Button>
             </div>
 
             {/* Mobile Sidebar Overlay */}
             {isMobileOpen && (
                 <div
-                    className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
                     onClick={closeMobileSidebar}
                 />
             )}
@@ -208,7 +214,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
             {/* Mobile Sidebar - Slides from Right */}
             <div
                 className={cn(
-                    "fixed top-0 right-0 w-72 bg-background h-screen z-50 flex flex-col transition-transform duration-300 md:hidden border-l shadow-lg",
+                    "fixed top-0 right-0 w-72 bg-white h-screen z-50 flex flex-col transition-transform duration-300 md:hidden shadow-2xl",
                     isMobileOpen ? "translate-x-0" : "translate-x-full"
                 )}
             >
@@ -216,7 +222,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
             </div>
 
             {/* Desktop Sidebar */}
-            <div className="w-72 bg-background h-screen sticky top-0 flex flex-col hidden md:flex shrink-0">
+            <div className="w-72 bg-white h-screen sticky top-0 flex flex-col hidden md:flex shrink-0 shadow-lg shadow-gray-100/50">
                 {sidebarContent}
             </div>
         </>
