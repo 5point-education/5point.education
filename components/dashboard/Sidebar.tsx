@@ -21,6 +21,7 @@ import {
     IndianRupee,
     FileText,
     UserCog,
+    User,
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -92,6 +93,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={IndianRupee} label="Fees" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={UserPlus} label="Teachers" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={User} label="Profile" href="/dashboard/admin/profile" onClick={closeMobileSidebar} />
                     </>
                 );
             case "RECEPTIONIST":
@@ -103,6 +105,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={Layers} label="Batch Management" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
                         <SidebarItem icon={IndianRupee} label="Fees Management" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={User} label="Profile" href="/dashboard/reception/profile" onClick={closeMobileSidebar} />
                     </>
                 );
             case "TEACHER":
@@ -112,6 +115,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={Users} label="My Students" href="/dashboard/teacher/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={ClipboardList} label="Exams" href="/dashboard/teacher/exam" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/teacher/attendance" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={User} label="Profile" href="/dashboard/teacher/profile" onClick={closeMobileSidebar} />
                     </>
                 );
             case "STUDENT":
@@ -121,6 +125,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={BookOpen} label="My Courses" href="/dashboard/student/courses" onClick={closeMobileSidebar} />
                         <SidebarItem icon={GraduationCap} label="Results" href="/dashboard/student/results" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/student/attendance" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={User} label="Profile" href="/dashboard/student/profile" onClick={closeMobileSidebar} />
                     </>
                 );
             default:
