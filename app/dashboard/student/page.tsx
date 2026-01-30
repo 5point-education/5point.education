@@ -123,7 +123,7 @@ export default function StudentDashboard() {
                 Good {timeOfDay}, Student! 👋
               </h1>
               <p className="text-blue-100 text-base md:text-xl font-light leading-relaxed">
-                You've completed <span className="font-semibold text-white">{data.overview.totalExams} exams</span> so far.
+                You&apos;ve completed <span className="font-semibold text-white">{data.overview.totalExams} exams</span> so far.
                 Keep pushing your limits!
               </p>
             </div>

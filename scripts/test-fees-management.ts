@@ -193,7 +193,7 @@ async function testUtilityFunctions() {
       [{ coveredMonths: ['2025-01'] }]
     );
     assert(!result.isValid, 'Should be invalid when duplicate months');
-    assert(result.duplicates?.includes('2025-01'), 'Should identify duplicate month');
+    assert(Boolean(result.duplicates?.includes('2025-01')), 'Should identify duplicate month');
   });
 }
 

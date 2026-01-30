@@ -949,7 +949,7 @@ export default function BatchesPage() {
                   </div>
                   
                   {Object.keys(daysWiseFeesMap).length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-2">No day fees added yet. Click "Add Day Fee" to start.</p>
+                    <p className="text-sm text-muted-foreground text-center py-2">No day fees added yet. Click &quot;Add Day Fee&quot; to start.</p>
                   )}
 
                   <div className="space-y-2">
