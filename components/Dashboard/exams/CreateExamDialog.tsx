@@ -34,7 +34,7 @@ export function CreateExamDialog({ batches }: CreateExamDialogProps) {
                 <DialogHeader>
                     <DialogTitle>Create New Exam</DialogTitle>
                     <DialogDescription>
-                        Select the batch you want to create an exam for.
+                        Select the batch. On the next page you’ll set the exam name, date, and marks structure for that batch.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">

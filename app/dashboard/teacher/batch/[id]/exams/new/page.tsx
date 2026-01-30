@@ -1,17 +1,30 @@
-"use client";
-
+import { db } from "@/lib/db";
+import { notFound } from "next/navigation";
 import { CreateExamForm } from "@/components/dashboard/exams/CreateExamForm";
 
-export default function CreateExamPage({ params }: { params: any }) {
-    // params.id is the batchId based on the route folder structure
-    return (
-        <div className="max-w-2xl mx-auto py-8">
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold">Create New Exam</h1>
-                <p className="text-muted-foreground">Define chapters and max marks.</p>
-            </div>
+export default async function CreateExamPage({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}) {
+    const { id: batchId } = await params;
 
-            <CreateExamForm batchId={params.id} />
+    const batch = await db.batch.findUnique({
+        where: { id: batchId },
+        select: { id: true, name: true, subject: true },
+    });
+
+    if (!batch) {
+        notFound();
+    }
+
+    return (
+        <div className="space-y-6 pt-6">
+            <CreateExamForm
+                batchId={batch.id}
+                batchName={batch.name}
+                batchSubject={batch.subject}
+            />
         </div>
     );
 }

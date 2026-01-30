@@ -96,7 +96,8 @@ export default function StudentListTable({
         try {
           let url = "";
           if (selectedBatch === "all") {
-            url = "/api/students";
+            // Teachers use their own endpoint (students in their batches); admin/receptionist use global list
+            url = role === "teacher" ? "/api/teacher/students" : "/api/students";
           } else {
             url = `/api/batches/${selectedBatch}/students`;
           }
@@ -246,21 +247,27 @@ export default function StudentListTable({
                                 {student.phone}
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            <TableCell className="align-top">
+                              <div className="flex flex-wrap gap-2 min-w-0 max-w-[280px]">
                                 {student.batches && student.batches.length > 0 ? (
-                                  student.batches.slice(0, 2).map((batch) => (
-                                    <Badge key={batch.id} variant="secondary" className="text-xs">
-                                      {batch.name}
-                                    </Badge>
-                                  ))
+                                  <>
+                                    {student.batches.slice(0, 4).map((batch) => (
+                                      <span
+                                        key={batch.id}
+                                        title={batch.name}
+                                        className="inline-flex items-center min-w-0 max-w-[160px] rounded-md bg-muted/60 px-2 py-1 text-xs font-medium text-muted-foreground border border-border/60 truncate"
+                                      >
+                                        {batch.name}
+                                      </span>
+                                    ))}
+                                    {student.batches.length > 4 && (
+                                      <span className="text-xs text-muted-foreground self-center">
+                                        +{student.batches.length - 4} more
+                                      </span>
+                                    )}
+                                  </>
                                 ) : (
                                   <span className="text-muted-foreground text-sm">—</span>
-                                )}
-                                {student.batches && student.batches.length > 2 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{student.batches.length - 2}
-                                  </Badge>
                                 )}
                               </div>
                             </TableCell>
