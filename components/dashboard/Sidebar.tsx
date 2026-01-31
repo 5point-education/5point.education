@@ -22,6 +22,7 @@ import {
     FileText,
     UserCog,
     User,
+    BarChart3,
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -113,6 +114,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/teacher" exact onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="My Students" href="/dashboard/teacher/students" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={BarChart3} label="Reports" href="/dashboard/teacher/reports" onClick={closeMobileSidebar} />
                         <SidebarItem icon={ClipboardList} label="Exams" href="/dashboard/teacher/exam" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/teacher/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/teacher/profile" onClick={closeMobileSidebar} />
@@ -122,6 +124,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 return (
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/student" exact onClick={closeMobileSidebar} />
+                        <SidebarItem icon={BarChart3} label="Reports" href="/dashboard/student/reports" onClick={closeMobileSidebar} />
                         <SidebarItem icon={BookOpen} label="My Courses" href="/dashboard/student/courses" onClick={closeMobileSidebar} />
                         <SidebarItem icon={GraduationCap} label="Results" href="/dashboard/student/results" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/student/attendance" onClick={closeMobileSidebar} />

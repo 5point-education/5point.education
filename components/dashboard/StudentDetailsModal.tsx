@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
     Dialog,
     DialogContent,
@@ -7,7 +8,8 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { User, Phone, Mail, Calendar, Users, BookOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { User, Phone, Mail, Calendar, Users, BookOpen, BarChart3 } from "lucide-react";
 
 interface BatchInfo {
     id: string;
@@ -30,12 +32,15 @@ interface StudentDetailsModalProps {
     student: StudentDetails | null;
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
+    /** When "teacher", show a link to view this student's analytics. */
+    role?: "teacher" | "receptionist" | "admin";
 }
 
 export function StudentDetailsModal({
     student,
     isOpen,
     onOpenChange,
+    role,
 }: StudentDetailsModalProps) {
     if (!student) return null;
 
@@ -127,6 +132,21 @@ export function StudentDetailsModal({
                             </p>
                         )}
                     </div>
+
+                    {/* View Analytics (teachers only) */}
+                    {role === "teacher" && (
+                        <div className="pt-2 border-t">
+                            <Button asChild variant="default" className="w-full" size="sm">
+                                <Link
+                                    href={`/dashboard/teacher/students/${student.studentId}/analytics`}
+                                    onClick={() => onOpenChange(false)}
+                                >
+                                    <BarChart3 className="h-4 w-4 mr-2" />
+                                    View student analytics
+                                </Link>
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>

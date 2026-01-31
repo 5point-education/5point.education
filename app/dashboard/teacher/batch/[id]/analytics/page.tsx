@@ -90,7 +90,12 @@ export default function BatchAnalyticsPage({ params }: { params: { id: string } 
                 <CardContent className="h-[400px]">
                     {chapterPerformance.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chapterPerformance} margin={{ top: 20, right: 30, left: 20, bottom: 50 }}>
+                            <BarChart
+                                data={chapterPerformance}
+                                margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
+                                barSize={28}
+                                barCategoryGap={24}
+                            >
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis
                                     dataKey="chapterName"
