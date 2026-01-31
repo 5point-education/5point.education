@@ -101,8 +101,8 @@ export function quarterToMonths(quarter: string): string[] {
 /**
  * Get monthly fee for a batch and admission
  * @param batch Batch object with fee configuration
- * @param admission Admission object with selectedDays
- * @returns Monthly fee amount
+ * @param admission Admission object with selectedDays and discount_value
+ * @returns Monthly fee amount (after discount)
  */
 export function getMonthlyFee(
   batch: {
@@ -113,8 +113,12 @@ export function getMonthlyFee(
   },
   admission: {
     selectedDays: number | null;
+    discount_value?: number | null;
   }
 ): number {
+  let baseFee = 0;
+  const discountValue = admission.discount_value || 0;
+
   // For days-wise fees
   if (
     batch.daysWiseFeesEnabled &&
@@ -125,24 +129,26 @@ export function getMonthlyFee(
       typeof batch.daysWiseFees === "object"
         ? (batch.daysWiseFees as Record<string, number>)
         : {};
-    return (
-      daysWiseFees[admission.selectedDays.toString()] ||
-      batch.feeAmount ||
-      0
-    );
+    baseFee = daysWiseFees[admission.selectedDays.toString()] || batch.feeAmount || 0;
+    // For days-wise: Apply full discount (it's already a monthly fee)
+    const discountedFee = baseFee - discountValue;
+    return Math.max(0, Math.round(discountedFee * 100) / 100);
+  } else if (batch.feeModel === "MONTHLY") {
+    // For regular monthly fee: Apply full discount
+    baseFee = batch.feeAmount || 0;
+    const discountedFee = baseFee - discountValue;
+    return Math.max(0, Math.round(discountedFee * 100) / 100);
+  } else if (batch.feeModel === "QUARTERLY") {
+    // For quarterly: Apply discount BEFORE dividing by 3
+    // discount_value is per quarter, so monthly = (quarterly - discount) / 3
+    const quarterlyFee = batch.feeAmount || 0;
+    const discountedQuarterly = quarterlyFee - discountValue;
+    const monthlyEquivalent = discountedQuarterly / 3;
+    return Math.max(0, Math.round(monthlyEquivalent * 100) / 100);
   }
 
-  // For regular monthly fee
-  if (batch.feeModel === "MONTHLY") {
-    return batch.feeAmount || 0;
-  }
-
-  // For quarterly, divide by 3
-  if (batch.feeModel === "QUARTERLY") {
-    return (batch.feeAmount || 0) / 3;
-  }
-
-  return 0;
+  // Fallback
+  return Math.max(0, Math.round((baseFee - discountValue) * 100) / 100);
 }
 
 /**
@@ -268,6 +274,7 @@ export async function calculatePendingFees(
     admission_date: Date;
     status: string;
     endDate: Date | null;
+    discount_value?: number | null;
     batch: {
       feeModel: any;
       feeAmount: number | null;
@@ -342,8 +349,11 @@ export async function calculatePendingFees(
     (month) => !coveredMonthsSet.has(month)
   );
 
-  // 5. Calculate pending amount (only for pending months up to today)
-  const monthlyFee = getMonthlyFee(admission.batch, { selectedDays });
+  // 5. Calculate pending amount (with discount applied)
+  const monthlyFee = getMonthlyFee(admission.batch, { 
+    selectedDays,
+    discount_value: admission.discount_value || 0
+  });
   const pendingAmount = pendingMonths.length * monthlyFee;
 
   // 6. Get future months for advance payment (only if batch is active and not withdrawn)

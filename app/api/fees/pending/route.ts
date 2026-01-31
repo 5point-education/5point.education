@@ -80,10 +80,20 @@ export async function GET(req: Request) {
       calculationEndDate = new Date();
     }
 
+    // Calculate actual fee based on fee model (not monthly equivalent)
+    const baseFee = admission.batch.feeAmount || 0;
+    const discountValue = admission.discount_value || 0;
+    const actualFee = Math.max(0, baseFee - discountValue); // Full fee after discount
+
     return NextResponse.json({
       admissionId,
       ...pendingData,
       calculationEndDate,
+      feeModel: admission.batch.feeModel, // Include fee model for UI display
+      actualFee, // Actual fee based on fee model (quarterly = full quarterly fee after discount)
+      baseFeeBeforeDiscount: baseFee, // Original fee before discount
+      discount_value: admission.discount_value || 0,
+      discount_type: admission.discount_type || null,
       allMonths: pendingData.totalMonths > 0 ? 
         getMonthsBetween(
           admission.admission_date,

@@ -170,6 +170,7 @@ export async function POST(req: Request) {
         const payment = await db.payment.create({
             data: {
                 studentId,
+                admissionId: admissionId || null,
                 amount: paymentAmount,
                 mode,
                 receipt_no,

@@ -13,7 +13,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { studentId, batchId, total_fees, admission_charge, admission_charge_pending, fees_pending, selectedDays } = body;
+        const { studentId, batchId, total_fees, admission_charge, admission_charge_pending, fees_pending, selectedDays, discount_value, discount_type } = body;
 
         if (!studentId || total_fees === undefined || fees_pending === undefined) {
             return new NextResponse("Missing required fields", { status: 400 });
@@ -28,6 +28,8 @@ export async function POST(req: Request) {
                 admission_charge_pending: admission_charge_pending ? parseFloat(admission_charge_pending) : 0, // Pending admission charge
                 fees_pending: parseFloat(fees_pending), // Pending batch fees only
                 selectedDays: selectedDays ? parseInt(selectedDays) : null, // For days-wise fees
+                discount_value: discount_value ? parseFloat(discount_value) : 0, // Fixed discount amount
+                discount_type: discount_type || null, // Optional discount reason
             }
         });
 

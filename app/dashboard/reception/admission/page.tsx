@@ -162,11 +162,13 @@ export default function AdmissionPage() {
         }
     });
 
-    // Multiple Batch State - now includes payment per batch
-    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, subject: string, fee: number, feeModel?: FeeModel, selectedDays?: number, paying: number }[]>([]);
+    // Multiple Batch State - now includes payment per batch and discount
+    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, subject: string, fee: number, feeModel?: FeeModel, selectedDays?: number, paying: number, discount_value?: number, discount_type?: string }[]>([]);
     const [tempBatchId, setTempBatchId] = useState("");
     const [tempFee, setTempFee] = useState("");
     const [tempSelectedDays, setTempSelectedDays] = useState<string>("");
+    const [tempDiscountValue, setTempDiscountValue] = useState<string>("");
+    const [tempDiscountType, setTempDiscountType] = useState<string>("");
 
     // Admission charge (one-time, applies to entire admission, not per batch)
     const [admissionCharge, setAdmissionCharge] = useState<string>("");
@@ -269,12 +271,16 @@ export default function AdmissionPage() {
             fee: parseFloat(tempFee),
             feeModel: b.feeModel,
             selectedDays: tempSelectedDays ? parseInt(tempSelectedDays) : undefined,
-            paying: 0 // Initialize payment for this batch
+            paying: 0, // Initialize payment for this batch
+            discount_value: tempDiscountValue ? parseFloat(tempDiscountValue) : 0,
+            discount_type: tempDiscountType || undefined
         }]);
 
         setTempBatchId("");
         setTempFee("");
         setTempSelectedDays("");
+        setTempDiscountValue("");
+        setTempDiscountType("");
     };
 
     const removeBatch = (id: string) => {
@@ -377,13 +383,20 @@ export default function AdmissionPage() {
                     const batchAdmissionCharge = index === 0 ? admissionChargeAmount : 0;
                     const batchAdmissionChargePending = index === 0 ? Math.max(0, admissionChargeAmount - payingAdmissionChargeAmount) : 0;
 
+                    // Calculate discounted fee for this batch
+                    const batchDiscount = b.discount_value || 0;
+                    const discountedBatchFee = Math.max(0, b.fee - batchDiscount);
+
                     return {
                         batchId: b.id,
-                        total_fees: b.fee, // Store batch fee (used for recurring)
+                        total_fees: b.fee, // Store base batch fee
                         admission_charge: batchAdmissionCharge, // One-time admission charge (only on first)
                         admission_charge_pending: batchAdmissionChargePending, // Pending admission charge
-                        fees_pending: Math.max(0, b.fee - b.paying), // Pending batch fee only
+                        fees_pending: Math.max(0, discountedBatchFee - b.paying), // Use DISCOUNTED fee for pending
                         selectedDays: b.selectedDays,
+                        discount_value: batchDiscount,
+                        discount_type: b.discount_type || null,
+                        discountedFee: discountedBatchFee, // Pass through for payment logic
                         // Pass through for payment creation
                         feeModel: b.feeModel,
                         paying: b.paying,
@@ -397,6 +410,9 @@ export default function AdmissionPage() {
                     admission_charge_pending: Math.max(0, admissionChargeAmount - payingAdmissionChargeAmount),
                     fees_pending: 0,
                     selectedDays: undefined,
+                    discount_value: 0,
+                    discount_type: null,
+                    discountedFee: 0,
                     feeModel: "ONE_TIME", // Default for non-batch
                     paying: 0,
                     index: 0
@@ -415,6 +431,8 @@ export default function AdmissionPage() {
                         admission_charge_pending: adm.admission_charge_pending,
                         fees_pending: adm.fees_pending,
                         selectedDays: adm.selectedDays,
+                        discount_value: adm.discount_value,
+                        discount_type: adm.discount_type,
                     }),
                 });
 
@@ -437,8 +455,10 @@ export default function AdmissionPage() {
                     // Check if tuition is fully paid for one or more months
                     let months: string[] = [];
                     // Only applicable for Monthly/Quarterly batches where fee > 0
-                    if ((adm.feeModel === "MONTHLY" || adm.feeModel === "QUARTERLY") && adm.total_fees > 0) {
-                        const monthlyFee = adm.feeModel === "QUARTERLY" ? adm.total_fees / 3 : adm.total_fees;
+                    // Use DISCOUNTED fee for calculating covered months
+                    const effectiveFee = adm.discountedFee || adm.total_fees; // Use discounted fee if available
+                    if ((adm.feeModel === "MONTHLY" || adm.feeModel === "QUARTERLY") && effectiveFee > 0) {
+                        const monthlyFee = adm.feeModel === "QUARTERLY" ? effectiveFee / 3 : effectiveFee;
 
                         // Calculate how many months are covered
                         // Use 0.01 tolerance for floating point math
@@ -669,7 +689,7 @@ export default function AdmissionPage() {
                                         )} />
                                         <FormField control={studentForm.control} name="aadharNo" render={({ field }) => (
                                             <FormItem><FormLabel>Aadhar No</FormLabel><FormControl><Input {...field} maxLength={12}
-                                                inputMode="numeric" 
+                                                inputMode="numeric"
                                                 onChange={(e) => {
                                                     const value = e.target.value;
                                                     if (value === "" || /^\d+$/.test(value)) {
@@ -839,16 +859,65 @@ export default function AdmissionPage() {
                                     </div>
 
                                     {selectedBatchDetails && (
-                                        <div className="mt-4 flex items-center justify-between">
-                                            <div className="text-sm">
-                                                <span className="text-muted-foreground">Batch Fee:</span>
-                                                <span className="font-semibold text-lg ml-2">₹{calculatedFee.toLocaleString()}</span>
-                                                <Badge variant="secondary" className="ml-2">{getFeeModelLabel(selectedBatchDetails.feeModel!)}</Badge>
+                                        <div className="mt-4 space-y-4 p-4 bg-muted/30 rounded-lg border">
+                                            {/* Base Fee Display */}
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-muted-foreground">Base Fee:</span>
+                                                <div>
+                                                    <span className="font-semibold text-lg">₹{calculatedFee.toLocaleString()}</span>
+                                                    <Badge variant="secondary" className="ml-2">{getFeeModelLabel(selectedBatchDetails.feeModel!)}</Badge>
+                                                </div>
                                             </div>
+
+                                            {/* Discount Section */}
+                                            <div className="grid grid-cols-2 gap-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs text-emerald-700 font-medium">Discount (₹)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        value={tempDiscountValue}
+                                                        onChange={(e) => setTempDiscountValue(e.target.value)}
+                                                        placeholder="0"
+                                                        className="h-9 border-emerald-200"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs text-emerald-700 font-medium">Reason</Label>
+                                                    <Select value={tempDiscountType} onValueChange={setTempDiscountType}>
+                                                        <SelectTrigger className="h-9 border-emerald-200">
+                                                            <SelectValue placeholder="Optional..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="SIBLING">Sibling</SelectItem>
+                                                            <SelectItem value="EARLY_BIRD">Early Bird</SelectItem>
+                                                            <SelectItem value="REFERRAL">Referral</SelectItem>
+                                                            <SelectItem value="SCHOLARSHIP">Scholarship</SelectItem>
+                                                            <SelectItem value="SPECIAL">Special</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+
+                                            {/* Final Fee After Discount */}
+                                            {parseFloat(tempDiscountValue) > 0 && (
+                                                <div className="flex items-center justify-between p-2 bg-primary/5 rounded border border-primary/20">
+                                                    <span className="text-sm font-medium">Fee after Discount:</span>
+                                                    <div className="text-right">
+                                                        <span className="text-xs text-muted-foreground line-through mr-2">
+                                                            ₹{calculatedFee.toLocaleString()}
+                                                        </span>
+                                                        <span className="font-bold text-lg text-primary">
+                                                            ₹{Math.max(0, calculatedFee - parseFloat(tempDiscountValue)).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <Button
                                                 onClick={addBatch}
                                                 disabled={!tempBatchId || (hasDaysWiseFees && !tempSelectedDays)}
-                                                className="gap-2"
+                                                className="w-full gap-2"
                                             >
                                                 <Plus className="h-4 w-4" />
                                                 Add Batch
@@ -872,9 +941,27 @@ export default function AdmissionPage() {
                                                         {batch.selectedDays && (
                                                             <Badge variant="secondary" className="text-xs">{batch.selectedDays} days/week</Badge>
                                                         )}
+                                                        {batch.discount_value && batch.discount_value > 0 && (
+                                                            <Badge variant="default" className="text-xs bg-emerald-500">
+                                                                ₹{batch.discount_value} off
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                     <p className="text-sm text-muted-foreground mt-0.5">
-                                                        {batch.subject} • Fee: ₹{batch.fee.toLocaleString()}
+                                                        {batch.subject} •
+                                                        {batch.discount_value && batch.discount_value > 0 ? (
+                                                            <>
+                                                                <span className="line-through">₹{batch.fee.toLocaleString()}</span>
+                                                                <span className="text-emerald-600 font-medium ml-1">
+                                                                    ₹{Math.max(0, batch.fee - batch.discount_value).toLocaleString()}
+                                                                </span>
+                                                                {batch.discount_type && (
+                                                                    <span className="text-emerald-600 text-xs ml-1">({batch.discount_type})</span>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <> Fee: ₹{batch.fee.toLocaleString()}</>
+                                                        )}
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-3">

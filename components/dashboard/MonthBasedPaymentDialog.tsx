@@ -46,6 +46,11 @@ interface PendingFeesData {
   allMonths: string[];
   coveredMonthsList: string[];
   futureMonths?: string[]; // Months available for advance payment
+  discount_value?: number; // Fixed discount amount applied
+  discount_type?: string | null; // Discount reason
+  feeModel?: string; // MONTHLY, QUARTERLY, ONE_TIME
+  actualFee?: number; // Actual fee based on fee model (before monthly conversion)
+  baseFeeBeforeDiscount?: number; // Original fee before discount
 }
 
 interface MonthBasedPaymentDialogProps {
@@ -269,11 +274,43 @@ export function MonthBasedPaymentDialog({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-xs text-muted-foreground mb-1">
-                    Monthly Fee
+                    {pendingData.feeModel === "QUARTERLY" ? "Quarterly Fee" : "Monthly Fee"}
                   </p>
-                  <p className="font-semibold">
-                    Rs. {pendingData.monthlyFee.toLocaleString()}
-                  </p>
+                  {/* Show actual fee for quarterly, monthly fee for monthly */}
+                  {pendingData.feeModel === "QUARTERLY" ? (
+                    <>
+                      {pendingData.discount_value && pendingData.discount_value > 0 ? (
+                        <>
+                          <p className="text-xs text-muted-foreground line-through">
+                            Rs. {pendingData.baseFeeBeforeDiscount?.toLocaleString()}
+                          </p>
+                          <p className="font-semibold text-primary">
+                            Rs. {pendingData.actualFee?.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-emerald-600 mt-1">
+                            ₹{pendingData.discount_value} off
+                            {pendingData.discount_type && ` (${pendingData.discount_type})`}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="font-semibold">
+                          Rs. {pendingData.actualFee?.toLocaleString()}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold">
+                        Rs. {pendingData.monthlyFee.toLocaleString()}
+                      </p>
+                      {pendingData.discount_value && pendingData.discount_value > 0 && (
+                        <p className="text-xs text-emerald-600 mt-1">
+                          ₹{pendingData.discount_value} off/month
+                          {pendingData.discount_type && ` (${pendingData.discount_type})`}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
                 <div className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-xs text-muted-foreground mb-1">

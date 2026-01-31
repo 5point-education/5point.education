@@ -219,6 +219,10 @@ model Admission {
   endDate        DateTime?        // When student left or batch ended
   status         AdmissionStatus @default(ACTIVE)
 
+  // Discount fields
+  discount_value   Float    @default(0)  // Fixed discount amount in rupees (deducted from monthly fee)
+  discount_type    String?              // Optional: "Sibling Discount", "Early Bird", etc.
+
   student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   batch            Batch?               @relation(fields: [batchId], references: [id])
   payments         Payment[]           // Direct relation to payments
