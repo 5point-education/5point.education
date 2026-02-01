@@ -90,6 +90,12 @@ model StudentProfile {
   aadharNo                String?
   nationality             String?  @default("Indian")
   
+  // Transport & Legal (NEW)
+  transport_facility      Boolean  @default(false)
+  pickup_location         String?
+  terms_accepted          Boolean  @default(false)
+  declaration_accepted    Boolean  @default(false)
+  
   // Previous fields mapped or kept
   age                     Int?     // Calculated from DOB usually, but keeping for legacy compatibility or quick access
   phone                   String   // Student's own mobile
@@ -99,6 +105,7 @@ model StudentProfile {
   class_level             Int?
   stream                  String?  // Science, Commerce, Arts
   aspirant_of             String?  // JEE, NEET, etc.
+  competitive_exams       String?  // NEW: Comma separated list of exams (NEET, JEE, CAT, etc.)
   service_type            ServiceType
   
   // Complex Data
@@ -219,6 +226,8 @@ model Admission {
   // NEW: End date and status
   endDate        DateTime?        // When student left or batch ended
   status         AdmissionStatus @default(ACTIVE)
+  admission_in_charge String?      // NEW: Admission In-charge name
+
 
   // Discount fields
   discount_value   Float    @default(0)  // Fixed discount amount in rupees (deducted from monthly fee)

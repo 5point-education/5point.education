@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { createAdminClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role, Board, ServiceType } from "@prisma/client";
 
@@ -129,6 +129,21 @@ export async function POST(req: Request) {
 
             return { user, profile };
         });
+
+        // Send password reset email so the student can set their own password
+        try {
+            const origin = req.headers.get("origin") ?? (req.headers.get("x-forwarded-host") ? `https://${req.headers.get("x-forwarded-host")}` : null);
+            const redirectTo = origin ? `${origin}/auth/callback?next=/auth/update-password` : undefined;
+            const authClient = createClient();
+            const { error: resetError } = await authClient.auth.resetPasswordForEmail(email, {
+                redirectTo: redirectTo ?? undefined,
+            });
+            if (resetError) {
+                console.warn("[STUDENTS_POST] Password reset email failed:", resetError.message);
+            }
+        } catch (e) {
+            console.warn("[STUDENTS_POST] Password reset email error:", e);
+        }
 
         return NextResponse.json({
             success: true,

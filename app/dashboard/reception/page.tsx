@@ -29,7 +29,6 @@ export default function ReceptionDashboard() {
   const [filter, setFilter] = useState<string>("ALL");
   const [subjectFilter, setSubjectFilter] = useState<string>("");
   const [classFilter, setClassFilter] = useState<string>("");
-  const [admittedOnly, setAdmittedOnly] = useState<boolean>(false);
 
   useEffect(() => {
     fetchEnquiries();
@@ -52,7 +51,6 @@ export default function ReceptionDashboard() {
       if (filter !== "ALL" && e.status !== filter) return false;
       if (subjectFilter && !e.subjects.toLowerCase().includes(subjectFilter.toLowerCase())) return false;
       if (classFilter && e.class_level !== parseInt(classFilter)) return false;
-      if (admittedOnly && e.status !== "ADMITTED") return false;
       return true;
     });
 
@@ -179,15 +177,7 @@ export default function ReceptionDashboard() {
                   <option key={i + 1} value={i + 1}>{i + 1}</option>
                 ))}
               </select>
-              {/* Admitted only toggle */}
-              <label className="flex items-center space-x-1 text-sm">
-                <input
-                  type="checkbox"
-                  checked={admittedOnly}
-                  onChange={e => setAdmittedOnly(e.target.checked)}
-                />
-                <span>Admitted only</span>
-              </label>
+             
             </div>
           </div>
         </CardHeader>
