@@ -171,11 +171,12 @@ enum FeeModel {
 }
 
 model Batch {
-  id        String   @id @default(cuid())
-  name      String
-  subject   String
-  teacherId String
-  schedule  String
+  id         String   @id @default(cuid())
+  name       String
+  subject    String
+  classLevel String?  // Class level (1-12) or course name (JEE, ECE, etc.)
+  teacherId  String
+  schedule   String
   capacity  Int?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
