@@ -1,8 +1,3 @@
-Sure — here’s a **clean, properly formatted README.md** you can copy-paste directly into GitHub.
-I kept everything the same, just structured it clearly with headings, code fences, and spacing.
-
----
-
 # 5 Point Education Hub — Coaching Center Management System
 
 A comprehensive, production-ready web application for managing coaching centers with support for tuition batches and home tutoring services.
@@ -285,12 +280,4 @@ npm run db:studio
 ## 📄 License
 
 This project is created for **educational and demonstration purposes**.
-
----
-
-## 🤝 Support
-
-For issues or questions — please open an issue in the repository.
-
----
 
