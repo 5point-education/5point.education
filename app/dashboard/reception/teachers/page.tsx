@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -69,7 +69,7 @@ export default function TeachersPage() {
     setSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    
+
     try {
       const response = await fetch("/api/teachers", {
         method: "POST",
@@ -91,13 +91,13 @@ export default function TeachersPage() {
       setOpen(false);
       fetchTeachers();
     } catch (error: any) {
-        toast({
-            title: "Error",
-            description: error.message,
-            variant: "destructive",
-        });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
-        setSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -111,7 +111,7 @@ export default function TeachersPage() {
     setSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    
+
     try {
       const response = await fetch("/api/teachers", {
         method: "PATCH",
@@ -141,13 +141,13 @@ export default function TeachersPage() {
       setEditingTeacher(null);
       fetchTeachers();
     } catch (error: any) {
-        toast({
-            title: "Error",
-            description: error.message,
-            variant: "destructive",
-        });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
-        setSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -236,18 +236,18 @@ export default function TeachersPage() {
   const filterTeachers = (teacherList: any[]) => {
     return teacherList.filter(teacher => {
       // Search filter - search by name, email, qualifications, or subjects
-      const matchesSearch = searchQuery === "" || 
+      const matchesSearch = searchQuery === "" ||
         teacher.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         teacher.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (teacher.teacherProfile?.qualifications || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (teacher.teacherProfile?.subjects_specialization || "").toLowerCase().includes(searchQuery.toLowerCase());
 
       // Qualification filter
-      const matchesQualification = qualificationFilter === "all" || 
+      const matchesQualification = qualificationFilter === "all" ||
         teacher.teacherProfile?.qualifications === qualificationFilter;
 
       // Subject filter
-      const matchesSubject = subjectFilter === "all" || 
+      const matchesSubject = subjectFilter === "all" ||
         (teacher.teacherProfile?.subjects_specialization || "").toLowerCase().includes(subjectFilter.toLowerCase());
 
       return matchesSearch && matchesQualification && matchesSubject;
@@ -285,7 +285,7 @@ export default function TeachersPage() {
                     <p className="text-xs">
                       {searchQuery || qualificationFilter !== "all" || subjectFilter !== "all"
                         ? "Try adjusting your filters"
-                        : isArchived 
+                        : isArchived
                           ? "Archived teachers will appear here"
                           : "Create your first teacher to get started"}
                     </p>
@@ -305,8 +305,8 @@ export default function TeachersPage() {
                     <div className="flex justify-end gap-2">
                       {!isArchived ? (
                         <>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="icon"
                             onClick={() => handleEditClick(teacher)}
                             title="Edit teacher"
@@ -314,8 +314,8 @@ export default function TeachersPage() {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="icon"
                             onClick={() => handleArchiveTeacher(teacher)}
                             title="Archive teacher"
@@ -325,8 +325,8 @@ export default function TeachersPage() {
                           </Button>
                         </>
                       ) : (
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => handleRestoreTeacher(teacher)}
                           title="Restore teacher"
@@ -355,7 +355,7 @@ export default function TeachersPage() {
             <p className="text-xs mt-1">
               {searchQuery || qualificationFilter !== "all" || subjectFilter !== "all"
                 ? "Try adjusting your filters"
-                : isArchived 
+                : isArchived
                   ? "Archived teachers will appear here"
                   : "Create your first teacher to get started"}
             </p>
@@ -372,8 +372,8 @@ export default function TeachersPage() {
                   <div className="flex gap-1">
                     {!isArchived ? (
                       <>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => handleEditClick(teacher)}
                           title="Edit teacher"
@@ -381,8 +381,8 @@ export default function TeachersPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => handleArchiveTeacher(teacher)}
                           title="Archive teacher"
@@ -392,8 +392,8 @@ export default function TeachersPage() {
                         </Button>
                       </>
                     ) : (
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="icon"
                         onClick={() => handleRestoreTeacher(teacher)}
                         title="Restore teacher"
@@ -443,7 +443,7 @@ export default function TeachersPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">Teachers</h1>
           <p className="text-muted-foreground text-sm sm:text-base">Manage teachers and their profiles</p>
         </div>
-        
+
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="w-full sm:w-auto">
@@ -588,18 +588,18 @@ export default function TeachersPage() {
           <TabsTrigger value="active" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span>Active</span>
-            <Badge variant="secondary" className="ml-1">
+            <Badge variant="outline" className="ml-1 font-normal border-amber-500 text-amber-600">
               {activeTeachers.length}
-              {(searchQuery || qualificationFilter !== "all" || subjectFilter !== "all") && 
+              {(searchQuery || qualificationFilter !== "all" || subjectFilter !== "all") &&
                 ` / ${teachers.filter(t => t.teacherProfile?.isActive !== false).length}`}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="archived" className="flex items-center gap-2">
             <Archive className="h-4 w-4" />
             <span>Archived</span>
-            <Badge variant="secondary" className="ml-1">
+            <Badge variant="outline" className="ml-1 font-normal border-amber-500 text-amber-600">
               {archivedTeachers.length}
-              {(searchQuery || qualificationFilter !== "all" || subjectFilter !== "all") && 
+              {(searchQuery || qualificationFilter !== "all" || subjectFilter !== "all") &&
                 ` / ${teachers.filter(t => t.teacherProfile?.isActive === false).length}`}
             </Badge>
           </TabsTrigger>
@@ -660,21 +660,21 @@ export default function TeachersPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-name">Name</Label>
-                  <Input 
-                    id="edit-name" 
-                    name="name" 
-                    required 
+                  <Input
+                    id="edit-name"
+                    name="name"
+                    required
                     placeholder="John Doe"
                     defaultValue={editingTeacher?.name || ""}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-email">Email</Label>
-                  <Input 
-                    id="edit-email" 
-                    name="email" 
-                    type="email" 
-                    required 
+                  <Input
+                    id="edit-email"
+                    name="email"
+                    type="email"
+                    required
                     placeholder="john@example.com"
                     defaultValue={editingTeacher?.email || ""}
                   />
@@ -683,21 +683,21 @@ export default function TeachersPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-qualifications">Qualifications</Label>
-                  <Input 
-                    id="edit-qualifications" 
-                    name="qualifications" 
-                    required 
+                  <Input
+                    id="edit-qualifications"
+                    name="qualifications"
+                    required
                     placeholder="M.Sc. Physics"
                     defaultValue={editingTeacher?.teacherProfile?.qualifications || ""}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-experience">Experience (Years)</Label>
-                  <Input 
-                    id="edit-experience" 
-                    name="experience_years" 
-                    type="number" 
-                    required 
+                  <Input
+                    id="edit-experience"
+                    name="experience_years"
+                    type="number"
+                    required
                     min="0"
                     defaultValue={editingTeacher?.teacherProfile?.experience_years || 0}
                   />
@@ -705,10 +705,10 @@ export default function TeachersPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-subjects">Specialization Subjects</Label>
-                <Input 
-                  id="edit-subjects" 
-                  name="subjects_specialization" 
-                  required 
+                <Input
+                  id="edit-subjects"
+                  name="subjects_specialization"
+                  required
                   placeholder="Physics, Mathematics"
                   defaultValue={editingTeacher?.teacherProfile?.subjects_specialization || ""}
                 />
