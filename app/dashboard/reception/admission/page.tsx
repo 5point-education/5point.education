@@ -287,18 +287,24 @@ export default function AdmissionPage() {
         setSelectedBatches(prev => prev.filter(x => x.id !== id));
     };
 
-    // Update payment for a specific batch
-    const updateBatchPayment = (batchId: string, amount: string) => {
-        setSelectedBatches(prev => prev.map(b =>
-            b.id === batchId ? { ...b, paying: parseFloat(amount) || 0 } : b
-        ));
+    // Toggle full payment for a specific batch (pay full discounted fee or nothing)
+    const toggleBatchPayment = (batchId: string, checked: boolean) => {
+        setSelectedBatches(prev => prev.map(b => {
+            if (b.id === batchId) {
+                const discountedFee = Math.max(0, b.fee - (b.discount_value || 0));
+                return { ...b, paying: checked ? discountedFee : 0 };
+            }
+            return b;
+        }));
     };
 
-    const totalBatchFees = selectedBatches.reduce((acc, curr) => acc + curr.fee, 0);
+    const totalBatchFees = selectedBatches.reduce((acc, curr) => acc + curr.fee, 0); // Base fees
+    const totalDiscount = selectedBatches.reduce((acc, curr) => acc + (curr.discount_value || 0), 0); // Total discounts
+    const totalBatchFeesAfterDiscount = Math.max(0, totalBatchFees - totalDiscount); // Fees after discount
     const totalBatchPayments = selectedBatches.reduce((acc, curr) => acc + curr.paying, 0);
     const admissionChargeAmount = admissionCharge ? parseFloat(admissionCharge) : 0;
     const payingAdmissionChargeAmount = payingAdmissionCharge ? parseFloat(payingAdmissionCharge) : 0;
-    const totalFees = totalBatchFees + admissionChargeAmount; // Total = Batch Fees + Admission Charge
+    const totalFees = totalBatchFeesAfterDiscount + admissionChargeAmount; // Total = (Batch Fees - Discount) + Admission Charge
     const totalPaid = totalBatchPayments + payingAdmissionChargeAmount; // Sum of all payments
     const totalPending = Math.max(0, totalFees - totalPaid);
 
@@ -848,7 +854,7 @@ export default function AdmissionPage() {
                                                             .sort(([a], [b]) => parseInt(a) - parseInt(b))
                                                             .map(([days, fee]) => (
                                                                 <SelectItem key={days} value={days} className="py-3">
-                                                                    <span className="font-medium">{days} days/week</span>
+                                                                    <span className="font-medium ">{days} days/week</span>
                                                                     <span className="text-muted-foreground ml-2">— ₹{fee.toLocaleString()}</span>
                                                                 </SelectItem>
                                                             ))}
@@ -939,7 +945,7 @@ export default function AdmissionPage() {
                                                         <h4 className="font-medium truncate">{batch.name}</h4>
                                                         <Badge variant="outline" className="text-xs">{getFeeModelLabel(batch.feeModel!)}</Badge>
                                                         {batch.selectedDays && (
-                                                            <Badge variant="secondary" className="text-xs">{batch.selectedDays} days/week</Badge>
+                                                            <Badge variant="secondary" className="text-xs text-white">{batch.selectedDays} days/week</Badge>
                                                         )}
                                                         {batch.discount_value && batch.discount_value > 0 && (
                                                             <Badge variant="default" className="text-xs bg-emerald-500">
@@ -965,17 +971,21 @@ export default function AdmissionPage() {
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-3">
-                                                    <div className="space-y-1">
-                                                        <Label className="text-xs text-muted-foreground">Paying Now</Label>
-                                                        <div className="relative">
-                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                                                            <Input
-                                                                type="number"
-                                                                value={batch.paying || ""}
-                                                                onChange={(e) => updateBatchPayment(batch.id, e.target.value)}
-                                                                className="w-28 h-10 pl-7 text-right font-medium"
-                                                            />
-                                                        </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Checkbox
+                                                            id={`pay-batch-${batch.id}`}
+                                                            checked={batch.paying > 0}
+                                                            onCheckedChange={(checked) => toggleBatchPayment(batch.id, checked as boolean)}
+                                                        />
+                                                        <Label
+                                                            htmlFor={`pay-batch-${batch.id}`}
+                                                            className="text-sm cursor-pointer"
+                                                        >
+                                                            Pay Now
+                                                            <span className="font-semibold text-primary ml-1">
+                                                                ₹{Math.max(0, batch.fee - (batch.discount_value || 0)).toLocaleString()}
+                                                            </span>
+                                                        </Label>
                                                     </div>
                                                     <Button
                                                         variant="ghost"
@@ -1047,6 +1057,12 @@ export default function AdmissionPage() {
                                     <span className="text-muted-foreground">Batch Fees ({selectedBatches.length} batch{selectedBatches.length !== 1 ? "es" : ""})</span>
                                     <span className="font-medium">₹{totalBatchFees.toLocaleString()}</span>
                                 </div>
+                                {totalDiscount > 0 && (
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-emerald-600 font-medium">Discount Applied</span>
+                                        <span className="font-medium text-emerald-600">- ₹{totalDiscount.toLocaleString()}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-muted-foreground">Admission Charge</span>
                                     <span className="font-medium">₹{admissionChargeAmount.toLocaleString()}</span>

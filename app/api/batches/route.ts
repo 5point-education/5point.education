@@ -48,7 +48,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { name, subject, teacherId, schedule, capacity, feeModel, feeAmount, installments, daysWiseFeesEnabled, daysWiseFees } = body;
+        const { name, subject, classLevel, teacherId, schedule, capacity, feeModel, feeAmount, installments, daysWiseFeesEnabled, daysWiseFees } = body;
 
         if (!name || !subject || !teacherId || !schedule ) {
             return new NextResponse("Missing required fields", { status: 400 });
@@ -57,6 +57,7 @@ export async function POST(req: Request) {
         const batchData: any = {
             name,
             subject,
+            classLevel: classLevel || null,
             teacherId,
             schedule,
             feeModel: feeModel || null,
@@ -94,7 +95,7 @@ export async function PATCH(req: Request) {
         }
 
         const body = await req.json();
-        const { id, name, subject, teacherId, schedule, capacity, isActive, feeModel, feeAmount, installments, daysWiseFeesEnabled, daysWiseFees, startDate, endDate } = body;
+        const { id, name, subject, classLevel, teacherId, schedule, capacity, isActive, feeModel, feeAmount, installments, daysWiseFeesEnabled, daysWiseFees, startDate, endDate } = body;
 
         if (!id) {
             return new NextResponse("Batch ID is required", { status: 400 });
@@ -115,6 +116,7 @@ export async function PATCH(req: Request) {
         const updateData: any = {};
         if (name !== undefined) updateData.name = name;
         if (subject !== undefined) updateData.subject = subject;
+        if (classLevel !== undefined) updateData.classLevel = classLevel || null;
         if (teacherId !== undefined) updateData.teacherId = teacherId;
         if (schedule !== undefined) updateData.schedule = schedule;
         if (capacity !== undefined) updateData.capacity = capacity ? parseInt(capacity) : null;

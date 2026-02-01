@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -57,6 +57,7 @@ interface Batch {
   id: string;
   name: string;
   subject: string;
+  classLevel?: string;
   teacherId: string;
   teacher?: { name: string };
   schedule: string;
@@ -92,6 +93,9 @@ export default function BatchesPage() {
     { day: "", startTime: "12:00", endTime: "13:00" }
   ]);
 
+  // Class Selection State (Create)
+  const [classLevel, setClassLevel] = useState<string>("");
+
   // Fee Configuration State (Create)
   const [feeModel, setFeeModel] = useState<FeeModel>(null);
   const [feeAmount, setFeeAmount] = useState("");
@@ -103,11 +107,12 @@ export default function BatchesPage() {
   const [editFormData, setEditFormData] = useState({
     name: "",
     subject: "",
+    classLevel: "",
     teacherId: "",
     capacity: "",
   });
   const [editScheduleItems, setEditScheduleItems] = useState<ScheduleItem[]>([]);
-  
+
   // Fee Configuration State (Edit)
   const [editFeeModel, setEditFeeModel] = useState<FeeModel>(null);
   const [editFeeAmount, setEditFeeAmount] = useState("");
@@ -211,6 +216,7 @@ export default function BatchesPage() {
     setEditFormData({
       name: batch.name,
       subject: batch.subject,
+      classLevel: batch.classLevel || "",
       teacherId: batch.teacherId,
       capacity: batch.capacity?.toString() || "",
     });
@@ -244,10 +250,10 @@ export default function BatchesPage() {
     setSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    
+
     // Validate schedule
     const validSchedule = scheduleItems.every(item => item.day.trim() !== "" && item.startTime !== "" && item.endTime !== "");
-    
+
     if (!validSchedule) {
       toast({
         title: "Incomplete Schedule",
@@ -270,6 +276,7 @@ export default function BatchesPage() {
 
     const payload = {
       ...data,
+      classLevel: classLevel,
       schedule: JSON.stringify(scheduleItems),
       feeModel: feeModel,
       feeAmount: feeAmount,
@@ -277,7 +284,7 @@ export default function BatchesPage() {
       daysWiseFeesEnabled: daysWiseFeesEnabled,
       daysWiseFees: daysWiseFeesEnabled ? daysWiseFeesNumeric : null,
     };
-    
+
     try {
       const response = await fetch("/api/batches", {
         method: "POST",
@@ -298,7 +305,8 @@ export default function BatchesPage() {
       });
       setOpen(false);
       setScheduleItems([{ day: "", startTime: "12:00", endTime: "13:00" }]);
-      // Reset fee state
+      // Reset class and fee state
+      setClassLevel("");
       setFeeModel(null);
       setFeeAmount("");
       setInstallments([]);
@@ -306,25 +314,25 @@ export default function BatchesPage() {
       setDaysWiseFees({});
       fetchData();
     } catch (error: any) {
-        toast({
-            title: "Error",
-            description: error.message,
-            variant: "destructive",
-        });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
-        setSubmitting(false);
+      setSubmitting(false);
     }
   };
 
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingBatch) return;
-    
+
     setSubmitting(true);
 
     // Validate schedule
     const validSchedule = editScheduleItems.every(item => item.day.trim() !== "" && item.startTime !== "" && item.endTime !== "");
-    
+
     if (!validSchedule) {
       toast({
         title: "Incomplete Schedule",
@@ -355,7 +363,7 @@ export default function BatchesPage() {
       daysWiseFeesEnabled: editDaysWiseFeesEnabled,
       daysWiseFees: editDaysWiseFeesEnabled ? editDaysWiseFeesNumeric : null,
     };
-    
+
     try {
       const response = await fetch("/api/batches", {
         method: "PATCH",
@@ -378,13 +386,13 @@ export default function BatchesPage() {
       setEditingBatch(null);
       fetchData();
     } catch (error: any) {
-        toast({
-            title: "Error",
-            description: error.message,
-            variant: "destructive",
-        });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
-        setSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -477,7 +485,7 @@ export default function BatchesPage() {
   const filterBatches = (batchList: Batch[]) => {
     return batchList.filter(batch => {
       // Search filter - search by name, subject, or teacher name
-      const matchesSearch = searchQuery === "" || 
+      const matchesSearch = searchQuery === "" ||
         batch.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         batch.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
         batch.teacher?.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -527,7 +535,7 @@ export default function BatchesPage() {
                     <p className="text-xs">
                       {searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all"
                         ? "Try adjusting your filters"
-                        : isArchived 
+                        : isArchived
                           ? "Archived batches will appear here"
                           : "Create your first batch to get started"}
                     </p>
@@ -539,8 +547,8 @@ export default function BatchesPage() {
                 <TableRow key={batch.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">{batch.name}</TableCell>
                   <TableCell className="text-sm">
-                    <Badge variant="secondary" className="font-normal">
-                      {getBatchClass(batch.name)}
+                    <Badge variant="outline" className="ml-1 font-normal border-amber-500 text-amber-600">
+                      {batch.classLevel ? (isNaN(Number(batch.classLevel)) ? batch.classLevel : `Class ${batch.classLevel}`) : getBatchClass(batch.name)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -564,8 +572,8 @@ export default function BatchesPage() {
                     <div className="flex justify-end gap-2">
                       {!isArchived ? (
                         <>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="icon"
                             onClick={() => handleEditClick(batch)}
                             title="Edit batch"
@@ -573,8 +581,8 @@ export default function BatchesPage() {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="icon"
                             onClick={() => handleArchiveBatch(batch)}
                             title="Archive batch"
@@ -584,8 +592,8 @@ export default function BatchesPage() {
                           </Button>
                         </>
                       ) : (
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => handleRestoreBatch(batch)}
                           title="Restore batch"
@@ -615,7 +623,7 @@ export default function BatchesPage() {
               <p className="text-xs">
                 {searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all"
                   ? "Try adjusting your filters"
-                  : isArchived 
+                  : isArchived
                     ? "Archived batches will appear here"
                     : "Create your first batch to get started"}
               </p>
@@ -630,7 +638,7 @@ export default function BatchesPage() {
                     <h3 className="font-medium text-sm truncate">{batch.name}</h3>
                     <div className="mt-1 flex gap-2">
                       <Badge variant="secondary" className="font-normal text-xs">
-                        {getBatchClass(batch.name)}
+                        {batch.classLevel ? (isNaN(Number(batch.classLevel)) ? batch.classLevel : `Class ${batch.classLevel}`) : getBatchClass(batch.name)}
                       </Badge>
                       <Badge variant="outline" className="font-normal text-xs">
                         {batch.subject}
@@ -640,8 +648,8 @@ export default function BatchesPage() {
                   <div className="flex gap-1">
                     {!isArchived ? (
                       <>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => handleEditClick(batch)}
                           title="Edit batch"
@@ -649,8 +657,8 @@ export default function BatchesPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => handleArchiveBatch(batch)}
                           title="Archive batch"
@@ -660,8 +668,8 @@ export default function BatchesPage() {
                         </Button>
                       </>
                     ) : (
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="icon"
                         onClick={() => handleRestoreBatch(batch)}
                         title="Restore batch"
@@ -713,26 +721,26 @@ export default function BatchesPage() {
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <Label>Schedule</Label>
-        <Button 
-          type="button" 
-          variant="outline" 
-          size="sm" 
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
           onClick={onAdd}
         >
           <Plus className="h-3 w-3 mr-1" />
           Add Time
         </Button>
       </div>
-      
+
       <div className="space-y-2 border rounded-md p-3 bg-muted/20">
         {items.map((item, index) => (
           <div key={index} className="flex gap-2 items-end">
             <div className="flex-1 space-y-1">
-               <Label className="text-xs text-muted-foreground">Day</Label>
-               <Select 
-                value={item.day} 
+              <Label className="text-xs text-muted-foreground">Day</Label>
+              <Select
+                value={item.day}
                 onValueChange={(val) => onChange(index, 'day', val)}
-               >
+              >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Day" />
                 </SelectTrigger>
@@ -745,22 +753,22 @@ export default function BatchesPage() {
             </div>
             <div className="w-[130px] space-y-1">
               <Label className="text-xs text-muted-foreground">Start</Label>
-              <TimePicker 
+              <TimePicker
                 value={item.startTime}
                 onChange={(val) => onChange(index, 'startTime', val)}
               />
             </div>
-             <div className="w-[130px] space-y-1">
+            <div className="w-[130px] space-y-1">
               <Label className="text-xs text-muted-foreground">End</Label>
-              <TimePicker 
+              <TimePicker
                 value={item.endTime}
                 onChange={(val) => onChange(index, 'endTime', val)}
               />
             </div>
-            <Button 
-              type="button" 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               className="h-9 w-9 text-destructive hover:text-destructive/90"
               onClick={() => onRemove(index)}
               disabled={items.length === 1}
@@ -793,236 +801,236 @@ export default function BatchesPage() {
     const totalScheduledDays = uniqueDays.size;
 
     return (
-    <div className="space-y-3 border rounded-md p-4 bg-muted/10">
-      <div className="flex justify-between items-center">
-        <Label className="text-base font-medium">Fee Configuration</Label>
-      </div>
-      
-      <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Fee Model</Label>
-        <Select 
-          value={currentModel || ""} 
-          onValueChange={(val) => setModel(val as FeeModel)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select fee model" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ONE_TIME">One-time Fee</SelectItem>
-            <SelectItem value="MONTHLY">Monthly Fee</SelectItem>
-            <SelectItem value="QUARTERLY">Quarterly Fee</SelectItem>
-            <SelectItem value="CUSTOM">Custom Installments</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <div className="space-y-3 border rounded-md p-4 bg-muted/10">
+        <div className="flex justify-between items-center">
+          <Label className="text-base font-medium">Fee Configuration</Label>
+        </div>
 
-      {currentModel && currentModel !== "CUSTOM" && (
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">
-            {currentModel === "ONE_TIME" && "Total Fee Amount"}
-            {currentModel === "MONTHLY" && "Monthly Fee Amount"}
-            {currentModel === "QUARTERLY" && "Quarterly Fee Amount"}
-          </Label>
-          <Input 
-            type="number" 
-            placeholder="₹0" 
-            value={amount} 
-            onChange={(e) => setAmount(e.target.value)}
-            min="0"
-          />
+          <Label className="text-xs text-muted-foreground">Fee Model</Label>
+          <Select
+            value={currentModel || ""}
+            onValueChange={(val) => setModel(val as FeeModel)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select fee model" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ONE_TIME">One-time Fee</SelectItem>
+              <SelectItem value="MONTHLY">Monthly Fee</SelectItem>
+              <SelectItem value="QUARTERLY">Quarterly Fee</SelectItem>
+              <SelectItem value="CUSTOM">Custom Installments</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      )}
 
-      {currentModel === "CUSTOM" && (
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <Label className="text-xs text-muted-foreground">Installments</Label>
-            <Button type="button" variant="outline" size="sm" onClick={onAddInst}>
-              <Plus className="h-3 w-3 mr-1" /> Add Installment
-            </Button>
-          </div>
-          
-          {instItems.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-2">No installments added yet</p>
-          )}
-          
-          {instItems.map((item, index) => (
-            <div key={index} className="flex gap-2 items-end bg-background p-2 rounded border">
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs text-muted-foreground">Name</Label>
-                <Input 
-                  placeholder="Installment name" 
-                  value={item.name} 
-                  onChange={(e) => onChangeInst(index, 'name', e.target.value)}
-                />
-              </div>
-              <div className="w-[120px] space-y-1">
-                <Label className="text-xs text-muted-foreground">Amount</Label>
-                <Input 
-                  type="number" 
-                  placeholder="₹0" 
-                  value={item.amount || ""} 
-                  onChange={(e) => onChangeInst(index, 'amount', parseFloat(e.target.value) || 0)}
-                  min="0"
-                />
-              </div>
-              <div className="w-[130px] space-y-1">
-                <Label className="text-xs text-muted-foreground">Due Date</Label>
-                <Input 
-                  type="date" 
-                  value={item.dueDate} 
-                  onChange={(e) => onChangeInst(index, 'dueDate', e.target.value)}
-                />
-              </div>
-              <Button 
-                type="button" 
-                variant="ghost" 
-                size="icon" 
-                className="h-9 w-9 text-destructive hover:text-destructive/90"
-                onClick={() => onRemoveInst(index)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-          
-          {instItems.length > 0 && (
-            <div className="text-sm font-medium text-right pt-2 border-t">
-              Total: ₹{instItems.reduce((sum, i) => sum + (i.amount || 0), 0).toLocaleString()}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Days-wise Fees Toggle - Only show for non-CUSTOM fee models */}
-      {currentModel && currentModel !== "CUSTOM" && (
-        <div className="space-y-3 pt-3 border-t">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-sm font-medium">Days-wise Fees</Label>
-              <p className="text-xs text-muted-foreground">
-                Set different fees based on attendance days per week
-              </p>
-            </div>
-            <Switch
-              checked={daysWiseEnabled}
-              onCheckedChange={(checked) => {
-                setDaysWiseEnabled(checked);
-                if (!checked) {
-                  setDaysWiseFeesMap({});
-                }
-              }}
+        {currentModel && currentModel !== "CUSTOM" && (
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              {currentModel === "ONE_TIME" && "Total Fee Amount"}
+              {currentModel === "MONTHLY" && "Monthly Fee Amount"}
+              {currentModel === "QUARTERLY" && "Quarterly Fee Amount"}
+            </Label>
+            <Input
+              type="number"
+              placeholder="₹0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              min="0"
             />
           </div>
+        )}
 
-          {daysWiseEnabled && (
-            <div className="space-y-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              {totalScheduledDays === 0 ? (
-                <p className="text-sm text-amber-600">
-                  Please add schedule days first to configure days-wise fees.
+        {currentModel === "CUSTOM" && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <Label className="text-xs text-muted-foreground">Installments</Label>
+              <Button type="button" variant="outline" size="sm" onClick={onAddInst}>
+                <Plus className="h-3 w-3 mr-1" /> Add Installment
+              </Button>
+            </div>
+
+            {instItems.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-2">No installments added yet</p>
+            )}
+
+            {instItems.map((item, index) => (
+              <div key={index} className="flex gap-2 items-end bg-background p-2 rounded border">
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs text-muted-foreground">Name</Label>
+                  <Input
+                    placeholder="Installment name"
+                    value={item.name}
+                    onChange={(e) => onChangeInst(index, 'name', e.target.value)}
+                  />
+                </div>
+                <div className="w-[120px] space-y-1">
+                  <Label className="text-xs text-muted-foreground">Amount</Label>
+                  <Input
+                    type="number"
+                    placeholder="₹0"
+                    value={item.amount || ""}
+                    onChange={(e) => onChangeInst(index, 'amount', parseFloat(e.target.value) || 0)}
+                    min="0"
+                  />
+                </div>
+                <div className="w-[130px] space-y-1">
+                  <Label className="text-xs text-muted-foreground">Due Date</Label>
+                  <Input
+                    type="date"
+                    value={item.dueDate}
+                    onChange={(e) => onChangeInst(index, 'dueDate', e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-destructive hover:text-destructive/90"
+                  onClick={() => onRemoveInst(index)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+
+            {instItems.length > 0 && (
+              <div className="text-sm font-medium text-right pt-2 border-t">
+                Total: ₹{instItems.reduce((sum, i) => sum + (i.amount || 0), 0).toLocaleString()}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Days-wise Fees Toggle - Only show for non-CUSTOM fee models */}
+        {currentModel && currentModel !== "CUSTOM" && (
+          <div className="space-y-3 pt-3 border-t">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Days-wise Fees</Label>
+                <p className="text-xs text-muted-foreground">
+                  Set different fees based on attendance days per week
                 </p>
-              ) : (
-                <>
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs text-muted-foreground">
-                      Add fee options for different attendance days (max {totalScheduledDays} days)
-                    </p>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => {
-                        // Find the first available day not yet added
-                        const usedDays = Object.keys(daysWiseFeesMap).map(Number);
-                        const availableDays = Array.from({ length: totalScheduledDays }, (_, i) => i + 1)
-                          .filter(d => !usedDays.includes(d));
-                        if (availableDays.length > 0) {
-                          const newMap = { ...daysWiseFeesMap };
-                          newMap[availableDays[0].toString()] = "";
-                          setDaysWiseFeesMap(newMap);
-                        }
-                      }}
-                      disabled={Object.keys(daysWiseFeesMap).length >= totalScheduledDays}
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> Add Day Fee
-                    </Button>
-                  </div>
-                  
-                  {Object.keys(daysWiseFeesMap).length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-2">No day fees added yet. Click &quot;Add Day Fee&quot; to start.</p>
-                  )}
+              </div>
+              <Switch
+                checked={daysWiseEnabled}
+                onCheckedChange={(checked) => {
+                  setDaysWiseEnabled(checked);
+                  if (!checked) {
+                    setDaysWiseFeesMap({});
+                  }
+                }}
+              />
+            </div>
 
-                  <div className="space-y-2">
-                    {Object.entries(daysWiseFeesMap)
-                      .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                      .map(([days, fee]) => {
-                        // Get list of days already used (except current)
-                        const usedDays = Object.keys(daysWiseFeesMap).map(Number).filter(d => d !== parseInt(days));
-                        const availableDays = Array.from({ length: totalScheduledDays }, (_, i) => i + 1)
-                          .filter(d => !usedDays.includes(d));
-                        
-                        return (
-                          <div key={days} className="flex items-center gap-2 bg-white p-2 rounded border">
-                            <div className="w-32">
-                              <Select 
-                                value={days} 
-                                onValueChange={(newDays) => {
+            {daysWiseEnabled && (
+              <div className="space-y-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                {totalScheduledDays === 0 ? (
+                  <p className="text-sm text-amber-600">
+                    Please add schedule days first to configure days-wise fees.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs text-muted-foreground">
+                        Add fee options for different attendance days (max {totalScheduledDays} days)
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Find the first available day not yet added
+                          const usedDays = Object.keys(daysWiseFeesMap).map(Number);
+                          const availableDays = Array.from({ length: totalScheduledDays }, (_, i) => i + 1)
+                            .filter(d => !usedDays.includes(d));
+                          if (availableDays.length > 0) {
+                            const newMap = { ...daysWiseFeesMap };
+                            newMap[availableDays[0].toString()] = "";
+                            setDaysWiseFeesMap(newMap);
+                          }
+                        }}
+                        disabled={Object.keys(daysWiseFeesMap).length >= totalScheduledDays}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Add Day Fee
+                      </Button>
+                    </div>
+
+                    {Object.keys(daysWiseFeesMap).length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-2">No day fees added yet. Click &quot;Add Day Fee&quot; to start.</p>
+                    )}
+
+                    <div className="space-y-2">
+                      {Object.entries(daysWiseFeesMap)
+                        .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                        .map(([days, fee]) => {
+                          // Get list of days already used (except current)
+                          const usedDays = Object.keys(daysWiseFeesMap).map(Number).filter(d => d !== parseInt(days));
+                          const availableDays = Array.from({ length: totalScheduledDays }, (_, i) => i + 1)
+                            .filter(d => !usedDays.includes(d));
+
+                          return (
+                            <div key={days} className="flex items-center gap-2 bg-white p-2 rounded border">
+                              <div className="w-32">
+                                <Select
+                                  value={days}
+                                  onValueChange={(newDays) => {
+                                    const newMap = { ...daysWiseFeesMap };
+                                    const currentFee = newMap[days];
+                                    delete newMap[days];
+                                    newMap[newDays] = currentFee;
+                                    setDaysWiseFeesMap(newMap);
+                                  }}
+                                >
+                                  <SelectTrigger className="h-9">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableDays.map((dayCount) => (
+                                      <SelectItem key={dayCount} value={dayCount.toString()}>
+                                        {dayCount} day{dayCount > 1 ? 's' : ''}/week
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <Input
+                                type="number"
+                                placeholder="₹0"
+                                value={fee}
+                                onChange={(e) => {
                                   const newMap = { ...daysWiseFeesMap };
-                                  const currentFee = newMap[days];
+                                  newMap[days] = e.target.value;
+                                  setDaysWiseFeesMap(newMap);
+                                }}
+                                min="0"
+                                className="flex-1"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 text-destructive hover:text-destructive/90"
+                                onClick={() => {
+                                  const newMap = { ...daysWiseFeesMap };
                                   delete newMap[days];
-                                  newMap[newDays] = currentFee;
                                   setDaysWiseFeesMap(newMap);
                                 }}
                               >
-                                <SelectTrigger className="h-9">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {availableDays.map((dayCount) => (
-                                    <SelectItem key={dayCount} value={dayCount.toString()}>
-                                      {dayCount} day{dayCount > 1 ? 's' : ''}/week
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <Input
-                              type="number"
-                              placeholder="₹0"
-                              value={fee}
-                              onChange={(e) => {
-                                const newMap = { ...daysWiseFeesMap };
-                                newMap[days] = e.target.value;
-                                setDaysWiseFeesMap(newMap);
-                              }}
-                              min="0"
-                              className="flex-1"
-                            />
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-9 w-9 text-destructive hover:text-destructive/90"
-                              onClick={() => {
-                                const newMap = { ...daysWiseFeesMap };
-                                delete newMap[days];
-                                setDaysWiseFeesMap(newMap);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+                          );
+                        })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -1032,7 +1040,7 @@ export default function BatchesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Batches</h1>
           <p className="text-muted-foreground mt-1">Manage student batches and schedules</p>
         </div>
-        
+
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="w-full sm:w-auto">
@@ -1058,6 +1066,32 @@ export default function BatchesPage() {
                   <Input id="subject" name="subject" required placeholder="Physics" />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="classLevel">Class / Course</Label>
+                  <Select
+                    value={classLevel}
+                    onValueChange={(val) => setClassLevel(val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select class or type custom" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
+                        <SelectItem key={num} value={num.toString()}>Class {num}</SelectItem>
+                      ))}
+                      <SelectItem value="JEE">JEE</SelectItem>
+                      <SelectItem value="NEET">NEET</SelectItem>
+                      <SelectItem value="WBJEE">WBJEE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="classLevelCustom"
+                    value={classLevel}
+                    onChange={(e) => setClassLevel(e.target.value)}
+                    placeholder="Or type custom (e.g., ECE, CSE, MBA)"
+                    className="mt-2"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="teacher">Assign Teacher</Label>
                   <Select name="teacherId" required>
                     <SelectTrigger>
@@ -1072,7 +1106,7 @@ export default function BatchesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 {renderScheduleEditor(scheduleItems, handleAddScheduleItem, handleRemoveScheduleItem, handleScheduleChange)}
 
                 <div className="space-y-2">
@@ -1105,29 +1139,55 @@ export default function BatchesPage() {
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-name">Batch Name</Label>
-                  <Input 
-                    id="edit-name" 
+                  <Input
+                    id="edit-name"
                     value={editFormData.name}
-                    onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
-                    required 
-                    placeholder="Class 12 Physics - Batch A" 
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    required
+                    placeholder="Class 12 Physics - Batch A"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-subject">Subject</Label>
-                  <Input 
-                    id="edit-subject" 
+                  <Input
+                    id="edit-subject"
                     value={editFormData.subject}
-                    onChange={(e) => setEditFormData({...editFormData, subject: e.target.value})}
-                    required 
-                    placeholder="Physics" 
+                    onChange={(e) => setEditFormData({ ...editFormData, subject: e.target.value })}
+                    required
+                    placeholder="Physics"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-classLevel">Class / Course</Label>
+                  <Select
+                    value={editFormData.classLevel}
+                    onValueChange={(val) => setEditFormData({ ...editFormData, classLevel: val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select class or type custom" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
+                        <SelectItem key={num} value={num.toString()}>Class {num}</SelectItem>
+                      ))}
+                      <SelectItem value="JEE">JEE</SelectItem>
+                      <SelectItem value="NEET">NEET</SelectItem>
+                      <SelectItem value="WBJEE">WBJEE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="edit-classLevelCustom"
+                    value={editFormData.classLevel}
+                    onChange={(e) => setEditFormData({ ...editFormData, classLevel: e.target.value })}
+                    placeholder="Or type custom (e.g., ECE, CSE, MBA)"
+                    className="mt-2"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-teacher">Assign Teacher</Label>
-                  <Select 
+                  <Select
                     value={editFormData.teacherId}
-                    onValueChange={(val) => setEditFormData({...editFormData, teacherId: val})}
+                    onValueChange={(val) => setEditFormData({ ...editFormData, teacherId: val })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a teacher" />
@@ -1141,18 +1201,18 @@ export default function BatchesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 {renderScheduleEditor(editScheduleItems, handleAddEditScheduleItem, handleRemoveEditScheduleItem, handleEditScheduleChange)}
 
                 <div className="space-y-2">
                   <Label htmlFor="edit-capacity">Capacity (Optional)</Label>
-                  <Input 
-                    id="edit-capacity" 
-                    type="number" 
+                  <Input
+                    id="edit-capacity"
+                    type="number"
                     value={editFormData.capacity}
-                    onChange={(e) => setEditFormData({...editFormData, capacity: e.target.value})}
-                    min="1" 
-                    placeholder="30" 
+                    onChange={(e) => setEditFormData({ ...editFormData, capacity: e.target.value })}
+                    min="1"
+                    placeholder="30"
                   />
                 </div>
 
@@ -1277,18 +1337,18 @@ export default function BatchesPage() {
           <TabsTrigger value="active" className="flex items-center gap-2">
             <Layers className="h-4 w-4" />
             <span>Active</span>
-            <Badge variant="secondary" className="ml-1">
+            <Badge variant="outline" className="ml-1 font-normal border-amber-500 text-amber-600">
               {activeBatches.length}
-              {(searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all") && 
+              {(searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all") &&
                 ` / ${batches.filter(b => b.isActive !== false).length}`}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="archived" className="flex items-center gap-2">
             <Archive className="h-4 w-4" />
             <span>Archived</span>
-            <Badge variant="secondary" className="ml-1">
+            <Badge variant="outline" className="ml-1 font-normal border-amber-500 text-amber-600">
               {archivedBatches.length}
-              {(searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all") && 
+              {(searchQuery || teacherFilter !== "all" || subjectFilter !== "all" || feeModelFilter !== "all") &&
                 ` / ${batches.filter(b => b.isActive === false).length}`}
             </Badge>
           </TabsTrigger>
