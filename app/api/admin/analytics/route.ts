@@ -12,21 +12,51 @@ export async function GET(req: Request) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    // Parse date range from query params
+    const url = new URL(req.url);
+    const fromParam = url.searchParams.get("from");
+    const toParam = url.searchParams.get("to");
+    
     const now = new Date();
+    
+    // Check if date filtering is enabled (both params must be present)
+    const hasDateFilter = fromParam && toParam;
+    const fromDate = hasDateFilter ? new Date(fromParam) : null;
+    const toDate = hasDateFilter ? new Date(toParam) : null;
+    
+    // Ensure toDate includes the full day if set
+    if (toDate) {
+      toDate.setHours(23, 59, 59, 999);
+    }
+    
+    // Build date filter condition for queries (empty object if no filter)
+    const dateFilter = hasDateFilter && fromDate && toDate
+      ? { gte: fromDate, lte: toDate }
+      : undefined;
+    
+    // Calculate current month for "This Month" revenue
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // 1. Business KPIs
-    const totalEnquiries = await db.enquiry.count();
-
-    const admittedEnquiries = await db.enquiry.count({
-      where: { status: EnquiryStatus.ADMITTED }
+    // 1. Business KPIs - filtered by date range if provided
+    const totalEnquiries = await db.enquiry.count({
+      where: dateFilter ? { createdAt: dateFilter } : undefined
     });
 
+    const admittedEnquiries = await db.enquiry.count({
+      where: { 
+        status: EnquiryStatus.ADMITTED,
+        ...(dateFilter ? { createdAt: dateFilter } : {})
+      }
+    });
+
+    // Total revenue within the selected date range (or all time if no filter)
     const revenueResult = await db.payment.aggregate({
-      _sum: { amount: true }
+      _sum: { amount: true },
+      where: dateFilter ? { date: dateFilter } : undefined
     });
     const totalRevenue = revenueResult._sum.amount || 0;
 
+    // Revenue "this month" - always shows current month for reference
     const revenueThisMonthResult = await db.payment.aggregate({
       _sum: { amount: true },
       where: { date: { gte: startOfMonth } }
@@ -44,7 +74,7 @@ export async function GET(req: Request) {
       ? parseFloat((((admittedEnquiries / totalEnquiries) * 100)).toFixed(1))
       : 0;
 
-    // 2. Organization KPIs (all real DB counts)
+    // 2. Organization KPIs (all real DB counts - these are not filtered by date)
     const totalStudents = await db.user.count({
       where: { role: Role.STUDENT }
     });
@@ -79,8 +109,9 @@ export async function GET(req: Request) {
       take: 10
     });
 
-    // 4. Recent enquiries (what’s new)
+    // 4. Recent enquiries (what's new) - filtered by date range if provided
     const recentEnquiries = await db.enquiry.findMany({
+      where: dateFilter ? { createdAt: dateFilter } : undefined,
       orderBy: { createdAt: "desc" },
       take: 7,
       select: {
@@ -93,12 +124,13 @@ export async function GET(req: Request) {
       }
     });
 
-    // 5. Lost Leads Analysis
+    // 5. Lost Leads Analysis - filtered by date range if provided
     const lostLeadsRaw = await db.enquiry.groupBy({
       by: ["lost_reason"],
       where: {
         status: EnquiryStatus.LOST,
-        lost_reason: { not: null }
+        lost_reason: { not: null },
+        ...(dateFilter ? { createdAt: dateFilter } : {})
       },
       _count: { lost_reason: true }
     });
@@ -108,8 +140,9 @@ export async function GET(req: Request) {
       count: item._count.lost_reason
     }));
 
-    // 6. Subject Demand
+    // 6. Subject Demand - filtered by date range if provided
     const allEnquiries = await db.enquiry.findMany({
+      where: dateFilter ? { createdAt: dateFilter } : undefined,
       select: { subjects: true }
     });
     const subjectCounts: Record<string, number> = {};

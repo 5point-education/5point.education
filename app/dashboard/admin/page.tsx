@@ -55,29 +55,36 @@ const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 export default function AdminDashboard() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filterMode, setFilterMode] = useState<'month' | 'custom'>('month');
+  const [filterMode, setFilterMode] = useState<'all' | 'month' | 'custom'>('all');
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [startDate, setStartDate] = useState<Date>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date>(endOfMonth(new Date()));
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
+  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({
+    from: null,
+    to: null,
   });
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
-    fetchAnalytics(dateRange);
-  }, [dateRange]);
+    fetchAnalytics(dateRange, filterMode);
+  }, [dateRange, filterMode]);
 
-  const fetchAnalytics = async (range: { from: Date; to: Date }) => {
+  const fetchAnalytics = async (range: { from: Date | null; to: Date | null }, mode: 'all' | 'month' | 'custom') => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        from: range.from.toISOString(),
-        to: range.to.toISOString(),
-      });
-      const response = await fetch(`/api/admin/analytics?${params}`);
+      let url = '/api/admin/analytics';
+
+      // Only add date params if not viewing all time
+      if (mode !== 'all' && range.from && range.to) {
+        const params = new URLSearchParams({
+          from: range.from.toISOString(),
+          to: range.to.toISOString(),
+        });
+        url = `/api/admin/analytics?${params}`;
+      }
+
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to load');
       const result = await response.json();
       setData(result);
@@ -104,13 +111,11 @@ export default function AdminDashboard() {
   };
 
   const handleReset = () => {
-    setFilterMode('month');
-    const from = startOfMonth(new Date());
-    const to = endOfMonth(new Date());
+    setFilterMode('all');
     setSelectedMonth(new Date());
-    setStartDate(from);
-    setEndDate(to);
-    setDateRange({ from, to });
+    setStartDate(startOfMonth(new Date()));
+    setEndDate(endOfMonth(new Date()));
+    setDateRange({ from: null, to: null });
     setShowMonthPicker(false);
     setShowDatePicker(false);
   };
@@ -161,10 +166,26 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-1 bg-white dark:bg-slate-800 rounded-lg p-1 border border-gray-200 dark:border-slate-700">
                 <Button
                   size="sm"
+                  variant={filterMode === 'all' ? 'default' : 'ghost'}
+                  className="text-xs h-8"
+                  onClick={() => {
+                    setFilterMode('all');
+                    setDateRange({ from: null, to: null });
+                    setShowMonthPicker(false);
+                    setShowDatePicker(false);
+                  }}
+                >
+                  All Time
+                </Button>
+                <Button
+                  size="sm"
                   variant={filterMode === 'month' ? 'default' : 'ghost'}
                   className="text-xs h-8"
                   onClick={() => {
                     setFilterMode('month');
+                    const from = startOfMonth(selectedMonth);
+                    const to = endOfMonth(selectedMonth);
+                    setDateRange({ from, to });
                     setShowDatePicker(false);
                   }}
                 >
@@ -176,6 +197,7 @@ export default function AdminDashboard() {
                   className="text-xs h-8"
                   onClick={() => {
                     setFilterMode('custom');
+                    setDateRange({ from: startDate, to: endDate });
                     setShowMonthPicker(false);
                   }}
                 >
@@ -258,8 +280,8 @@ export default function AdminDashboard() {
                 </Popover>
               )}
 
-              {(dateRange.from.getMonth() !== new Date().getMonth() || dateRange.to.getMonth() !== new Date().getMonth()) && (
-                <Button variant="ghost" size="sm" className="text-xs h-9 px-2" onClick={handleReset}>
+              {filterMode !== 'all' && (
+                <Button variant="ghost" size="sm" className="text-xs h-9 px-2" onClick={handleReset} title="Show all data">
                   <X className="h-4 w-4" />
                 </Button>
               )}

@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
@@ -22,14 +22,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { 
-  History, 
-  Loader2, 
-  Pencil, 
-  Search, 
+import {
+  History,
+  Loader2,
+  Pencil,
+  Search,
   Trash2,
   Calendar,
+  Receipt,
+  BookOpen,
+  Ticket,
+  CreditCard,
 } from "lucide-react";
 import { MonthBasedPaymentDialog } from "@/components/dashboard/MonthBasedPaymentDialog";
 
@@ -41,8 +46,13 @@ interface AdmissionInfo {
   batchName: string;
   total_fees: number;
   fees_pending: number;
+  admission_charge: number;
+  admission_charge_pending: number;
   feeModel: string | null;
   admission_date: string;
+  monthlyFee?: number;
+  totalMonths?: number;
+  pendingMonths?: number;
 }
 
 interface PaymentInfo {
@@ -64,8 +74,12 @@ interface StudentFeeData {
   admissions: AdmissionInfo[];
   payments: PaymentInfo[];
   totalFees: number;
+  totalCalculatedFees: number; // Batch fees only
+  totalAdmissionCharge: number;
   totalPaid: number;
   totalPending: number;
+  totalBatchFeesPending: number;
+  totalAdmissionChargePending: number;
 }
 
 interface Batch {
@@ -83,6 +97,7 @@ export default function FeesManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [batchFilter, setBatchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("batch-fees");
   const { toast } = useToast();
 
   // History Dialog State
@@ -101,9 +116,17 @@ export default function FeesManagementPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
 
-  // Month-based Payment Dialog State
+  // Month-based Payment Dialog State (for Batch Fees)
   const [monthBasedPaymentOpen, setMonthBasedPaymentOpen] = useState(false);
   const [monthBasedPaymentStudent, setMonthBasedPaymentStudent] = useState<StudentFeeData | null>(null);
+
+  // Admission Charge Payment Dialog State
+  const [admissionChargePaymentOpen, setAdmissionChargePaymentOpen] = useState(false);
+  const [admissionChargeStudent, setAdmissionChargeStudent] = useState<StudentFeeData | null>(null);
+  const [selectedAdmissionForCharge, setSelectedAdmissionForCharge] = useState<AdmissionInfo | null>(null);
+  const [chargePaymentAmount, setChargePaymentAmount] = useState("");
+  const [chargePaymentMode, setChargePaymentMode] = useState("CASH");
+  const [chargeReceiptNo, setChargeReceiptNo] = useState("");
 
   // ==================== DATA FETCHING ====================
 
@@ -141,22 +164,35 @@ export default function FeesManagementPage() {
   // ==================== FILTERS ====================
 
   const filteredData = feesData.filter(student => {
-    const matchesSearch = 
+    const matchesSearch =
       student.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.phone.includes(searchQuery) ||
       student.email.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesBatch = 
+    const matchesBatch =
       batchFilter === "all" ||
       student.admissions.some(adm => adm.batchId === batchFilter);
 
-    const matchesStatus = 
-      statusFilter === "all" ||
-      (statusFilter === "pending" && student.totalPending > 0) ||
-      (statusFilter === "paid" && student.totalPending === 0);
+    // Adjust status filter based on active tab
+    let matchesStatus = true;
+    if (activeTab === "batch-fees") {
+      matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "pending" && student.totalBatchFeesPending > 0) ||
+        (statusFilter === "paid" && student.totalBatchFeesPending === 0);
+    } else {
+      matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "pending" && student.totalAdmissionChargePending > 0) ||
+        (statusFilter === "paid" && student.totalAdmissionChargePending === 0);
+    }
 
     return matchesSearch && matchesBatch && matchesStatus;
   });
+
+  // Filter students based on tab
+  const batchFeesStudents = filteredData.filter(s => s.totalCalculatedFees > 0 || s.totalBatchFeesPending > 0);
+  const admissionChargeStudents = filteredData.filter(s => s.totalAdmissionCharge > 0);
 
   // ==================== HANDLERS ====================
 
@@ -252,6 +288,82 @@ export default function FeesManagementPage() {
     }
   };
 
+  const handleOpenAdmissionChargePayment = (student: StudentFeeData, admission: AdmissionInfo) => {
+    setAdmissionChargeStudent(student);
+    setSelectedAdmissionForCharge(admission);
+    setChargePaymentAmount(admission.admission_charge_pending.toString());
+    setChargePaymentMode("CASH");
+    setChargeReceiptNo("");
+    setAdmissionChargePaymentOpen(true);
+  };
+
+  const handleSubmitAdmissionChargePayment = async () => {
+    if (!admissionChargeStudent || !selectedAdmissionForCharge || !chargePaymentAmount || !chargeReceiptNo) {
+      toast({
+        title: "Missing fields",
+        description: "Please fill all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const amount = parseFloat(chargePaymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid payment amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (amount > selectedAdmissionForCharge.admission_charge_pending) {
+      toast({
+        title: "Amount too high",
+        description: "Payment amount cannot exceed pending admission charge",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/payments/admission-charge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: admissionChargeStudent.studentId,
+          admissionId: selectedAdmissionForCharge.id,
+          amount: amount,
+          mode: chargePaymentMode,
+          receipt_no: chargeReceiptNo,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+
+      toast({
+        title: "Success",
+        description: "Admission charge payment recorded successfully",
+      });
+      setAdmissionChargePaymentOpen(false);
+      setAdmissionChargeStudent(null);
+      setSelectedAdmissionForCharge(null);
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to record payment",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ==================== UTILITY FUNCTIONS ====================
 
   const getFeeModelLabel = (model: string | null) => {
@@ -278,189 +390,351 @@ export default function FeesManagementPage() {
     return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   };
 
+  // Calculate tab-specific totals
+  const batchFeesPendingTotal = filteredData.reduce((sum, s) => sum + s.totalBatchFeesPending, 0);
+  const admissionChargePendingTotal = filteredData.reduce((sum, s) => sum + s.totalAdmissionChargePending, 0);
+
   // ==================== RENDER ====================
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Fees Management</h1>
-        <p className="text-muted-foreground">Manage student fees and payments with month-based tracking</p>
+        <p className="text-muted-foreground">Manage student fees and payments - Batch Fees & Admission Charges</p>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name or phone..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+      {/* Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="batch-fees" className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Batch Fees
+            {batchFeesPendingTotal > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-amber-100 text-amber-800">
+                ₹{batchFeesPendingTotal.toLocaleString()}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="admission-charges" className="flex items-center gap-2">
+            <Ticket className="h-4 w-4" />
+            Admission Charges
+            {admissionChargePendingTotal > 0 && (
+              <Badge variant="secondary" className="ml-1 bg-red-100 text-red-800">
+                ₹{admissionChargePendingTotal.toLocaleString()}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Filters */}
+        <Card className="mt-4">
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-4">
+              <div className="flex-1 min-w-[200px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name or phone..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="w-[200px]">
+                <Select value={batchFilter} onValueChange={setBatchFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Batches</SelectItem>
+                    {batches.map(batch => (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        {batch.name} - {batch.subject}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-[150px]">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <div className="w-[200px]">
-              <Select value={batchFilter} onValueChange={setBatchFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by batch" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Batches</SelectItem>
-                  {batches.map(batch => (
-                    <SelectItem key={batch.id} value={batch.id}>
-                      {batch.name} - {batch.subject}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-[150px]">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          </CardContent>
+        </Card>
+
+        {/* ==================== BATCH FEES TAB ==================== */}
+        <TabsContent value="batch-fees" className="space-y-4">
+          {/* Summary Cards for Batch Fees */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Students with Batch Fees</CardDescription>
+                <CardTitle className="text-2xl">{batchFeesStudents.length}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total Batch Fees Pending</CardDescription>
+                <CardTitle className="text-2xl text-red-600">
+                  ₹{batchFeesPendingTotal.toLocaleString()}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total Batch Fees Collected</CardDescription>
+                <CardTitle className="text-2xl text-green-600">
+                  ₹{filteredData.reduce((sum, s) => sum + (s.totalCalculatedFees - s.totalBatchFeesPending), 0).toLocaleString()}
+                </CardTitle>
+              </CardHeader>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Students</CardDescription>
-            <CardTitle className="text-2xl">{filteredData.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Pending</CardDescription>
-            <CardTitle className="text-2xl text-red-600">
-              ₹{filteredData.reduce((sum, s) => sum + s.totalPending, 0).toLocaleString()}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Collected</CardDescription>
-            <CardTitle className="text-2xl text-green-600">
-              ₹{filteredData.reduce((sum, s) => sum + s.totalPaid, 0).toLocaleString()}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Data Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Student Fees</CardTitle>
-          <CardDescription>
-            View and manage fees for all students. Total fees are calculated based on months from admission date. 
-            Pending fees = (Monthly Fee × Unpaid Months) + Admission Charge Pending.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No students found
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Batch(es)</TableHead>
-                  <TableHead className="text-right">Total Fees</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Pending</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredData.map((student) => (
-                  <TableRow key={student.studentId}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{student.studentName}</div>
-                        <div className="text-sm text-muted-foreground">{student.phone}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {student.admissions.map((adm) => (
-                          <div key={adm.id} className="text-sm">
-                            <span>{adm.batchName}</span>
-                            {adm.feeModel && (
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                {getFeeModelLabel(adm.feeModel)}
-                              </Badge>
-                            )}
+          {/* Batch Fees Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Batch Fees
+              </CardTitle>
+              <CardDescription>
+                Recurring batch fees (Monthly/Quarterly). Payments must be for complete billing periods.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : batchFeesStudents.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No students with batch fees found
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Batch(es)</TableHead>
+                      <TableHead className="text-right">Total Batch Fees</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                      <TableHead className="text-right">Pending</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {batchFeesStudents.map((student) => (
+                      <TableRow key={student.studentId}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{student.studentName}</div>
+                            <div className="text-sm text-muted-foreground">{student.phone}</div>
                           </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      ₹{student.totalFees.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right text-green-600">
-                      ₹{student.totalPaid.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right text-red-600">
-                      ₹{student.totalPending.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      {student.totalPending === 0 ? (
-                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Paid</Badge>
-                      ) : student.totalPaid > 0 ? (
-                        <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Partial</Badge>
-                      ) : (
-                        <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Pending</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => {
-                            setMonthBasedPaymentStudent(student);
-                            setMonthBasedPaymentOpen(true);
-                          }}
-                          disabled={student.totalPending === 0}
-                        >
-                          <Calendar className="h-4 w-4 mr-1" />
-                          Record Payment
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenHistoryDialog(student)}
-                        >
-                          <History className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {student.admissions.map((adm) => (
+                              <div key={adm.id} className="text-sm">
+                                <span>{adm.batchName}</span>
+                                {adm.feeModel && (
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    {getFeeModelLabel(adm.feeModel)}
+                                  </Badge>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          ₹{student.totalCalculatedFees.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right text-green-600">
+                          ₹{(student.totalCalculatedFees - student.totalBatchFeesPending).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right text-red-600">
+                          ₹{student.totalBatchFeesPending.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          {student.totalBatchFeesPending === 0 ? (
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Paid</Badge>
+                          ) : student.totalCalculatedFees > student.totalBatchFeesPending ? (
+                            <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Partial</Badge>
+                          ) : (
+                            <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Pending</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => {
+                                setMonthBasedPaymentStudent(student);
+                                setMonthBasedPaymentOpen(true);
+                              }}
+                              disabled={student.totalBatchFeesPending === 0}
+                            >
+                              <Calendar className="h-4 w-4 mr-1" />
+                              Pay Months
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenHistoryDialog(student)}
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ==================== ADMISSION CHARGES TAB ==================== */}
+        <TabsContent value="admission-charges" className="space-y-4">
+          {/* Summary Cards for Admission Charges */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Students with Admission Charges</CardDescription>
+                <CardTitle className="text-2xl">{admissionChargeStudents.length}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total Admission Charges Pending</CardDescription>
+                <CardTitle className="text-2xl text-red-600">
+                  ₹{admissionChargePendingTotal.toLocaleString()}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total Admission Charges Collected</CardDescription>
+                <CardTitle className="text-2xl text-green-600">
+                  ₹{filteredData.reduce((sum, s) => sum + (s.totalAdmissionCharge - s.totalAdmissionChargePending), 0).toLocaleString()}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+
+          {/* Admission Charges Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Ticket className="h-5 w-5" />
+                Admission Charges
+              </CardTitle>
+              <CardDescription>
+                One-time admission charges. Partial/custom amounts can be paid.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : admissionChargeStudents.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No students with admission charges found
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Batch</TableHead>
+                      <TableHead className="text-right">Admission Charge</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                      <TableHead className="text-right">Pending</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {admissionChargeStudents.map((student) => (
+                      student.admissions
+                        .filter(adm => adm.admission_charge > 0)
+                        .map((adm) => (
+                          <TableRow key={`${student.studentId}-${adm.id}`}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{student.studentName}</div>
+                                <div className="text-sm text-muted-foreground">{student.phone}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <span>{adm.batchName}</span>
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  Admitted: {formatDate(adm.admission_date)}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              ₹{adm.admission_charge.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right text-green-600">
+                              ₹{(adm.admission_charge - adm.admission_charge_pending).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right text-red-600">
+                              ₹{adm.admission_charge_pending.toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              {adm.admission_charge_pending === 0 ? (
+                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Paid</Badge>
+                              ) : adm.admission_charge > adm.admission_charge_pending ? (
+                                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Partial</Badge>
+                              ) : (
+                                <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Pending</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => handleOpenAdmissionChargePayment(student, adm)}
+                                  disabled={adm.admission_charge_pending === 0}
+                                >
+                                  <CreditCard className="h-4 w-4 mr-1" />
+                                  Pay
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenHistoryDialog(student)}
+                                >
+                                  <History className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* ==================== DIALOGS ==================== */}
 
@@ -475,19 +749,46 @@ export default function FeesManagementPage() {
           </DialogHeader>
           {historyStudent && (
             <div className="space-y-4 py-4">
-              <div className="bg-muted/50 p-3 rounded-lg">
-                <div className="grid grid-cols-3 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Total Fees:</span>
-                    <p className="font-medium">₹{historyStudent.totalFees.toLocaleString()}</p>
+              {/* Summary showing both batch fees and admission charges */}
+              <div className="bg-muted/50 p-3 rounded-lg space-y-3">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-2">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      Batch Fees
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 pl-6">
+                      <div>
+                        <span className="text-muted-foreground">Total:</span>
+                        <p className="font-medium">₹{historyStudent.totalCalculatedFees.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Pending:</span>
+                        <p className="font-medium text-red-600">₹{historyStudent.totalBatchFeesPending.toLocaleString()}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Paid:</span>
-                    <p className="font-medium text-green-600">₹{historyStudent.totalPaid.toLocaleString()}</p>
+                  <div className="space-y-2">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Ticket className="h-4 w-4" />
+                      Admission Charges
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 pl-6">
+                      <div>
+                        <span className="text-muted-foreground">Total:</span>
+                        <p className="font-medium">₹{historyStudent.totalAdmissionCharge.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Pending:</span>
+                        <p className="font-medium text-red-600">₹{historyStudent.totalAdmissionChargePending.toLocaleString()}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Pending:</span>
-                    <p className="font-medium text-red-600">₹{historyStudent.totalPending.toLocaleString()}</p>
+                </div>
+                <div className="border-t pt-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Paid:</span>
+                    <span className="font-medium text-green-600">₹{historyStudent.totalPaid.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -639,7 +940,105 @@ export default function FeesManagementPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Month-Based Payment Dialog */}
+      {/* Admission Charge Payment Dialog */}
+      <Dialog open={admissionChargePaymentOpen} onOpenChange={setAdmissionChargePaymentOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Pay Admission Charge</DialogTitle>
+            <DialogDescription>
+              Record admission charge payment for {admissionChargeStudent?.studentName}
+              {selectedAdmissionForCharge && (
+                <span className="block mt-1 text-foreground font-medium">
+                  {selectedAdmissionForCharge.batchName}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Payment Summary */}
+            {selectedAdmissionForCharge && (
+              <div className="bg-muted/50 p-3 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Admission Charge:</span>
+                  <span className="font-medium">₹{selectedAdmissionForCharge.admission_charge.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Already Paid:</span>
+                  <span className="font-medium text-green-600">
+                    ₹{(selectedAdmissionForCharge.admission_charge - selectedAdmissionForCharge.admission_charge_pending).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm border-t pt-2">
+                  <span className="text-muted-foreground">Pending:</span>
+                  <span className="font-medium text-red-600">
+                    ₹{selectedAdmissionForCharge.admission_charge_pending.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="charge-amount">
+                Payment Amount <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="charge-amount"
+                type="number"
+                value={chargePaymentAmount}
+                onChange={(e) => setChargePaymentAmount(e.target.value)}
+                min="1"
+                max={selectedAdmissionForCharge?.admission_charge_pending}
+                placeholder="Enter amount"
+              />
+              <p className="text-xs text-muted-foreground">
+                You can pay any amount up to ₹{selectedAdmissionForCharge?.admission_charge_pending.toLocaleString()}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="charge-mode">Payment Mode</Label>
+              <Select value={chargePaymentMode} onValueChange={setChargePaymentMode}>
+                <SelectTrigger id="charge-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CASH">Cash</SelectItem>
+                  <SelectItem value="UPI">UPI</SelectItem>
+                  <SelectItem value="BANK">Bank Transfer</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="charge-receipt">
+                Receipt No. <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="charge-receipt"
+                value={chargeReceiptNo}
+                onChange={(e) => setChargeReceiptNo(e.target.value)}
+                placeholder="REC-001"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdmissionChargePaymentOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitAdmissionChargePayment}
+              disabled={submitting || !chargePaymentAmount || !chargeReceiptNo}
+            >
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Receipt className="mr-2 h-4 w-4" />
+              Record Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Month-Based Payment Dialog for Batch Fees */}
       {monthBasedPaymentStudent && (
         <MonthBasedPaymentDialog
           open={monthBasedPaymentOpen}
