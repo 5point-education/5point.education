@@ -8,7 +8,8 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  IndianRupee
+  IndianRupee,
+  Info
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -29,6 +30,8 @@ interface DashboardData {
     totalPending: number;
     monthlyFee: number;
     pendingMonths: number;
+    discountVal: number;
+    discountType?: string;
     status: string;
   }>;
   performanceData: Array<{
@@ -116,6 +119,28 @@ export default function StudentDashboard() {
         {/* LEFT MAIN COLUMN */}
         <div className="xl:col-span-3 space-y-6">
 
+          {/* 0. Pending Payment Banner */}
+          {data.overview.pendingFees > 0 && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-sm mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <IndianRupee className="h-5 w-5 text-yellow-600 mr-2" />
+                  <div>
+                    <p className="text-sm font-bold text-yellow-800">
+                      Payment Pending: ₹{data.overview.pendingFees.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      Please clear your dues to avoid service interruption.
+                    </p>
+                  </div>
+                </div>
+                <button className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-xs font-bold rounded-full transition-colors">
+                  Pay Now
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* 1. Welcome Banner */}
           <div className="relative overflow-hidden rounded-3xl bg-[#2563eb] p-8 text-white shadow-xl shadow-blue-200">
             <div className="relative z-10 flex flex-col justify-center h-full max-w-2xl">
@@ -195,24 +220,51 @@ export default function StudentDashboard() {
             <div className="flex flex-col gap-4">
 
               {/* Stat 1: Pending Fees */}
-              <Card className="flex-1 border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-center mb-3">
-                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mr-4 ${data.overview.pendingFees > 0 ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-green-600'}`}>
-                      <IndianRupee className="h-6 w-6" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xl md:text-2xl font-bold text-slate-800">
-                        {data.overview.pendingFees > 0 ? `₹${data.overview.pendingFees.toLocaleString('en-IN')}` : 'Clear'}
-                      </p>
+              <Card className="flex-1 border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow bg-white z-20 overflow-visible">
+                <div className="p-4 flex items-center h-full">
+                  <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mr-4 ${data.overview.pendingFees > 0 ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-green-600'}`}>
+                    <IndianRupee className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xl md:text-2xl font-bold text-slate-800">
+                      {data.overview.pendingFees > 0 ? `₹${data.overview.pendingFees.toLocaleString('en-IN')}` : 'Clear'}
+                    </p>
+                    <div className="flex items-center gap-2">
                       <p className="text-sm text-slate-500 font-medium">
-                        {data.overview.pendingFees > 0 ? 'Pending Fees' : 'Dues Cleared'}
+                        {data.overview.pendingFees > 0 ? 'Total Pending Fees' : 'All Dues Cleared'}
                       </p>
+                      {data.overview.pendingFees > 0 && (
+                        <div className="group relative">
+                          <Info className="h-4 w-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
+
+                          <div className="absolute left-1/2 bottom-full mb-3 -translate-x-1/2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none group-hover:pointer-events-auto origin-bottom z-50">
+                            <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 rotate-45 w-3 h-3 bg-white border-r border-b border-slate-100"></div>
+                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-2 border-b border-slate-50">Fee Breakdown</p>
+                            <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                              {data.feesBreakdown.map((item, idx) => (
+                                <div key={idx} className="space-y-1">
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-xs font-semibold text-slate-700 line-clamp-1 flex-1 mr-2">{item.batchName}</span>
+                                    <span className="text-xs font-bold text-rose-600 whitespace-nowrap">₹{item.totalPending.toLocaleString('en-IN')}</span>
+                                  </div>
+                                  {item.discountVal > 0 && (
+                                    <div className="flex items-center text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded w-fit">
+                                      <span>Disc: -₹{item.discountVal.toLocaleString('en-IN')}</span>
+                                    </div>
+                                  )}
+                                  {item.pendingMonths > 0 && (
+                                    <p className="text-[10px] text-slate-400">
+                                      {item.pendingMonths} month(s) pending
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {/* Detailed Breakdown */}
-
                 </div>
               </Card>
               {/* Stat 2: Total Exams */}

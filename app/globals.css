@@ -23,11 +23,16 @@
     --ring: 217 91% 60%;
     --radius: 0.5rem;
     /* Brand-aligned chart colors */
-    --chart-1: 217 91% 60%; /* Primary blue */
-    --chart-2: 25 95% 53%; /* Accent orange */
-    --chart-3: 217 91% 40%; /* Dark blue */
-    --chart-4: 25 95% 63%; /* Light orange */
-    --chart-5: 210 40% 50%; /* Slate accent */
+    --chart-1: 217 91% 60%;
+    /* Primary blue */
+    --chart-2: 25 95% 53%;
+    /* Accent orange */
+    --chart-3: 217 91% 40%;
+    /* Dark blue */
+    --chart-4: 25 95% 63%;
+    /* Light orange */
+    --chart-5: 210 40% 50%;
+    /* Slate accent */
   }
 
   .dark {

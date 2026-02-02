@@ -45,7 +45,7 @@ export async function GET(req: Request) {
       let calculatedPendingAmount = 0;
       let monthlyFee = 0;
       let pendingMonths: string[] = [];
-      
+
       // Calculate pending fees if batch exists and is not ONE_TIME/CUSTOM
       if (adm.batch && adm.batch.feeModel !== "ONE_TIME" && adm.batch.feeModel !== "CUSTOM") {
         try {
@@ -84,6 +84,8 @@ export async function GET(req: Request) {
           totalPending,
           monthlyFee,
           pendingMonths: pendingMonths.length,
+          discountVal: adm.discount_value,
+          discountType: adm.discount_type,
           status: adm.status,
         });
       }
