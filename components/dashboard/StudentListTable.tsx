@@ -21,9 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, User, Phone, Eye, PlusCircle } from "lucide-react";
+import { Search, User, Phone, Eye, PlusCircle, Pencil } from "lucide-react";
 import { AddStudentToBatchModal } from "./AddStudentToBatchModal";
 import { StudentDetailsModal } from "./StudentDetailsModal";
+import { EditStudentModal } from "./EditStudentModal";
 
 interface BatchInfo {
   id: string;
@@ -74,6 +75,7 @@ export default function StudentListTable({
   const [loading, setLoading] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(10);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Modal State
   const [isAddBatchOpen, setIsAddBatchOpen] = useState(false);
@@ -83,12 +85,21 @@ export default function StudentListTable({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedStudentDetails, setSelectedStudentDetails] = useState<Student | null>(null);
 
+  // Edit Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<Student | null>(null);
+
   const openDetailsModal = (student: Student) => {
     setSelectedStudentDetails(student);
     setIsDetailsOpen(true);
   };
 
-  // Fetch students when batch is selected
+  const openEditModal = (student: Student) => {
+    setSelectedStudentForEdit(student);
+    setIsEditModalOpen(true);
+  };
+
+  // Fetch students when batch is selected or refreshKey changes
   useEffect(() => {
     const fetchStudents = async () => {
       if (selectedBatch) {
@@ -122,7 +133,7 @@ export default function StudentListTable({
     };
 
     fetchStudents();
-  }, [selectedBatch]);
+  }, [selectedBatch, refreshKey]);
 
   // Apply search filter
   useEffect(() => {
@@ -279,16 +290,26 @@ export default function StudentListTable({
                             <TableCell>{formatDate(student.joinDate)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                {/* Only show Add to Batch if role is receptionist or admin */}
+                                {/* Only show Add to Batch & Edit if role is receptionist or admin */}
                                 {(role === 'receptionist' || role === 'admin') && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openAddBatchModal(student)}
-                                    title="Add to another batch"
-                                  >
-                                    <PlusCircle className="h-4 w-4" />
-                                  </Button>
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openEditModal(student)}
+                                      title="Edit details"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openAddBatchModal(student)}
+                                      title="Add to another batch"
+                                    >
+                                      <PlusCircle className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
                                 <Button
                                   variant="outline"
@@ -375,19 +396,29 @@ export default function StudentListTable({
           onOpenChange={setIsAddBatchOpen}
           batches={batches}
           onSuccess={() => {
-            // Optional: refresh list if needed, but not strictly required if we just added to a batch
-            // Maybe if we are viewing that batch, we should refresh.
-            // For now, doing nothing.
+            // Added to batch - forcing list refresh
+            setRefreshKey(k => k + 1);
           }}
           existingBatchIds={selectedStudentForBatch.existingBatchIds}
         />
       )}
+
+      {/* Edit Student Modal */}
+      <EditStudentModal
+        student={selectedStudentForEdit}
+        isOpen={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        onSuccess={() => {
+          setRefreshKey(k => k + 1);
+        }}
+      />
 
       {/* Student Details Modal */}
       <StudentDetailsModal
         student={selectedStudentDetails}
         isOpen={isDetailsOpen}
         onOpenChange={setIsDetailsOpen}
+        role={role}
       />
     </>
   );

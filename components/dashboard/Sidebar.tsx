@@ -146,7 +146,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         alt="5 Point Education"
                         width={150}
                         height={40}
-                        className="h-10 w-auto object-contain"
+                        className="h-12 w-auto object-contain"
                         priority
                     />
                 </Link>

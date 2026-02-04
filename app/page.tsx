@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Home, Users, TrendingUp, Award, ChevronRight, Sparkles, Target, Star } from "lucide-react";
+import logo from "./assets/5pointlogo.png";
 
 export default function HomePage() {
   return (
@@ -11,14 +12,15 @@ export default function HomePage() {
       <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-3 group">
-            <Image
-              src="/5pointlogo.png"
-              alt="5 Point Education"
-              width={180}
-              height={50}
-              className="h-12 w-auto object-contain"
-              priority
-            />
+            <div className="relative h-12 w-28 overflow-hidden">
+              <Image
+                src={logo}
+                alt="5 Point Education"
+                fill
+                className="object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                priority
+              />
+            </div>
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/enquiry">
@@ -280,11 +282,11 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center">
             <Image
-              src="/5pointlogo.png"
+              src={logo}
               alt="5 Point Education"
               width={160}
               height={45}
-              className="h-12 w-auto object-contain brightness-0 invert mb-4"
+              className="h-12 w-auto object-contain bg-white rounded p-1 mb-4"
             />
             <p className="text-gray-400 text-sm text-center max-w-md mb-6">
               Empowering students with quality education through personalized learning experiences.
