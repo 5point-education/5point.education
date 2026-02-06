@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function RegisterUserPage() {
@@ -15,6 +15,7 @@ export default function RegisterUserPage() {
     const router = useRouter();
     const formRef = useRef<HTMLFormElement>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState<Record<string, string[]> | null>(null);
 
     async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -109,7 +110,7 @@ export default function RegisterUserPage() {
                 <CardHeader className="space-y-1">
                     <CardTitle className="text-2xl font-bold text-center">Register New User</CardTitle>
                     <CardDescription className="text-center">
-                        Create an account for a new admin, teacher, or student.
+                        Create an account for a new admin or receptionist.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -132,7 +133,23 @@ export default function RegisterUserPage() {
 
                         <div className="space-y-2">
                             <Label htmlFor="password">Password</Label>
-                            <Input id="password" name="password" type="password" required minLength={6} disabled={isLoading} />
+                            <div className="relative">
+                                <Input id="password" name="password" type={showPassword ? "text" : "password"} required minLength={6} disabled={isLoading} className="pr-10" />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                </Button>
+                            </div>
                             {errors?.password && (
                                 <p className="text-sm text-red-500">{errors.password.join(", ")}</p>
                             )}
@@ -140,15 +157,13 @@ export default function RegisterUserPage() {
 
                         <div className="space-y-2">
                             <Label htmlFor="role">Role</Label>
-                            <Select name="role" required defaultValue="STUDENT" disabled={isLoading}>
+                            <Select name="role" required defaultValue="RECEPTIONIST" disabled={isLoading}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a role" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="ADMIN">Admin</SelectItem>
                                     <SelectItem value="RECEPTIONIST">Receptionist</SelectItem>
-                                    <SelectItem value="TEACHER">Teacher</SelectItem>
-                                    <SelectItem value="STUDENT">Student</SelectItem>
                                 </SelectContent>
                             </Select>
                             {errors?.role && (

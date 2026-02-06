@@ -203,11 +203,13 @@ export async function GET(req: Request) {
             .map(u => ({
                 admissionId: "N/A",
                 studentId: u.studentProfile!.id,
+                userId: u.id,
                 name: u.name,
                 email: u.email,
                 phone: u.studentProfile!.phone,
                 parentName: u.studentProfile!.fatherName,
                 joinDate: u.createdAt,
+                isActive: u.is_active,
                 batches: u.studentProfile!.admissions
                     .filter(adm => adm.batch)
                     .map(adm => ({
@@ -222,6 +224,64 @@ export async function GET(req: Request) {
 
     } catch (error) {
         console.log("[STUDENTS_GET]", error);
+        return new NextResponse("Internal Error", { status: 500 });
+    }
+}
+
+export async function PATCH(req: Request) {
+    try {
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user || (user.user_metadata.role !== Role.ADMIN && user.user_metadata.role !== Role.RECEPTIONIST)) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const body = await req.json();
+        const { studentId, isActive } = body;
+
+        if (!studentId) {
+            return new NextResponse("Student ID is required", { status: 400 });
+        }
+
+        // We receive studentId (profile ID), need to find the user ID
+        const studentProfile = await db.studentProfile.findUnique({
+            where: { id: studentId },
+            select: { userId: true }
+        });
+
+        if (!studentProfile) {
+            return new NextResponse("Student not found", { status: 404 });
+        }
+
+        // Update User active status
+        const updatedUser = await db.user.update({
+            where: { id: studentProfile.userId },
+            data: { is_active: isActive }
+        });
+
+        // Sync with Supabase Auth (Ban/Unban)
+        try {
+            if (isActive) {
+                // Enable: Remove ban
+                await supabase.auth.admin.updateUserById(studentProfile.userId, {
+                    ban_duration: "none"
+                });
+            } else {
+                // Disable: Ban for 100 years
+                await supabase.auth.admin.updateUserById(studentProfile.userId, {
+                    ban_duration: "876600h" // ~100 years
+                });
+            }
+        } catch (authError) {
+            console.error("Failed to sync auth status:", authError);
+            // We continue even if auth sync fails, though ideally we should handle this better
+        }
+
+        return NextResponse.json(updatedUser);
+
+    } catch (error) {
+        console.log("[STUDENTS_PATCH]", error);
         return new NextResponse("Internal Error", { status: 500 });
     }
 }

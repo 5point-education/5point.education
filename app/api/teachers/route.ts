@@ -155,7 +155,7 @@ export async function PATCH(req: Request) {
             where: { id },
             data: {
                 ...updateData,
-                teacherProfile: existingTeacher.teacherProfile 
+                teacherProfile: existingTeacher.teacherProfile
                     ? { update: profileUpdateData }
                     : { create: profileUpdateData },
             },
@@ -168,6 +168,72 @@ export async function PATCH(req: Request) {
 
     } catch (error) {
         console.log("[TEACHERS_PATCH]", error);
+        return new NextResponse("Internal Error", { status: 500 });
+    }
+}
+
+export async function DELETE(req: Request) {
+    try {
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        // Only Admin or Receptionist can delete teachers
+        const userRole = user?.user_metadata?.role as string;
+        if (error || !user || (userRole !== Role.ADMIN && userRole !== Role.RECEPTIONIST)) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const body = await req.json();
+        const { id } = body;
+
+        if (!id) {
+            return new NextResponse("Teacher ID is required", { status: 400 });
+        }
+
+        // Check if teacher exists
+        const existingTeacher = await db.user.findUnique({
+            where: { id },
+            include: { teacherProfile: true },
+        });
+
+        if (!existingTeacher || existingTeacher.role !== Role.TEACHER) {
+            return new NextResponse("Teacher not found", { status: 404 });
+        }
+
+        // Check if teacher is assigned to any batches
+        const assignedBatches = await db.batch.findMany({
+            where: { teacherId: id },
+            select: { name: true },
+        });
+
+        if (assignedBatches.length > 0) {
+            const batchNames = assignedBatches.map(b => b.name).join(", ");
+            return new NextResponse(
+                `Cannot delete teacher. They are assigned to the following batch(es): ${batchNames}. Please reassign or remove them from these batches first.`,
+                { status: 400 }
+            );
+        }
+
+        // Delete from Supabase Auth FIRST (before database)
+        // This ensures auth is cleaned up even if database deletion fails
+        const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(id);
+        if (deleteAuthError) {
+            console.error("[TEACHERS_DELETE] Failed to delete from Supabase Auth:", deleteAuthError.message);
+            return new NextResponse(
+                `Failed to delete teacher authentication: ${deleteAuthError.message}`,
+                { status: 500 }
+            );
+        }
+
+        // Delete from database (this will cascade delete the teacher profile)
+        await db.user.delete({
+            where: { id },
+        });
+
+        return NextResponse.json({ message: "Teacher deleted successfully" });
+
+    } catch (error) {
+        console.log("[TEACHERS_DELETE]", error);
         return new NextResponse("Internal Error", { status: 500 });
     }
 }

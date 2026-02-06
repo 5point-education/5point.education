@@ -25,15 +25,18 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { UserPlus, Loader2, Search, X, Archive, Pencil, RotateCcw, Users } from "lucide-react";
+import { UserPlus, Loader2, Search, X, Archive, Pencil, RotateCcw, Users, Eye, EyeOff, Trash2 } from "lucide-react";
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<any | null>(null);
+  const [deletingTeacher, setDeletingTeacher] = useState<any | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
   // Search and Filter State
@@ -207,6 +210,47 @@ export default function TeachersPage() {
     }
   };
 
+  const handleDeleteClick = (teacher: any) => {
+    setDeletingTeacher(teacher);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteTeacher = async () => {
+    if (!deletingTeacher) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/teachers", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: deletingTeacher.id }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to delete teacher");
+      }
+
+      toast({
+        title: "Success",
+        description: "Teacher deleted successfully",
+      });
+      setDeleteOpen(false);
+      setDeletingTeacher(null);
+      fetchTeachers();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Extract unique values for filters
   const uniqueQualifications = useMemo(() => {
     const quals = new Set<string>();
@@ -323,6 +367,15 @@ export default function TeachersPage() {
                           >
                             <Archive className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteClick(teacher)}
+                            title="Delete teacher"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </>
                       ) : (
                         <Button
@@ -389,6 +442,15 @@ export default function TeachersPage() {
                           className="h-8 w-8"
                         >
                           <Archive className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteClick(teacher)}
+                          title="Delete teacher"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </>
                     ) : (
@@ -472,7 +534,23 @@ export default function TeachersPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input id="password" name="password" type="password" required />
+                  <div className="relative">
+                    <Input id="password" name="password" type={showPassword ? "text" : "password"} required className="pr-10" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -724,6 +802,50 @@ export default function TeachersPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Teacher</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete this teacher? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deletingTeacher && (
+            <div className="py-4">
+              <p className="text-sm">
+                <span className="font-semibold">Teacher:</span> {deletingTeacher.name}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold">Email:</span> {deletingTeacher.email}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDeleteOpen(false);
+                setDeletingTeacher(null);
+              }}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteTeacher}
+              disabled={submitting}
+            >
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete Teacher
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

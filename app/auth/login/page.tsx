@@ -61,6 +61,8 @@ export default function LoginPage() {
           errorMessage = "Please verify your email address before logging in.";
         } else if (error.message.includes("User not found")) {
           errorMessage = "No account found with this email address.";
+        } else if (error.message.toLowerCase().includes("banned")) {
+          errorMessage = "Your account has been disabled. Please contact the administrator.";
         }
 
         toast({

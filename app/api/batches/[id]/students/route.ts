@@ -11,8 +11,8 @@ export async function GET(
         const supabase = createAdminClient();
         const { data: { user }, error } = await supabase.auth.getUser();
 
-        if (error || !user || (user.user_metadata.role !== Role.TEACHER && 
-            user.user_metadata.role !== Role.ADMIN && 
+        if (error || !user || (user.user_metadata.role !== Role.TEACHER &&
+            user.user_metadata.role !== Role.ADMIN &&
             user.user_metadata.role !== Role.RECEPTIONIST)) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
@@ -44,7 +44,8 @@ export async function GET(
                             select: {
                                 name: true,
                                 email: true,
-                                image: true
+                                image: true,
+                                is_active: true
                             }
                         }
                     }
@@ -58,6 +59,7 @@ export async function GET(
             name: admission.student.user.name,
             email: admission.student.user.email,
             phone: admission.student.phone,
+            isActive: admission.student.user.is_active,
             parentName: admission.student.fatherName, // Mapped for frontend compatibility
             joinDate: admission.admission_date
         }));

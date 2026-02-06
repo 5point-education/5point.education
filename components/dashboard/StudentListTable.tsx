@@ -21,7 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, User, Phone, Eye, PlusCircle, Pencil } from "lucide-react";
+import { Search, User, Phone, Eye, PlusCircle, Pencil, Ban, CheckCircle, Loader2 } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 import { AddStudentToBatchModal } from "./AddStudentToBatchModal";
 import { StudentDetailsModal } from "./StudentDetailsModal";
 import { EditStudentModal } from "./EditStudentModal";
@@ -41,6 +42,7 @@ interface Student {
   phone: string;
   parentName: string;
   joinDate: string;
+  isActive?: boolean;
   batches?: BatchInfo[];
 }
 
@@ -76,6 +78,8 @@ export default function StudentListTable({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(10);
   const [refreshKey, setRefreshKey] = useState(0);
+  const { toast } = useToast();
+  const [toggleLoading, setToggleLoading] = useState<string | null>(null);
 
   // Modal State
   const [isAddBatchOpen, setIsAddBatchOpen] = useState(false);
@@ -176,6 +180,47 @@ export default function StudentListTable({
       existingBatchIds: existingIds
     });
     setIsAddBatchOpen(true);
+  };
+
+  const handleToggleStudentStatus = async (student: Student) => {
+    // If undefined, assume active
+    const currentStatus = student.isActive !== false;
+    const newStatus = !currentStatus;
+
+    setToggleLoading(student.studentId);
+    try {
+      const response = await fetch("/api/students", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          studentId: student.studentId,
+          isActive: newStatus
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update student status");
+      }
+
+      toast({
+        title: "Success",
+        description: `Student ${newStatus ? 'activated' : 'disabled'} successfully`,
+      });
+
+      // Refresh list
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update student status",
+        variant: "destructive",
+      });
+    } finally {
+      setToggleLoading(null);
+    }
   };
 
   return (
@@ -308,6 +353,23 @@ export default function StudentListTable({
                                       title="Add to another batch"
                                     >
                                       <PlusCircle className="h-4 w-4" />
+                                    </Button>
+                                    {/* Disable/Enable Button */}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleToggleStudentStatus(student)}
+                                      disabled={toggleLoading === student.studentId}
+                                      title={student.isActive !== false ? "Disable student" : "Enable student"}
+                                      className={student.isActive === false ? "text-green-600 hover:text-green-700" : "text-destructive hover:text-destructive"}
+                                    >
+                                      {toggleLoading === student.studentId ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : student.isActive === false ? (
+                                        <CheckCircle className="h-4 w-4" />
+                                      ) : (
+                                        <Ban className="h-4 w-4" />
+                                      )}
                                     </Button>
                                   </>
                                 )}
