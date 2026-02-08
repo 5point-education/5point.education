@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { format } from 'date-fns';
-import { CalendarIcon, UserRoundCheck, UserRoundX, Plus, Eye, Edit3, History, Users } from 'lucide-react';
+import { CalendarIcon, UserRoundCheck, UserRoundX, Plus, Eye, Edit3, History, Users, X, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -71,6 +71,11 @@ const AttendanceComponent = ({
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('history');
+
+  // Filter states
+  const [filterBatch, setFilterBatch] = useState<string>('all');
+  const [filterSubject, setFilterSubject] = useState<string>('all');
+  const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
 
   // Modal states
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -145,12 +150,38 @@ const AttendanceComponent = ({
     });
   }, [students]);
 
+  // Derive filter options
+  const uniqueBatches = Array.from(new Set(attendanceHistory.map(h => h.batchName))).sort();
+  const uniqueSubjects = Array.from(new Set(attendanceHistory.map(h => h.subject))).sort();
+
+  // Filter history
+  const filteredHistory = attendanceHistory.filter(history => {
+    const matchesBatch = filterBatch === 'all' || history.batchName === filterBatch;
+    const matchesSubject = filterSubject === 'all' || history.subject === filterSubject;
+    const matchesDate = !filterDate || (() => {
+      const historyDate = new Date(history.date);
+      const selectedFilterDate = new Date(filterDate);
+      return (
+        historyDate.getDate() === selectedFilterDate.getDate() &&
+        historyDate.getMonth() === selectedFilterDate.getMonth() &&
+        historyDate.getFullYear() === selectedFilterDate.getFullYear()
+      );
+    })();
+    return matchesBatch && matchesSubject && matchesDate;
+  });
+
+  const clearFilters = () => {
+    setFilterBatch('all');
+    setFilterSubject('all');
+    setFilterDate(undefined);
+  };
+
   const fetchStudentsForAttendance = async () => {
     if (!selectedBatch || !selectedDate) return;
 
     setLoading(true);
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+      const dateStr = format(selectedDate, 'yyyy-MM-dd'); // Format as YYYY-MM-DD in local timezone
       const response = await fetch(`/api/attendance?batchId=${selectedBatch}&date=${dateStr}`);
 
       if (!response.ok) {
@@ -220,7 +251,7 @@ const AttendanceComponent = ({
 
     setLoading(true);
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+      const dateStr = format(selectedDate, 'yyyy-MM-dd'); // Format as YYYY-MM-DD in local timezone
       const attendanceData = students.map(student => ({
         studentId: student.studentId,
         isPresent: student.isPresent
@@ -417,6 +448,76 @@ const AttendanceComponent = ({
             <CardDescription>View and manage past attendance records</CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Filters */}
+            <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+              <div className="flex items-center gap-2 text-sm text-gray-500 mb-2 md:mb-0 md:w-auto">
+                <Filter className="h-4 w-4" />
+                <span className="font-medium">Filters:</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 flex-1">
+                {/* Batch Filter */}
+                <Select value={filterBatch} onValueChange={setFilterBatch}>
+                  <SelectTrigger className="w-full bg-white">
+                    <SelectValue placeholder="All Batches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Batches</SelectItem>
+                    {uniqueBatches.map(batchName => (
+                      <SelectItem key={batchName} value={batchName}>{batchName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Subject Filter */}
+                <Select value={filterSubject} onValueChange={setFilterSubject}>
+                  <SelectTrigger className="w-full bg-white">
+                    <SelectValue placeholder="All Subjects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Subjects</SelectItem>
+                    {uniqueSubjects.map(subject => (
+                      <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Date Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        'w-full justify-start text-left font-normal bg-white',
+                        !filterDate && 'text-muted-foreground'
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filterDate ? format(filterDate, 'PPP') : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={filterDate}
+                      onSelect={setFilterDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                {/* Clear Filters */}
+                <Button
+                  variant="ghost"
+                  onClick={clearFilters}
+                  className="text-gray-500 hover:text-gray-900 md:w-auto w-full"
+                  disabled={filterBatch === 'all' && filterSubject === 'all' && !filterDate}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
             {historyLoading ? (
               <div className="flex justify-center py-10">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -438,53 +539,58 @@ const AttendanceComponent = ({
               <>
                 {/* Mobile View - Card Layout */}
                 <div className="md:hidden space-y-4">
-                  {attendanceHistory.map((history, index) => (
-                    <div
-                      key={`${history.batchId}-${history.date}`}
-                      className="p-4 rounded-lg border bg-white shadow-sm"
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-semibold text-gray-900">{history.batchName}</h4>
-                          <p className="text-sm text-gray-600">{history.subject}</p>
-                          {history.classLevel && (
-                            <Badge variant="outline" className="mt-1">{history.classLevel}</Badge>
-                          )}
-                        </div>
-                        <span className="text-xs text-gray-500">{formatDate(history.date)}</span>
-                      </div>
-
-                      <div className="flex gap-4 mb-3">
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-sm">Present: <span className="font-semibold text-green-600">{history.present}</span></span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                          <span className="text-sm">Absent: <span className="font-semibold text-red-600">{history.absent}</span></span>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openViewModal(history)}
-                          className="flex-1"
-                        >
-                          <Eye className="h-4 w-4 mr-1" /> View
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditModal(history)}
-                          className="flex-1"
-                        >
-                          <Edit3 className="h-4 w-4 mr-1" /> Edit
-                        </Button>
-                      </div>
+                  {filteredHistory.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      No records match the selected filters
                     </div>
-                  ))}
+                  ) : (
+                    filteredHistory.map((history, index) => (
+                      <div
+                        key={`${history.batchId}-${history.date}`}
+                        className="p-4 rounded-lg border bg-white shadow-sm"
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h4 className="font-semibold text-gray-900">{history.batchName}</h4>
+                            <p className="text-sm text-gray-600">{history.subject}</p>
+                            {history.classLevel && (
+                              <Badge variant="outline" className="mt-1">{history.classLevel}</Badge>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-500">{formatDate(history.date)}</span>
+                        </div>
+
+                        <div className="flex gap-4 mb-3">
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-sm">Present: <span className="font-semibold text-green-600">{history.present}</span></span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                            <span className="text-sm">Absent: <span className="font-semibold text-red-600">{history.absent}</span></span>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openViewModal(history)}
+                            className="flex-1"
+                          >
+                            <Eye className="h-4 w-4 mr-1" /> View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditModal(history)}
+                            className="flex-1"
+                          >
+                            <Edit3 className="h-4 w-4 mr-1" /> Edit
+                          </Button>
+                        </div>
+                      </div>
+                    )))}
                 </div>
 
                 {/* Desktop View - Table Layout */}
@@ -516,58 +622,65 @@ const AttendanceComponent = ({
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {attendanceHistory.map((history, index) => (
-                        <tr
-                          key={`${history.batchId}-${history.date}`}
-                          className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{history.batchName}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-600">{history.subject}</div>
-                            {history.classLevel && (
-                              <Badge variant="outline" className="mt-1 text-xs">{history.classLevel}</Badge>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-600">{formatDate(history.date)}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              {history.present}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              {history.absent}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="text-sm font-medium text-gray-900">{history.total}</span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <div className="flex justify-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openViewModal(history)}
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openEditModal(history)}
-                                className="text-amber-600 hover:text-amber-800 hover:bg-amber-50"
-                              >
-                                <Edit3 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                      {filteredHistory.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
+                            No records match the selected filters
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        filteredHistory.map((history, index) => (
+                          <tr
+                            key={`${history.batchId}-${history.date}`}
+                            className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{history.batchName}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-600">{history.subject}</div>
+                              {history.classLevel && (
+                                <Badge variant="outline" className="mt-1 text-xs">{history.classLevel}</Badge>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-600">{formatDate(history.date)}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {history.present}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                {history.absent}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span className="text-sm font-medium text-gray-900">{history.total}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <div className="flex justify-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openViewModal(history)}
+                                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditModal(history)}
+                                  className="text-amber-600 hover:text-amber-800 hover:bg-amber-50"
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        )))}
                     </tbody>
                   </table>
                 </div>
@@ -620,6 +733,7 @@ const AttendanceComponent = ({
                       mode="single"
                       selected={selectedDate}
                       onSelect={(date) => date && setSelectedDate(date)}
+                      disabled={{ after: new Date() }}
                       initialFocus
                     />
                   </PopoverContent>

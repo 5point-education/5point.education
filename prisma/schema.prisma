@@ -50,6 +50,18 @@ enum AdmissionStatus {
   CANCELLED   // Admission cancelled
 }
 
+enum NoticeScope {
+  GLOBAL
+  BATCH
+  INDIVIDUAL
+}
+
+enum NoticePriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
 // Models
 model User {
   id            String    @id @default(cuid())
@@ -66,6 +78,7 @@ model User {
   teacherProfile TeacherProfile?
   batches        Batch[]
   enquiries      Enquiry[]
+  noticesCreated Notice[]         @relation("NoticesCreated")
 
   @@map("users")
 }
@@ -120,6 +133,7 @@ model StudentProfile {
   examScores ExamScore[]
   academicRecords AcademicRecord[]
   attendances  Attendance[]
+  noticeRecipients NoticeRecipient[]
 
   @@map("student_profiles")
 }
@@ -206,6 +220,7 @@ model Batch {
   admissions Admission[]
   exams      Exam[]
   attendances  Attendance[]
+  notices      Notice[]
 
   @@map("batches")
 }
@@ -336,4 +351,41 @@ model Attendance {
 
   @@unique([date, batchId, studentId])
   @@map("attendances")
+}
+
+model Notice {
+  id          String         @id @default(cuid())
+  title       String
+  body        String
+  scope       NoticeScope
+  priority    NoticePriority @default(NORMAL)
+  expiresAt   DateTime?
+  createdById String
+  batchId     String?
+  isDeleted   Boolean        @default(false)
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  creator    User              @relation("NoticesCreated", fields: [createdById], references: [id])
+  batch      Batch?            @relation(fields: [batchId], references: [id])
+  recipients NoticeRecipient[]
+
+  @@index([scope, batchId])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("notices")
+}
+
+model NoticeRecipient {
+  id        String @id @default(cuid())
+  noticeId  String
+  studentId String
+
+  notice  Notice         @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([noticeId, studentId])
+  @@index([studentId])
+  @@map("notice_recipients")
 }

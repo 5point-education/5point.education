@@ -41,6 +41,27 @@ export async function GET(req: Request) {
     let totalAdmissionChargePending = 0;
     const feesBreakdown = [];
 
+    // Calculate total discounts across all batches (independent of pending fees)
+    let totalDiscounts = 0;
+    const discountsBreakdown: Array<{
+      batchName: string;
+      discountValue: number;
+      discountType: string | null;
+      status: string;
+    }> = [];
+
+    for (const adm of admissions) {
+      if (adm.discount_value && adm.discount_value > 0) {
+        totalDiscounts += adm.discount_value;
+        discountsBreakdown.push({
+          batchName: adm.batch ? `${adm.batch.name} - ${adm.batch.subject}` : 'No Batch',
+          discountValue: adm.discount_value,
+          discountType: adm.discount_type,
+          status: adm.status,
+        });
+      }
+    }
+
     for (const adm of admissions) {
       let calculatedPendingAmount = 0;
       let monthlyFee = 0;
@@ -151,9 +172,11 @@ export async function GET(req: Request) {
         pendingFees,
         totalFeesPending: totalCalculatedFeesPending,
         totalAdmissionChargePending,
+        totalDiscounts,
         nextClass
       },
       feesBreakdown,
+      discountsBreakdown,
       performanceData,
       recentResults
     });

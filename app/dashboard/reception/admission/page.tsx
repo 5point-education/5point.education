@@ -29,7 +29,7 @@ import { Separator } from "@/components/ui/separator";
 
 const studentSchema = z.object({
     // Course / Programme
-    program_level: z.enum(["SECONDARY", "HIGHER_SECONDARY", "ENGINEERING", "ROBOTICS"]),
+    program_level: z.enum(["PRIMARY", "SECONDARY", "HIGHER_SECONDARY", "ENGINEERING", "ROBOTICS"]),
     board: z.enum(["ICSE", "CBSE", "WBBSE", "OTHER"]),
     class_level: z.string().transform((v) => parseInt(v, 10)),
     stream: z.string().optional(), // Science/Commerce
@@ -603,6 +603,7 @@ export default function AdmissionPage() {
                                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                                     <SelectContent>
+                                                        <SelectItem value="PRIMARY">Class (1-7)</SelectItem>
                                                         <SelectItem value="SECONDARY">Secondary (Class 8-10)</SelectItem>
                                                         <SelectItem value="HIGHER_SECONDARY">Higher Secondary (11-12)</SelectItem>
                                                         <SelectItem value="ENGINEERING">Engineering</SelectItem>

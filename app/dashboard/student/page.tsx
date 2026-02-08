@@ -9,7 +9,9 @@ import {
   Clock,
   CheckCircle2,
   IndianRupee,
-  Info
+  Info,
+  Percent,
+  CreditCard
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -20,6 +22,7 @@ interface DashboardData {
     pendingFees: number;
     totalFeesPending: number;
     totalAdmissionChargePending: number;
+    totalDiscounts: number;
     nextClass: string;
   };
   feesBreakdown: Array<{
@@ -31,6 +34,12 @@ interface DashboardData {
     monthlyFee: number;
     pendingMonths: number;
     discountVal: number;
+    discountType?: string;
+    status: string;
+  }>;
+  discountsBreakdown: Array<{
+    batchName: string;
+    discountValue: number;
     discountType?: string;
     status: string;
   }>;
@@ -134,9 +143,9 @@ export default function StudentDashboard() {
                     </p>
                   </div>
                 </div>
-                <button className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-xs font-bold rounded-full transition-colors">
+                {/* <button className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-xs font-bold rounded-full transition-colors">
                   Pay Now
-                </button>
+                </button> */}
               </div>
             </div>
           )}
@@ -267,7 +276,91 @@ export default function StudentDashboard() {
                   </div>
                 </div>
               </Card>
-              {/* Stat 2: Total Exams */}
+
+              {/* Stat 2: Admission Charge Pending - Only show if student has pending admission charges */}
+              {data.overview.totalAdmissionChargePending > 0 && (
+                <Card className="flex-1 border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow bg-white z-20 overflow-visible">
+                  <div className="p-4 flex items-center h-full">
+                    <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 mr-4">
+                      <CreditCard className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xl md:text-2xl font-bold text-slate-800">
+                        ₹{data.overview.totalAdmissionChargePending.toLocaleString('en-IN')}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-slate-500 font-medium">Admission Charge Pending</p>
+                        {/* {data.feesBreakdown.filter(item => item.admissionChargePending > 0).length > 0 && (
+                          <div className="group relative">
+                            <Info className="h-4 w-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
+
+                            <div className="absolute left-1/2 bottom-full mb-3 -translate-x-1/2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none group-hover:pointer-events-auto origin-bottom z-50">
+                              <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 rotate-45 w-3 h-3 bg-white border-r border-b border-slate-100"></div>
+                              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-2 border-b border-slate-50">Admission Charge Breakdown</p>
+                              <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                                {data.feesBreakdown.filter(item => item.admissionChargePending > 0).map((item, idx) => (
+                                  <div key={idx} className="space-y-1">
+                                    <div className="flex justify-between items-start">
+                                      <span className="text-xs font-semibold text-slate-700 line-clamp-1 flex-1 mr-2">{item.batchName}</span>
+                                      <span className="text-xs font-bold text-amber-600 whitespace-nowrap">₹{item.admissionChargePending.toLocaleString('en-IN')}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )} */}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Stat 3: Total Discounts - Only show if student has discounts */}
+              {data.overview.totalDiscounts > 0 && (
+                <Card className="flex-1 border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow bg-white z-20 overflow-visible">
+                  <div className="p-4 flex items-center h-full">
+                    <div className="h-12 w-12 rounded-2xl bg-green-50 flex items-center justify-center text-green-600 mr-4">
+                      <Percent className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xl md:text-2xl font-bold text-slate-800">
+                        ₹{data.overview.totalDiscounts.toLocaleString('en-IN')}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-slate-500 font-medium">Total Discounts</p>
+                        {data.discountsBreakdown.length > 0 && (
+                          <div className="group relative">
+                            <Info className="h-4 w-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
+
+                            <div className="absolute left-1/2 bottom-full mb-3 -translate-x-1/2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none group-hover:pointer-events-auto origin-bottom z-50">
+                              <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 rotate-45 w-3 h-3 bg-white border-r border-b border-slate-100"></div>
+                              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-2 border-b border-slate-50">Discount Breakdown</p>
+                              <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                                {data.discountsBreakdown.map((item, idx) => (
+                                  <div key={idx} className="space-y-1">
+                                    <div className="flex justify-between items-start">
+                                      <span className="text-xs font-semibold text-slate-700 line-clamp-1 flex-1 mr-2">{item.batchName}</span>
+                                      <span className="text-xs font-bold text-green-600 whitespace-nowrap">-₹{item.discountValue.toLocaleString('en-IN')}</span>
+                                    </div>
+                                    {item.discountType && (
+                                      <div className="flex items-center text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded w-fit">
+                                        <span>{item.discountType.replace('_', ' ')}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Stat 3: Total Exams */}
               <Card className="flex-1 border-none shadow-sm rounded-2xl flex items-center p-4 hover:shadow-md transition-shadow">
                 <div className="h-12 w-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600 mr-4">
                   <BookOpen className="h-6 w-6" />
@@ -278,7 +371,7 @@ export default function StudentDashboard() {
                 </div>
               </Card>
 
-              {/* Stat 3: Average Score */}
+              {/* Stat 4: Average Score */}
               <Card className="flex-1 border-none shadow-sm rounded-2xl flex items-center p-4 hover:shadow-md transition-shadow">
                 <div className="h-12 w-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 mr-4">
                   <TrendingUp className="h-6 w-6" />

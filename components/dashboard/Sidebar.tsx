@@ -23,6 +23,7 @@ import {
     UserCog,
     User,
     BarChart3,
+    Megaphone,
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -93,6 +94,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={Layers} label="Batches" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
                         <SidebarItem icon={IndianRupee} label="Fees" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/reception/notices" onClick={closeMobileSidebar} />
                         <SidebarItem icon={UserPlus} label="Teachers" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/admin/profile" onClick={closeMobileSidebar} />
                     </>
@@ -106,6 +108,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={Layers} label="Batch Management" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
                         <SidebarItem icon={IndianRupee} label="Fees Management" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/reception/notices" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/reception/profile" onClick={closeMobileSidebar} />
                     </>
                 );
@@ -117,6 +120,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={BarChart3} label="Reports" href="/dashboard/teacher/reports" onClick={closeMobileSidebar} />
                         <SidebarItem icon={ClipboardList} label="Exams" href="/dashboard/teacher/exam" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/teacher/attendance" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/teacher/notices" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/teacher/profile" onClick={closeMobileSidebar} />
                     </>
                 );
@@ -128,6 +132,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={BookOpen} label="My Courses" href="/dashboard/student/courses" onClick={closeMobileSidebar} />
                         <SidebarItem icon={GraduationCap} label="Results" href="/dashboard/student/results" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/student/attendance" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/student/notices" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/student/profile" onClick={closeMobileSidebar} />
                     </>
                 );

@@ -20,11 +20,10 @@ export async function GET(req: Request) {
       return new NextResponse("Missing required parameters: batchId and date", { status: 400 });
     }
 
-    // Parse the date to create a date range for the entire day
-    const startDate = new Date(date);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(date);
-    endDate.setHours(23, 59, 59, 999);
+    // Parse the date to create a date range for the entire day (in UTC to match storage)
+    const [year, month, day] = date.split('-').map(Number);
+    const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
     // Get students in the batch
     const admissions = await db.admission.findMany({
@@ -105,9 +104,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Parse the date
-    const attendanceDate = new Date(date);
-    attendanceDate.setUTCHours(0, 0, 0, 0); // Set to start of day in UTC
+    // Parse the date (format: YYYY-MM-DD) as UTC
+    const [year, month, day] = date.split('-').map(Number);
+    const attendanceDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
 
     // Process attendance data
     for (const record of attendanceData) {
