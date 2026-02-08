@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Megaphone, AlertTriangle, AlertCircle, Info, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Megaphone, AlertTriangle, AlertCircle, Info, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Notice {
     id: string;
@@ -72,7 +72,7 @@ export default function StudentNoticesPage() {
                 );
             default:
                 return (
-                    <Badge variant="secondary" className="dark:bg-slate-700 dark:text-slate-200">
+                    <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400">
                         <Info className="h-3 w-3 mr-1" />
                         Normal
                     </Badge>
@@ -88,30 +88,6 @@ export default function StudentNoticesPage() {
             hour: "2-digit",
             minute: "2-digit"
         });
-    };
-
-    const getExpiryInfo = (expiresAt: string | null) => {
-        if (!expiresAt) return null;
-
-        const expiryDate = new Date(expiresAt);
-        const now = new Date();
-        const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (daysUntilExpiry <= 3) {
-            return (
-                <span className="text-orange-600 dark:text-orange-400 text-sm flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Expires {daysUntilExpiry === 0 ? "today" : daysUntilExpiry === 1 ? "tomorrow" : `in ${daysUntilExpiry} days`}
-                </span>
-            );
-        }
-
-        return (
-            <span className="text-muted-foreground text-sm flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Expires on {formatDate(expiresAt).split(",")[0]}
-            </span>
-        );
     };
 
     if (loading && notices.length === 0) {
@@ -188,7 +164,6 @@ export default function StudentNoticesPage() {
                                     </span>
                                     <span>By {notice.createdBy}</span>
                                     <span>{formatDate(notice.createdAt)}</span>
-                                    {getExpiryInfo(notice.expiresAt)}
                                 </div>
                             </CardContent>
                         </Card>

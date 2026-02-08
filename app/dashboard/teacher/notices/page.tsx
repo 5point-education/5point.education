@@ -321,13 +321,13 @@ export default function TeacherNoticesPage() {
                         High
                     </Badge>
                 );
-            default:
-                return (
-                    <Badge variant="secondary" className="dark:bg-slate-700 dark:text-slate-200">
-                        <Info className="h-3 w-3 mr-1" />
-                        Normal
-                    </Badge>
-                );
+                default:
+                    return (
+                        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                            <Info className="h-3 w-3 mr-1" />
+                            Normal
+                        </Badge>
+                    );
         }
     };
 
@@ -377,8 +377,8 @@ export default function TeacherNoticesPage() {
                 transition-all duration-200 hover:shadow-md
                 dark:bg-slate-900 dark:border-slate-800
                 ${notice.isExpired ? "opacity-60" : ""}
-                ${notice.priority === "URGENT" ? "border-l-4 border-l-red-500" : ""}
-                ${notice.priority === "HIGH" ? "border-l-4 border-l-orange-500" : ""}
+                ${notice.priority === "URGENT" ? "border-l-4 border-l-red-500 dark:border-l-red-600" : ""}
+                ${notice.priority === "HIGH" ? "border-l-4 border-l-orange-500 dark:border-l-orange-600" : ""}
               `}
                         >
                             <CardHeader className="pb-2">

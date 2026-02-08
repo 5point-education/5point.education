@@ -105,6 +105,12 @@ npx prisma generate
 - Verify DATABASE_URL in .env
 - Test connection with: `npx prisma db push`
 
+### Error: "Unable to communicate with Prisma Client" in Prisma Studio
+Prisma CLI (including Studio) only loads **`.env`** by default, not `.env.local`. If your `DATABASE_URL` is in `.env.local`:
+- Use **`npm run db:studio`** (this project’s script loads `.env.local` first), or
+- Copy `DATABASE_URL` into a `.env` file in the project root.
+Also ensure the database is running and reachable, then run `npx prisma generate` and restart Prisma Studio.
+
 ### Error: "NEXTAUTH_SECRET is not set"
 - Make sure .env file exists in project root
 - Restart dev server after creating .env

@@ -10,7 +10,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
+    "db:studio": "node scripts/prisma-studio.js",
     "test:fees": "tsx scripts/test-fees-management.ts",
     "test:portal": "tsx scripts/test-portal-e2e.ts"
   },

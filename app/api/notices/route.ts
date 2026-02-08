@@ -3,6 +3,18 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role, NoticeScope, NoticePriority } from "@prisma/client";
 
+/** Parse expiry as end of day (23:59:59.999) when date-only YYYY-MM-DD is provided. */
+function parseExpiresAtEndOfDay(expiresAt: string | null | undefined): Date | null {
+  if (expiresAt == null || typeof expiresAt !== "string") return null;
+  const s = expiresAt.trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, m - 1, d, 23, 59, 59, 999);
+  }
+  return new Date(expiresAt);
+}
+
 // POST /api/notices - Create a notice
 export async function POST(req: Request) {
   try {
@@ -81,7 +93,7 @@ export async function POST(req: Request) {
         body: noticeBody,
         scope: scope as NoticeScope,
         priority: (priority as NoticePriority) || NoticePriority.NORMAL,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        expiresAt: parseExpiresAtEndOfDay(expiresAt),
         createdById: user.id,
         batchId: scope === NoticeScope.BATCH ? batchId : null,
         // Create recipients if INDIVIDUAL scope

@@ -149,8 +149,8 @@ export default function ReceptionNoticesPage() {
                 limit: "10",
                 showExpired: showExpired.toString(),
             });
-            if (scopeFilter) params.append("scope", scopeFilter);
-            if (priorityFilter) params.append("priority", priorityFilter);
+            if (["GLOBAL", "BATCH", "INDIVIDUAL"].includes(scopeFilter)) params.append("scope", scopeFilter);
+            if (["NORMAL", "HIGH", "URGENT"].includes(priorityFilter)) params.append("priority", priorityFilter);
 
             const response = await fetch(`/api/notices?${params}`);
             if (!response.ok) throw new Error("Failed to fetch notices");
@@ -428,13 +428,13 @@ export default function ReceptionNoticesPage() {
                         High
                     </Badge>
                 );
-            default:
-                return (
-                    <Badge variant="secondary" className="dark:bg-slate-700 dark:text-slate-200">
-                        <Info className="h-3 w-3 mr-1" />
-                        Normal
-                    </Badge>
-                );
+                default:
+                    return (
+                        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                            <Info className="h-3 w-3 mr-1" />
+                            Normal
+                        </Badge>
+                    );
         }
     };
 
@@ -477,7 +477,7 @@ export default function ReceptionNoticesPage() {
                             <span className="text-sm font-medium text-muted-foreground">Filters:</span>
                         </div>
 
-                        <Select value={scopeFilter} onValueChange={setScopeFilter}>
+                        <Select value={scopeFilter || "all"} onValueChange={(v) => setScopeFilter(v === "all" ? "" : v)}>
                             <SelectTrigger className="w-[140px] dark:bg-slate-800 dark:border-slate-700">
                                 <SelectValue placeholder="All Scopes" />
                             </SelectTrigger>
@@ -489,7 +489,7 @@ export default function ReceptionNoticesPage() {
                             </SelectContent>
                         </Select>
 
-                        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                        <Select value={priorityFilter || "all"} onValueChange={(v) => setPriorityFilter(v === "all" ? "" : v)}>
                             <SelectTrigger className="w-[140px] dark:bg-slate-800 dark:border-slate-700">
                                 <SelectValue placeholder="All Priorities" />
                             </SelectTrigger>
@@ -543,8 +543,8 @@ export default function ReceptionNoticesPage() {
                 transition-all duration-200 hover:shadow-md
                 dark:bg-slate-900 dark:border-slate-800
                 ${notice.isExpired ? "opacity-60" : ""}
-                ${notice.priority === "URGENT" ? "border-l-4 border-l-red-500" : ""}
-                ${notice.priority === "HIGH" ? "border-l-4 border-l-orange-500" : ""}
+                ${notice.priority === "URGENT" ? "border-l-4 border-l-red-500 dark:border-l-red-600" : ""}
+                ${notice.priority === "HIGH" ? "border-l-4 border-l-orange-500 dark:border-l-orange-600" : ""}
               `}
                         >
                             <CardHeader className="pb-2">

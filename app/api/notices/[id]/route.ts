@@ -3,6 +3,18 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role, NoticePriority } from "@prisma/client";
 
+/** Parse expiry as end of day (23:59:59.999) when date-only YYYY-MM-DD is provided. */
+function parseExpiresAtEndOfDay(expiresAt: string | null | undefined): Date | null {
+  if (expiresAt == null || typeof expiresAt !== "string") return null;
+  const s = expiresAt.trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, m - 1, d, 23, 59, 59, 999);
+  }
+  return new Date(expiresAt);
+}
+
 // PATCH /api/notices/[id] - Edit a notice
 export async function PATCH(
   req: Request,
@@ -57,7 +69,7 @@ export async function PATCH(
       updateData.priority = priority;
     }
     if (expiresAt !== undefined) {
-      updateData.expiresAt = expiresAt ? new Date(expiresAt) : null;
+      updateData.expiresAt = parseExpiresAtEndOfDay(expiresAt);
     }
 
     const updatedNotice = await db.notice.update({
