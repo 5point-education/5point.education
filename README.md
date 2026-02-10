@@ -6,7 +6,7 @@ A comprehensive, production-ready web application for managing coaching centers 
 
 ## 🚀 Features
 
-### Public Features
+### Public Feature
 
 * **Landing Page:** Professional homepage with service showcase
 * **Enquiry Form:** Public form for capturing leads with validation
