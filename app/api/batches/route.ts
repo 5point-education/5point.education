@@ -33,7 +33,9 @@ export async function GET(req: Request) {
         return NextResponse.json(batches);
 
     } catch (error) {
-        console.log("[BATCHES_GET]", error);
+        // Log full error for Vercel/server debugging (visible in Vercel Functions log)
+        console.error("[BATCHES_GET]", error instanceof Error ? error.message : error);
+        if (error instanceof Error && error.stack) console.error("[BATCHES_GET] stack", error.stack);
         return new NextResponse("Internal Error", { status: 500 });
     }
 }
@@ -81,7 +83,8 @@ export async function POST(req: Request) {
         return NextResponse.json(batch);
 
     } catch (error) {
-        console.log("[BATCHES_POST]", error);
+        console.error("[BATCHES_POST]", error instanceof Error ? error.message : error);
+        if (error instanceof Error && error.stack) console.error("[BATCHES_POST] stack", error.stack);
         return new NextResponse("Internal Error", { status: 500 });
     }
 }
@@ -162,7 +165,8 @@ export async function PATCH(req: Request) {
         return NextResponse.json(batch);
 
     } catch (error) {
-        console.log("[BATCHES_PATCH]", error);
+        console.error("[BATCHES_PATCH]", error instanceof Error ? error.message : error);
+        if (error instanceof Error && error.stack) console.error("[BATCHES_PATCH] stack", error.stack);
         return new NextResponse("Internal Error", { status: 500 });
     }
 }
