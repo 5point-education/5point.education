@@ -159,6 +159,10 @@ export default function EnquiryEditPage({ params }: { params: { id: string } }) 
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
+                                <span className="text-sm font-medium text-muted-foreground">Enquiry submitted</span>
+                                <p className="text-lg">{enquiry.createdAt ? format(new Date(enquiry.createdAt), "MMM dd, yyyy") : "-"}</p>
+                            </div>
+                            <div>
                                 <span className="text-sm font-medium text-muted-foreground">Name</span>
                                 <p className="text-lg">{enquiry.name}</p>
                             </div>

@@ -58,6 +58,7 @@ interface Batch {
   name: string;
   subject: string;
   classLevel?: string;
+  board?: string | null;
   teacherId: string;
   teacher?: { name: string };
   schedule: string;
@@ -95,6 +96,7 @@ export default function BatchesPage() {
 
   // Class Selection State (Create)
   const [classLevel, setClassLevel] = useState<string>("");
+  const [board, setBoard] = useState<string>("");
 
   // Fee Configuration State (Create)
   const [feeModel, setFeeModel] = useState<FeeModel>(null);
@@ -108,6 +110,7 @@ export default function BatchesPage() {
     name: "",
     subject: "",
     classLevel: "",
+    board: "",
     teacherId: "",
     capacity: "",
   });
@@ -217,6 +220,7 @@ export default function BatchesPage() {
       name: batch.name,
       subject: batch.subject,
       classLevel: batch.classLevel || "",
+      board: batch.board || "",
       teacherId: batch.teacherId,
       capacity: batch.capacity?.toString() || "",
     });
@@ -277,6 +281,7 @@ export default function BatchesPage() {
     const payload = {
       ...data,
       classLevel: classLevel,
+      board: board.trim() || null,
       schedule: JSON.stringify(scheduleItems),
       feeModel: feeModel,
       feeAmount: feeAmount,
@@ -305,8 +310,8 @@ export default function BatchesPage() {
       });
       setOpen(false);
       setScheduleItems([{ day: "", startTime: "12:00", endTime: "13:00" }]);
-      // Reset class and fee state
       setClassLevel("");
+      setBoard("");
       setFeeModel(null);
       setFeeAmount("");
       setInstallments([]);
@@ -356,6 +361,7 @@ export default function BatchesPage() {
     const payload = {
       id: editingBatch.id,
       ...editFormData,
+      board: editFormData.board.trim() || null,
       schedule: JSON.stringify(editScheduleItems),
       feeModel: editFeeModel,
       feeAmount: editFeeAmount,
@@ -559,7 +565,7 @@ export default function BatchesPage() {
                   <TableCell className="text-sm">{batch.teacher?.name || "—"}</TableCell>
                   <TableCell className="text-sm">{formatSchedule(batch.schedule)}</TableCell>
                   <TableCell className="text-sm">
-                    {batch._count.admissions} / {batch.capacity ?? "∞"}
+                    {batch._count.admissions}{batch.capacity != null ? ` / ${batch.capacity}` : ""}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(batch.createdAt).toLocaleDateString("en-US", {
@@ -1066,6 +1072,15 @@ export default function BatchesPage() {
                   <Input id="subject" name="subject" required placeholder="Physics" />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="board">Board</Label>
+                  <Input
+                    id="board"
+                    value={board}
+                    onChange={(e) => setBoard(e.target.value)}
+                    placeholder="e.g. ICSE, CBSE, WB (optional)"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="classLevel">Class / Course</Label>
                   <Select
                     value={classLevel}
@@ -1155,6 +1170,15 @@ export default function BatchesPage() {
                     onChange={(e) => setEditFormData({ ...editFormData, subject: e.target.value })}
                     required
                     placeholder="Physics"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-board">Board</Label>
+                  <Input
+                    id="edit-board"
+                    value={editFormData.board}
+                    onChange={(e) => setEditFormData({ ...editFormData, board: e.target.value })}
+                    placeholder="e.g. ICSE, CBSE, WB (optional)"
                   />
                 </div>
                 <div className="space-y-2">

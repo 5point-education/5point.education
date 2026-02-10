@@ -129,7 +129,7 @@ export default function ReceptionDashboard() {
               <CardTitle>Enquiry Tracker</CardTitle>
               <CardDescription>Manage and track all student enquiries</CardDescription>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
               <Button
                 variant={filter === "ALL" ? "default" : "outline"}
                 size="sm"
@@ -158,15 +158,13 @@ export default function ReceptionDashboard() {
               >
                 Admitted
               </Button>
-              {/* Subject filter */}
               <input
                 type="text"
                 placeholder="Subject"
                 value={subjectFilter}
                 onChange={e => setSubjectFilter(e.target.value)}
-                className="border rounded px-2 py-1 text-sm"
+                className="border rounded px-2 py-1 text-sm w-24 sm:w-32"
               />
-              {/* Class filter */}
               <select
                 value={classFilter}
                 onChange={e => setClassFilter(e.target.value)}
@@ -177,7 +175,6 @@ export default function ReceptionDashboard() {
                   <option key={i + 1} value={i + 1}>{i + 1}</option>
                 ))}
               </select>
-             
             </div>
           </div>
         </CardHeader>
@@ -185,75 +182,87 @@ export default function ReceptionDashboard() {
           {loading ? (
             <div className="text-center py-8">Loading...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Subjects</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Follow-up</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEnquiries.length === 0 ? (
+            <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
+              <Table className="min-w-[800px]">
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      No enquiries found
-                    </TableCell>
+                    <TableHead className="whitespace-nowrap">Name</TableHead>
+                    <TableHead className="whitespace-nowrap">Enquiry date</TableHead>
+                    <TableHead className="whitespace-nowrap">Phone</TableHead>
+                    <TableHead className="whitespace-nowrap">Email</TableHead>
+                    <TableHead className="whitespace-nowrap">Class</TableHead>
+                    <TableHead className="whitespace-nowrap w-[90px] max-w-[90px]">Subjects</TableHead>
+                    <TableHead className="whitespace-nowrap">Service</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="whitespace-nowrap">Follow-up</TableHead>
+                    <TableHead className="whitespace-nowrap">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredEnquiries.map((enquiry) => (
-                    <TableRow key={enquiry.id}>
-                      <TableCell className="font-medium">{enquiry.name}</TableCell>
-                      <TableCell>{enquiry.phone}</TableCell>
-                      <TableCell>{enquiry.email || "-"}</TableCell>
-                      <TableCell>{enquiry.class_level}</TableCell>
-                      <TableCell className="max-w-xs truncate">{enquiry.subjects}</TableCell>
-                      <TableCell>
-                        <span className="text-xs">
-                          {enquiry.service_type === "HOME_TUTOR" ? "Home" : "Batch"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs ${getStatusColor(enquiry.status)}`}>
-                          {enquiry.status.replace("_", " ")}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {enquiry.follow_up_date
-                          ? format(new Date(enquiry.follow_up_date), "MMM dd, yyyy")
-                          : "-"
-                        }
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditStatus(enquiry.id)}
-                          >
-                            Edit
-                          </Button>
-                          {enquiry.status !== "ADMITTED" && enquiry.status !== "LOST" && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleRegisterStudent(enquiry.id)}
-                            >
-                              Register
-                            </Button>
-                          )}
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredEnquiries.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        No enquiries found
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    filteredEnquiries.map((enquiry) => (
+                      <TableRow key={enquiry.id}>
+                        <TableCell className="font-medium whitespace-nowrap">{enquiry.name}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap text-sm">
+                          {enquiry.createdAt
+                            ? format(new Date(enquiry.createdAt), "MMM dd, yyyy")
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm">{enquiry.phone}</TableCell>
+                        <TableCell className="text-sm max-w-[120px] truncate">{enquiry.email || "-"}</TableCell>
+                        <TableCell className="whitespace-nowrap">{enquiry.class_level}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[90px] truncate" title={enquiry.subjects}>
+                          {enquiry.subjects}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          <span className="text-xs">
+                            {enquiry.service_type === "HOME_TUTOR" ? "Home" : "Batch"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded text-xs whitespace-nowrap ${getStatusColor(enquiry.status)}`}>
+                            {enquiry.status.replace("_", " ")}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {enquiry.follow_up_date
+                            ? format(new Date(enquiry.follow_up_date), "MMM dd, yyyy")
+                            : "-"
+                          }
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          <div className="flex gap-1 sm:gap-2 flex-wrap">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditStatus(enquiry.id)}
+                              className="text-xs sm:text-sm"
+                            >
+                              Edit
+                            </Button>
+                            {enquiry.status !== "ADMITTED" && enquiry.status !== "LOST" && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleRegisterStudent(enquiry.id)}
+                                className="text-xs sm:text-sm"
+                              >
+                                Register
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

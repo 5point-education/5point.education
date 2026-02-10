@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, CheckCircle2, Copy, Plus, Trash2, GraduationCap, X, CreditCard, Receipt } from "lucide-react";
+import { Loader2, CheckCircle2, Copy, Plus, Trash2, GraduationCap, X, CreditCard, Receipt, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -95,6 +95,7 @@ interface Batch {
     id: string;
     name: string;
     subject: string;
+    teacher?: { name: string };
     feeModel?: FeeModel;
     feeAmount?: number;
     installments?: InstallmentItem[];
@@ -176,8 +177,8 @@ export default function AdmissionPage() {
         }
     });
 
-    // Multiple Batch State - now includes payment per batch and discount
-    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, subject: string, fee: number, feeModel?: FeeModel, selectedDays?: number, paying: number, discount_value?: number, discount_type?: string }[]>([]);
+    // Multiple Batch State - now includes payment per batch, discount, and teacher
+    const [selectedBatches, setSelectedBatches] = useState<{ id: string, name: string, subject: string, teacherName?: string, fee: number, feeModel?: FeeModel, selectedDays?: number, paying: number, discount_value?: number, discount_type?: string }[]>([]);
     const [tempBatchId, setTempBatchId] = useState("");
     const [tempFee, setTempFee] = useState("");
     const [tempSelectedDays, setTempSelectedDays] = useState<string>("");
@@ -282,10 +283,11 @@ export default function AdmissionPage() {
             id: tempBatchId,
             name: b.name,
             subject: b.subject,
+            teacherName: b.teacher?.name,
             fee: parseFloat(tempFee),
             feeModel: b.feeModel,
             selectedDays: tempSelectedDays ? parseInt(tempSelectedDays) : undefined,
-            paying: 0, // Initialize payment for this batch
+            paying: 0,
             discount_value: tempDiscountValue ? parseFloat(tempDiscountValue) : 0,
             discount_type: tempDiscountType || undefined
         }]);
@@ -1015,22 +1017,28 @@ export default function AdmissionPage() {
 
                                 <div className="space-y-4">
                                     {/* Batch Selector */}
-                                    <div className="p-4 bg-muted/30 rounded-lg border border-dashed">
+                                    <div className="p-4 sm:p-5 bg-muted/30 rounded-xl border border-border/80">
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label className="text-sm font-medium">Choose Batch</Label>
+                                                <Label className="text-sm font-medium text-foreground">Choose Batch</Label>
                                                 <Select value={tempBatchId} onValueChange={(v) => { setTempBatchId(v); setTempSelectedDays(""); }}>
-                                                    <SelectTrigger className="h-11">
+                                                    <SelectTrigger className="h-11 bg-background">
                                                         <SelectValue placeholder="Select a batch..." />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {batches.filter(b => !selectedBatches.some(sb => sb.id === b.id)).map(b => (
                                                             <SelectItem key={b.id} value={b.id} className="py-3">
-                                                                <div className="flex flex-col text-left">
+                                                                <div className="flex flex-col text-left gap-0.5">
                                                                     <span className="font-medium">{b.name}</span>
                                                                     <span className="text-xs text-muted-foreground">
-                                                                        {b.subject} • ₹{(b.feeAmount || 0).toLocaleString()}/{getFeeModelLabel(b.feeModel!)}
-                                                                        {b.daysWiseFeesEnabled && " • Days-wise pricing"}
+                                                                        {b.subject}
+                                                                        {b.teacher?.name && (
+                                                                            <span className="inline-flex items-center gap-1 ml-1">
+                                                                                · <User className="h-3 w-3 inline" /> {b.teacher.name}
+                                                                            </span>
+                                                                        )}
+                                                                        {" · "}₹{(b.feeAmount || 0).toLocaleString()}/{getFeeModelLabel(b.feeModel!)}
+                                                                        {b.daysWiseFeesEnabled && " · Days-wise"}
                                                                     </span>
                                                                 </div>
                                                             </SelectItem>
@@ -1062,34 +1070,38 @@ export default function AdmissionPage() {
                                         </div>
 
                                         {selectedBatchDetails && (
-                                            <div className="mt-4 space-y-4 p-4 bg-muted/30 rounded-lg border">
-                                                {/* Base Fee Display */}
+                                            <div className="mt-4 space-y-4 p-4 bg-background/80 rounded-xl border">
+                                                {selectedBatchDetails.teacher?.name && (
+                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                        <User className="h-4 w-4 shrink-0" />
+                                                        <span>Teacher: <span className="font-medium text-foreground">{selectedBatchDetails.teacher.name}</span></span>
+                                                    </div>
+                                                )}
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-sm text-muted-foreground">Base Fee:</span>
-                                                    <div>
+                                                    <span className="text-sm text-muted-foreground">Base Fee</span>
+                                                    <div className="flex items-center gap-2">
                                                         <span className="font-semibold text-lg">₹{calculatedFee.toLocaleString()}</span>
-                                                        <Badge variant="secondary" className="ml-2">{getFeeModelLabel(selectedBatchDetails.feeModel!)}</Badge>
+                                                        <Badge variant="secondary" className="text-xs">{getFeeModelLabel(selectedBatchDetails.feeModel!)}</Badge>
                                                     </div>
                                                 </div>
 
-                                                {/* Discount Section */}
-                                                <div className="grid grid-cols-2 gap-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                                                <div className="grid grid-cols-2 gap-3 p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
                                                     <div className="space-y-1">
-                                                        <Label className="text-xs text-emerald-700 font-medium">Discount (₹)</Label>
+                                                        <Label className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Discount (₹)</Label>
                                                         <Input
                                                             type="number"
                                                             min="0"
                                                             value={tempDiscountValue}
                                                             onChange={(e) => setTempDiscountValue(e.target.value)}
                                                             placeholder="0"
-                                                            className="h-9 border-emerald-200"
+                                                            className="h-9 border-emerald-200 dark:border-emerald-800"
                                                         />
                                                     </div>
                                                     <div className="space-y-1">
-                                                        <Label className="text-xs text-emerald-700 font-medium">Reason</Label>
+                                                        <Label className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Reason</Label>
                                                         <Select value={tempDiscountType} onValueChange={setTempDiscountType}>
-                                                            <SelectTrigger className="h-9 border-emerald-200">
-                                                                <SelectValue placeholder="Optional..." />
+                                                            <SelectTrigger className="h-9 border-emerald-200 dark:border-emerald-800">
+                                                                <SelectValue placeholder="Optional" />
                                                             </SelectTrigger>
                                                             <SelectContent>
                                                                 <SelectItem value="SIBLING">Sibling</SelectItem>
@@ -1102,17 +1114,12 @@ export default function AdmissionPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Final Fee After Discount */}
                                                 {parseFloat(tempDiscountValue) > 0 && (
-                                                    <div className="flex items-center justify-between p-2 bg-primary/5 rounded border border-primary/20">
-                                                        <span className="text-sm font-medium">Fee after Discount:</span>
-                                                        <div className="text-right">
-                                                            <span className="text-xs text-muted-foreground line-through mr-2">
-                                                                ₹{calculatedFee.toLocaleString()}
-                                                            </span>
-                                                            <span className="font-bold text-lg text-primary">
-                                                                ₹{Math.max(0, calculatedFee - parseFloat(tempDiscountValue)).toLocaleString()}
-                                                            </span>
+                                                    <div className="flex items-center justify-between py-2 px-3 bg-primary/5 rounded-lg border border-primary/20">
+                                                        <span className="text-sm font-medium">Fee after discount</span>
+                                                        <div className="text-right flex items-baseline gap-2">
+                                                            <span className="text-xs text-muted-foreground line-through">₹{calculatedFee.toLocaleString()}</span>
+                                                            <span className="font-bold text-primary">₹{Math.max(0, calculatedFee - parseFloat(tempDiscountValue)).toLocaleString()}</span>
                                                         </div>
                                                     </div>
                                                 )}
@@ -1131,64 +1138,62 @@ export default function AdmissionPage() {
 
                                     {/* Selected Batches */}
                                     {selectedBatches.length > 0 && (
-                                        <div className="space-y-3">
+                                        <div className="space-y-2">
+                                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Added batches ({selectedBatches.length})</p>
                                             {selectedBatches.map((batch) => (
                                                 <div
                                                     key={batch.id}
-                                                    className="flex items-center gap-4 p-4 bg-card border rounded-lg shadow-sm"
+                                                    className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-card border rounded-xl shadow-sm hover:shadow-md transition-shadow"
                                                 >
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <h4 className="font-medium truncate">{batch.name}</h4>
-                                                            <Badge variant="outline" className="text-xs">{getFeeModelLabel(batch.feeModel!)}</Badge>
+                                                    <div className="flex-1 min-w-0 space-y-1">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <h4 className="font-semibold text-foreground">{batch.name}</h4>
+                                                            <Badge variant="outline" className="text-xs font-normal">{getFeeModelLabel(batch.feeModel!)}</Badge>
                                                             {batch.selectedDays && (
-                                                                <Badge variant="secondary" className="text-xs text-white">{batch.selectedDays} days/week</Badge>
+                                                                <Badge variant="secondary" className="text-xs">{batch.selectedDays} days/wk</Badge>
                                                             )}
                                                             {batch.discount_value && batch.discount_value > 0 && (
-                                                                <Badge variant="default" className="text-xs bg-emerald-500">
-                                                                    ₹{batch.discount_value} off
-                                                                </Badge>
+                                                                <Badge className="text-xs bg-emerald-600 hover:bg-emerald-600">−₹{batch.discount_value}</Badge>
                                                             )}
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground mt-0.5">
-                                                            {batch.subject} •
-                                                            {batch.discount_value && batch.discount_value > 0 ? (
-                                                                <>
-                                                                    <span className="line-through">₹{batch.fee.toLocaleString()}</span>
-                                                                    <span className="text-emerald-600 font-medium ml-1">
-                                                                        ₹{Math.max(0, batch.fee - batch.discount_value).toLocaleString()}
-                                                                    </span>
-                                                                    {batch.discount_type && (
-                                                                        <span className="text-emerald-600 text-xs ml-1">({batch.discount_type})</span>
-                                                                    )}
-                                                                </>
-                                                            ) : (
-                                                                <> Fee: ₹{batch.fee.toLocaleString()}</>
+                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+                                                            <span>{batch.subject}</span>
+                                                            {batch.teacherName && (
+                                                                <span className="inline-flex items-center gap-1">
+                                                                    <User className="h-3.5 w-3" />
+                                                                    {batch.teacherName}
+                                                                </span>
                                                             )}
-                                                        </p>
+                                                            <span className="text-foreground/80">
+                                                                {batch.discount_value && batch.discount_value > 0 ? (
+                                                                    <>
+                                                                        <span className="line-through">₹{batch.fee.toLocaleString()}</span>
+                                                                        <span className="text-emerald-600 dark:text-emerald-400 font-medium ml-1">₹{Math.max(0, batch.fee - batch.discount_value).toLocaleString()}</span>
+                                                                        {batch.discount_type && <span className="text-xs ml-1">({batch.discount_type})</span>}
+                                                                    </>
+                                                                ) : (
+                                                                    <>₹{batch.fee.toLocaleString()}</>
+                                                                )}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-3 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
                                                         <div className="flex items-center gap-2">
                                                             <Checkbox
                                                                 id={`pay-batch-${batch.id}`}
                                                                 checked={batch.paying > 0}
                                                                 onCheckedChange={(checked) => toggleBatchPayment(batch.id, checked as boolean)}
                                                             />
-                                                            <Label
-                                                                htmlFor={`pay-batch-${batch.id}`}
-                                                                className="text-sm cursor-pointer"
-                                                            >
-                                                                Pay Now
-                                                                <span className="font-semibold text-primary ml-1">
-                                                                    ₹{Math.max(0, batch.fee - (batch.discount_value || 0)).toLocaleString()}
-                                                                </span>
+                                                            <Label htmlFor={`pay-batch-${batch.id}`} className="text-sm cursor-pointer whitespace-nowrap">
+                                                                Pay <span className="font-semibold text-primary">₹{Math.max(0, batch.fee - (batch.discount_value || 0)).toLocaleString()}</span>
                                                             </Label>
                                                         </div>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
                                                             onClick={() => removeBatch(batch.id)}
-                                                            className="text-destructive hover:text-destructive hover:bg-destructive/10 mt-5"
+                                                            className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-9 w-9"
+                                                            aria-label="Remove batch"
                                                         >
                                                             <X className="h-4 w-4" />
                                                         </Button>

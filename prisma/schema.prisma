@@ -196,6 +196,7 @@ model Batch {
   name       String
   subject    String
   classLevel String?  // Class level (1-12) or course name (JEE, ECE, etc.)
+  board      String?  // e.g. ICSE, CBSE, WB, WBBSE — entered manually when creating batch
   teacherId  String
   schedule   String
   capacity  Int?
