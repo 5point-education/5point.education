@@ -2,7 +2,7 @@
 
 A comprehensive, production-ready web application for managing coaching centers with support for tuition batches and home tutoring services.
 
----
+--
 
 ## 🚀 Features
 
