@@ -118,6 +118,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/teacher" exact onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="My Students" href="/dashboard/teacher/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={BarChart3} label="Reports" href="/dashboard/teacher/reports" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={IndianRupee} label="Payroll" href="/dashboard/teacher/payroll" onClick={closeMobileSidebar} />
                         <SidebarItem icon={ClipboardList} label="Exams" href="/dashboard/teacher/exam" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/teacher/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/teacher/notices" onClick={closeMobileSidebar} />
