@@ -140,6 +140,22 @@ export async function PATCH(req: Request) {
             return new NextResponse("Teacher not found", { status: 404 });
         }
 
+        // If email is being changed, update it in Supabase Auth first
+        if (email !== undefined && email !== existingTeacher.email) {
+            const { error: authUpdateError } = await supabase.auth.admin.updateUserById(id, {
+                email,
+                email_confirm: true,
+            });
+
+            if (authUpdateError) {
+                console.error("[TEACHERS_PATCH] Supabase Auth email update error:", authUpdateError);
+                return new NextResponse(
+                    authUpdateError.message || "Failed to update email in authentication",
+                    { status: 500 }
+                );
+            }
+        }
+
         const updateData: any = {};
         if (name !== undefined) updateData.name = name;
         if (email !== undefined) updateData.email = email;

@@ -34,6 +34,7 @@ export function EditStudentModal({
 
     const [formData, setFormData] = useState({
         name: "",
+        email: "",
         phone: "",
         parentName: "",
     });
@@ -42,6 +43,7 @@ export function EditStudentModal({
         if (student) {
             setFormData({
                 name: student.name || "",
+                email: student.email || "",
                 phone: student.phone || "",
                 parentName: student.parentName || "",
             });
@@ -73,11 +75,11 @@ export function EditStudentModal({
             });
             onSuccess();
             onOpenChange(false);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error updating student:", error);
             toast({
                 title: "Error",
-                description: "Failed to update student details",
+                description: error.message || "Failed to update student details",
                 variant: "destructive",
             });
         } finally {
@@ -95,12 +97,13 @@ export function EditStudentModal({
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label htmlFor="email">Email (Cannot be changed)</Label>
+                        <Label htmlFor="email">Email</Label>
                         <Input
                             id="email"
-                            value={student.email}
-                            disabled
-                            className="bg-muted"
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                            required
                         />
                     </div>
 
