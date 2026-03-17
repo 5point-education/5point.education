@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
+import { WhatsAppService } from "@/lib/whatsapp-service";
 
 export async function GET(req: Request) {
     try {
@@ -160,6 +161,33 @@ export async function PATCH(req: Request) {
                     endDate: batch.endDate || new Date()
                 }
             });
+        }
+
+        // Send WhatsApp notification for schedule change
+        if (schedule !== undefined && schedule !== currentBatch.schedule) {
+            (async () => {
+                try {
+                    const activeAdmissions = await db.admission.findMany({
+                        where: { batchId: id, status: "ACTIVE" },
+                        include: { student: true }
+                    });
+                    
+                    const phones = activeAdmissions
+                        .map(a => a.student.parentMobile || a.student.phone)
+                        .filter(Boolean) as string[];
+                        
+                    const uniquePhones = [...new Set(phones)];
+                    for (const phone of uniquePhones) {
+                        await WhatsAppService.sendScheduleChange(
+                            phone,
+                            currentBatch.name,
+                            schedule
+                        );
+                    }
+                } catch (err) {
+                    console.error("Failed to send WhatsApp schedule change:", err);
+                }
+            })();
         }
 
         return NextResponse.json(batch);

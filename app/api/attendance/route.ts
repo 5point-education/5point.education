@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
+import { WhatsAppService } from "@/lib/whatsapp-service";
 
 export async function GET(req: Request) {
   try {
@@ -117,7 +118,7 @@ export async function POST(req: Request) {
       }
 
       // Upsert attendance record
-      await (db as any).attendance.upsert({
+      const attendance = await (db as any).attendance.upsert({
         where: {
           date_batchId_studentId: {
             date: attendanceDate,
@@ -134,8 +135,25 @@ export async function POST(req: Request) {
           batchId: batchId,
           studentId: studentId,
           status: isPresent
+        },
+        include: {
+          student: {
+            include: { user: true }
+          }
         }
       });
+
+      // Send WhatsApp notification if marked absent
+      if (!isPresent) {
+        const phone = attendance.student.parentMobile || attendance.student.phone;
+        if (phone) {
+          WhatsAppService.sendAbsenceNotification(
+            phone,
+            attendance.student.user.name,
+            date
+          ).catch(console.error); // Catch errors to prevent breaking the flow
+        }
+      }
     }
 
     return NextResponse.json({ success: true, message: "Attendance saved successfully" });
@@ -188,8 +206,27 @@ export async function PUT(req: Request) {
       data: {
         status: isPresent,
         updatedAt: new Date()
+      },
+      include: {
+        student: {
+          include: { user: true }
+        }
       }
     });
+
+    // Send WhatsApp notification if marked absent
+    if (!isPresent) {
+      const phone = updatedAttendance.student.parentMobile || updatedAttendance.student.phone;
+      if (phone) {
+        // Need to format the date correctly for the message
+        const dateStr = updatedAttendance.date.toISOString().split('T')[0];
+        WhatsAppService.sendAbsenceNotification(
+          phone,
+          updatedAttendance.student.user.name,
+          dateStr
+        ).catch(console.error);
+      }
+    }
 
     return NextResponse.json({ success: true, attendance: updatedAttendance });
   } catch (error) {

@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role, NoticeScope, NoticePriority } from "@prisma/client";
+import { WhatsAppService } from "@/lib/whatsapp-service";
 
 /** Parse expiry as end of day (23:59:59.999) when date-only YYYY-MM-DD is provided. */
 function parseExpiresAtEndOfDay(expiresAt: string | null | undefined): Date | null {
@@ -123,6 +124,44 @@ export async function POST(req: Request) {
         }
       }
     });
+
+    // Send WhatsApp notification asynchronously
+    (async () => {
+      try {
+        let phones: string[] = [];
+
+        if (scope === NoticeScope.GLOBAL) {
+          // Fetch all active admissions' students
+          const allStudents = await db.studentProfile.findMany({
+            where: { admissions: { some: { status: "ACTIVE" } } },
+            select: { phone: true, parentMobile: true }
+          });
+          phones = allStudents.map(s => s.parentMobile || s.phone).filter(Boolean) as string[];
+        } else if (scope === NoticeScope.BATCH) {
+          // Fetch students in this batch
+          const batchStudents = await db.studentProfile.findMany({
+            where: { admissions: { some: { batchId, status: "ACTIVE" } } },
+            select: { phone: true, parentMobile: true }
+          });
+          phones = batchStudents.map(s => s.parentMobile || s.phone).filter(Boolean) as string[];
+        } else if (scope === NoticeScope.INDIVIDUAL && studentIds) {
+          // Fetch specific students
+          const specificStudents = await db.studentProfile.findMany({
+            where: { id: { in: studentIds } },
+            select: { phone: true, parentMobile: true }
+          });
+          phones = specificStudents.map(s => s.parentMobile || s.phone).filter(Boolean) as string[];
+        }
+
+        // Send to uniquely identified phones
+        const uniquePhones = [...new Set(phones)];
+        for (const phone of uniquePhones) {
+          await WhatsAppService.sendAnnouncement(phone, title, noticeBody);
+        }
+      } catch (err) {
+        console.error("Failed to send WhatsApp announcement:", err);
+      }
+    })();
 
     return NextResponse.json(notice, { status: 201 });
   } catch (error) {

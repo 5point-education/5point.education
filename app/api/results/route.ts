@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
+import { WhatsAppService } from "@/lib/whatsapp-service";
 
 export async function POST(req: Request) {
     try {
@@ -15,11 +16,7 @@ export async function POST(req: Request) {
         const { examId, results } = await req.json(); // results: [{ studentId, score, remarks }]
 
         // Transactional bulk upsert
-        // Prisma doesn't strictly have "bulk upsert" in one query easily for diverse data, 
-        // but we can loop in transaction or use delete+create (dangerous for logs)
-        // or iteration. Iteration in transaction is safest for now.
-
-        await db.$transaction(
+        const updatedRecords = await db.$transaction(
             results.map((result: any) =>
                 db.result.upsert({
                     where: {
@@ -37,10 +34,29 @@ export async function POST(req: Request) {
                         studentId: result.studentId,
                         score: parseFloat(result.score),
                         remarks: result.remarks
+                    },
+                    include: {
+                        student: {
+                            include: { user: true }
+                        },
+                        exam: true
                     }
                 })
             )
         );
+
+        // Send WhatsApp notifications asynchronously
+        Promise.all(updatedRecords.map(async (record) => {
+            const phone = record.student.parentMobile || record.student.phone;
+            if (phone) {
+                await WhatsAppService.sendMarksUpdated(
+                    phone,
+                    record.student.user.name,
+                    record.exam.name,
+                    record.score
+                ).catch(console.error);
+            }
+        })).catch(console.error); // Catch any top-level errors in the Promise.all
 
         return NextResponse.json({ success: true });
     } catch (error) {
