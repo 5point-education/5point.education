@@ -96,6 +96,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/reception/notices" onClick={closeMobileSidebar} />
                         <SidebarItem icon={UserPlus} label="Teachers" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Users} label="Receptionists" href="/dashboard/admin/receptionists" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/admin/profile" onClick={closeMobileSidebar} />
                     </>
                 );
