@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,11 +35,7 @@ export default function AdminReceptionistsPage() {
   // Search and Filter State
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    fetchReceptionists();
-  }, []);
-
-  const fetchReceptionists = async () => {
+  const fetchReceptionists = useCallback(async () => {
     try {
       const response = await fetch("/api/receptionists");
       if (response.ok) {
@@ -56,7 +52,11 @@ export default function AdminReceptionistsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchReceptionists();
+  }, [fetchReceptionists]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

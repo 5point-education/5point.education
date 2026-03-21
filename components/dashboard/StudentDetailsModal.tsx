@@ -15,7 +15,7 @@ interface BatchInfo {
     id: string;
     name: string;
     subject: string;
-    isActive: boolean;
+    isActive?: boolean;
 }
 
 interface StudentDetails {
@@ -34,6 +34,8 @@ interface StudentDetailsModalProps {
     onOpenChange: (open: boolean) => void;
     /** When "teacher", show a link to view this student's analytics. */
     role?: "teacher" | "receptionist" | "admin";
+    /** Optional callback to refresh student list */
+    onRefresh?: () => void;
 }
 
 export function StudentDetailsModal({
@@ -41,6 +43,7 @@ export function StudentDetailsModal({
     isOpen,
     onOpenChange,
     role,
+    onRefresh,
 }: StudentDetailsModalProps) {
     if (!student) return null;
 

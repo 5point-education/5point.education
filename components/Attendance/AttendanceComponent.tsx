@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -104,14 +104,10 @@ const AttendanceComponent = ({
     };
 
     fetchBatches();
-  }, [batchApiEndpoint]);
+  }, [batchApiEndpoint, toast]);
 
   // Fetch attendance history
-  useEffect(() => {
-    fetchAttendanceHistory();
-  }, []);
-
-  const fetchAttendanceHistory = async () => {
+  const fetchAttendanceHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       const response = await fetch('/api/attendance/history');
@@ -128,14 +124,50 @@ const AttendanceComponent = ({
     } finally {
       setHistoryLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchAttendanceHistory();
+  }, [fetchAttendanceHistory]);
 
   // Fetch students when batch and date are selected
+  const fetchStudentsForAttendance = useCallback(async () => {
+    if (!selectedBatch || !selectedDate) return;
+
+    setLoading(true);
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd'); // Format as YYYY-MM-DD in local timezone
+      const response = await fetch(`/api/attendance?batchId=${selectedBatch}&date=${dateStr}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch students');
+      }
+
+      const data = await response.json();
+      // Set all students to absent by default if they don't have attendance marked
+      // This ensures no student has null/undefined status and prevents data inconsistency
+      const studentsWithDefaultStatus = data.map((student: StudentAttendance) => ({
+        ...student,
+        isPresent: student.isPresent === null ? false : student.isPresent
+      }));
+      setStudents(studentsWithDefaultStatus);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch students for attendance',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedBatch, selectedDate, toast]);
+
   useEffect(() => {
     if (selectedBatch && activeTab === 'new') {
       fetchStudentsForAttendance();
     }
-  }, [selectedBatch, selectedDate, activeTab]);
+  }, [selectedBatch, selectedDate, activeTab, fetchStudentsForAttendance]);
 
   // Update summary when students change
   useEffect(() => {
@@ -174,38 +206,6 @@ const AttendanceComponent = ({
     setFilterBatch('all');
     setFilterSubject('all');
     setFilterDate(undefined);
-  };
-
-  const fetchStudentsForAttendance = async () => {
-    if (!selectedBatch || !selectedDate) return;
-
-    setLoading(true);
-    try {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd'); // Format as YYYY-MM-DD in local timezone
-      const response = await fetch(`/api/attendance?batchId=${selectedBatch}&date=${dateStr}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch students');
-      }
-
-      const data = await response.json();
-      // Set all students to absent by default if they don't have attendance marked
-      // This ensures no student has null/undefined status and prevents data inconsistency
-      const studentsWithDefaultStatus = data.map((student: StudentAttendance) => ({
-        ...student,
-        isPresent: student.isPresent === null ? false : student.isPresent
-      }));
-      setStudents(studentsWithDefaultStatus);
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch students for attendance',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleAttendanceChange = (studentId: string, isPresent: boolean) => {

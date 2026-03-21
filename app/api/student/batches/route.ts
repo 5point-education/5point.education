@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { AdmissionStatus, Role } from "@prisma/client";
 
 export async function GET() {
   const supabase = createClient();
@@ -9,7 +10,7 @@ export async function GET() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!user || user.user_metadata?.role !== Role.STUDENT) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -18,9 +19,15 @@ export async function GET() {
       include: {
         admissions: {
           where: {
+            status: AdmissionStatus.ACTIVE,
             batchId: {
               not: null
-            }
+            },
+            batch: {
+              is: {
+                isActive: true
+              }
+            },
           },
           include: {
             batch: {

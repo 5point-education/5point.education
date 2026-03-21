@@ -201,7 +201,7 @@ export async function GET(req: Request) {
         const formattedStudents = users
             .filter(u => u.studentProfile) // Only return users with a profile
             .map(u => ({
-                admissionId: "N/A",
+                admissionId: "N/A", // This will be handled dynamically based on selected batch
                 studentId: u.studentProfile!.id,
                 userId: u.id,
                 name: u.name,
@@ -217,7 +217,17 @@ export async function GET(req: Request) {
                         name: adm.batch!.name,
                         subject: adm.batch!.subject,
                         isActive: adm.batch!.isActive
-                    }))
+                    })),
+                // Include all admissions for batch management
+                admissions: u.studentProfile!.admissions.map(adm => ({
+                    id: adm.id,
+                    batchId: adm.batchId,
+                    batch: adm.batch ? {
+                        name: adm.batch.name,
+                        subject: adm.batch.subject,
+                        isActive: adm.batch.isActive
+                    } : null
+                }))
             }));
 
         return NextResponse.json(formattedStudents);

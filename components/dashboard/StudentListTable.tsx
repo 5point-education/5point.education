@@ -21,22 +21,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, User, Phone, Eye, PlusCircle, Pencil, Ban, CheckCircle, Loader2 } from "lucide-react";
+import { Search, User, Phone, Eye, PlusCircle, Pencil, Ban, CheckCircle, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { AddStudentToBatchModal } from "./AddStudentToBatchModal";
 import { StudentDetailsModal } from "./StudentDetailsModal";
 import { EditStudentModal } from "./EditStudentModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface BatchInfo {
   id: string;
   name: string;
   subject: string;
-  isActive: boolean;
+  isActive?: boolean; // Make optional to handle cases where it might not be provided
 }
 
 interface Student {
-  admissionId: string;
+  admissionId: string; // Will be the specific admission ID when viewing a batch
   studentId: string;
+  userId: string;
   name: string;
   email: string;
   phone: string;
@@ -44,6 +53,15 @@ interface Student {
   joinDate: string;
   isActive?: boolean;
   batches?: BatchInfo[];
+  admissions?: Array<{
+    id: string;
+    batchId?: string;
+    batch?: {
+      name: string;
+      subject: string;
+      isActive?: boolean;
+    };
+  }>;
 }
 
 interface Batch {
@@ -93,6 +111,15 @@ export default function StudentListTable({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<Student | null>(null);
 
+  // Remove from Batch Modal State
+  const [isRemoveBatchOpen, setIsRemoveBatchOpen] = useState(false);
+  const [removeLoading, setRemoveLoading] = useState(false);
+  const [selectedStudentForRemoval, setSelectedStudentForRemoval] = useState<{
+    student: Student;
+    admissionId: string;
+    batchName: string;
+  } | null>(null);
+
   const openDetailsModal = (student: Student) => {
     setSelectedStudentDetails(student);
     setIsDetailsOpen(true);
@@ -137,7 +164,7 @@ export default function StudentListTable({
     };
 
     fetchStudents();
-  }, [selectedBatch, refreshKey]);
+  }, [selectedBatch, refreshKey, role]);
 
   // Apply search filter
   useEffect(() => {
@@ -220,6 +247,59 @@ export default function StudentListTable({
       });
     } finally {
       setToggleLoading(null);
+    }
+  };
+
+  const openRemoveBatchModal = (student: Student, admissionId: string, batchName: string) => {
+    setSelectedStudentForRemoval({
+      student,
+      admissionId,
+      batchName
+    });
+    setIsRemoveBatchOpen(true);
+  };
+
+  const handleRemoveFromBatch = async () => {
+    if (!selectedStudentForRemoval) return;
+
+    const { student, admissionId, batchName } = selectedStudentForRemoval;
+    setRemoveLoading(true);
+
+    try {
+      const response = await fetch(`/api/admissions/${admissionId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "remove_from_batch",
+          endDate: new Date().toISOString()
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to remove student from batch");
+      }
+
+      toast({
+        title: "Success",
+        description: `Student has been removed from ${batchName}`,
+      });
+
+      // Close modal and refresh list
+      setIsRemoveBatchOpen(false);
+      setSelectedStudentForRemoval(null);
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error("Error removing from batch:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to remove student from batch",
+        variant: "destructive",
+      });
+    } finally {
+      setRemoveLoading(false);
     }
   };
 
@@ -313,13 +393,37 @@ export default function StudentListTable({
                                 {student.batches && student.batches.length > 0 ? (
                                   <>
                                     {student.batches.slice(0, 4).map((batch) => (
-                                      <span
+                                      <div
                                         key={batch.id}
-                                        title={batch.name}
-                                        className="inline-flex items-center min-w-0 max-w-[160px] rounded-md bg-muted/60 px-2 py-1 text-xs font-medium text-muted-foreground border border-border/60 truncate"
+                                        className="inline-flex items-center gap-1 min-w-0 max-w-[180px] rounded-md bg-muted/60 px-2 py-1 text-xs font-medium text-muted-foreground border border-border/60"
                                       >
-                                        {batch.name}
-                                      </span>
+                                        <span title={batch.name} className="truncate">
+                                          {batch.name}
+                                        </span>
+                                        {(role === "receptionist" || role === "admin") && (
+                                          <button
+                                            type="button"
+                                            className="text-orange-600 hover:text-orange-700"
+                                            title={`Remove from ${batch.name}`}
+                                            onClick={() => {
+                                              const matchingAdmission = student.admissions?.find(
+                                                (admission) => admission.batchId === batch.id
+                                              );
+                                              if (matchingAdmission?.id) {
+                                                openRemoveBatchModal(student, matchingAdmission.id, batch.name);
+                                              } else {
+                                                toast({
+                                                  title: "Admission not found",
+                                                  description: "Unable to identify this batch enrollment for removal.",
+                                                  variant: "destructive",
+                                                });
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </button>
+                                        )}
+                                      </div>
                                     ))}
                                     {student.batches.length > 4 && (
                                       <span className="text-xs text-muted-foreground self-center">
@@ -482,6 +586,32 @@ export default function StudentListTable({
         onOpenChange={setIsDetailsOpen}
         role={role}
       />
+
+      {/* Remove from Batch Confirmation Dialog */}
+      <Dialog open={isRemoveBatchOpen} onOpenChange={setIsRemoveBatchOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Remove from Batch</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove {selectedStudentForRemoval?.student.name} from the batch &quot;{selectedStudentForRemoval?.batchName}&quot;?
+              <br /><br />
+              This will mark the admission as withdrawn and the student will no longer be enrolled in this batch.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRemoveBatchOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRemoveFromBatch}
+              disabled={removeLoading}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {removeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Remove from Batch"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -81,6 +81,11 @@ export async function GET(req: Request) {
 
     // Get total count
     const total = await db.notice.count({ where });
+    const latestNotice = await db.notice.findFirst({
+      where,
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true }
+    });
 
     // Get notices ordered by priority (URGENT > HIGH > NORMAL) then by date
     const notices = await db.notice.findMany({
@@ -120,6 +125,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       notices: formattedNotices,
+      metadata: {
+        latestNoticeCreatedAt: latestNotice?.createdAt ?? null
+      },
       pagination: {
         page,
         limit,

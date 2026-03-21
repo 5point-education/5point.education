@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -32,9 +32,10 @@ interface SidebarItemProps {
     href: string;
     exact?: boolean;
     onClick?: () => void;
+    showNotificationDot?: boolean;
 }
 
-const SidebarItem = ({ icon: Icon, label, href, exact, onClick }: SidebarItemProps) => {
+const SidebarItem = ({ icon: Icon, label, href, exact, onClick, showNotificationDot }: SidebarItemProps) => {
     const pathname = usePathname();
     const isActive = exact
         ? pathname === href
@@ -58,6 +59,12 @@ const SidebarItem = ({ icon: Icon, label, href, exact, onClick }: SidebarItemPro
                 )}
             />
             <span className={cn("font-medium text-sm", isActive ? "font-semibold" : "")}>{label}</span>
+            {showNotificationDot && (
+                <span className="ml-auto relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 ring-2 ring-white/70" />
+                </span>
+            )}
         </Link>
     );
 };
@@ -75,11 +82,43 @@ interface SidebarProps {
 
 export function Sidebar({ user, onLogout }: SidebarProps) {
     const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const [hasUnreadStudentNotices, setHasUnreadStudentNotices] = useState(false);
     const userRole = user?.role?.toUpperCase() || "STUDENT";
     const userName = user?.name || user?.email || "User";
     const userInitial = userName.charAt(0).toUpperCase();
 
     const closeMobileSidebar = () => setIsMobileOpen(false);
+
+    useEffect(() => {
+        if (userRole !== "STUDENT") return;
+
+        const refreshNoticeState = async () => {
+            try {
+                const response = await fetch("/api/student/notices?page=1&limit=1", { cache: "no-store" });
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const latestNoticeCreatedAt = data?.metadata?.latestNoticeCreatedAt as string | null;
+                if (!latestNoticeCreatedAt) {
+                    setHasUnreadStudentNotices(false);
+                    return;
+                }
+
+                const lastSeen = localStorage.getItem("studentNoticesLastSeenAt");
+                const hasUnread = !lastSeen || new Date(latestNoticeCreatedAt).getTime() > new Date(lastSeen).getTime();
+                setHasUnreadStudentNotices(hasUnread);
+            } catch {
+                // Silent failure: sidebar should remain usable even if notice check fails.
+            }
+        };
+
+        refreshNoticeState();
+        window.addEventListener("student-notices-read", refreshNoticeState);
+
+        return () => {
+            window.removeEventListener("student-notices-read", refreshNoticeState);
+        };
+    }, [userRole]);
 
     const renderLinks = () => {
         switch (userRole) {
@@ -110,6 +149,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={IndianRupee} label="Fees Management" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/reception/notices" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Calendar} label="Schedule" href="/dashboard/reception/schedule" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/reception/profile" onClick={closeMobileSidebar} />
                     </>
                 );
@@ -135,7 +175,13 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={IndianRupee} label="Payments" href="/dashboard/student/payments" onClick={closeMobileSidebar} />
                         <SidebarItem icon={GraduationCap} label="Results" href="/dashboard/student/results" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/student/attendance" onClick={closeMobileSidebar} />
-                        <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/student/notices" onClick={closeMobileSidebar} />
+                        <SidebarItem
+                            icon={Megaphone}
+                            label="Notices"
+                            href="/dashboard/student/notices"
+                            onClick={closeMobileSidebar}
+                            showNotificationDot={hasUnreadStudentNotices}
+                        />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/student/profile" onClick={closeMobileSidebar} />
                     </>
                 );

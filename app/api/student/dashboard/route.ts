@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { AdmissionStatus, Role } from "@prisma/client";
 import { calculatePendingFees } from "@/lib/fees-utils";
 
 export async function GET(req: Request) {
@@ -24,7 +24,10 @@ export async function GET(req: Request) {
 
     // 2. Get Admissions (for Fees & Batch info) with payments
     const admissions = await db.admission.findMany({
-      where: { studentId: studentProfile.id },
+      where: {
+        studentId: studentProfile.id,
+        status: AdmissionStatus.ACTIVE
+      },
       include: {
         batch: true,
         payments: {

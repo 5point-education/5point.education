@@ -47,6 +47,12 @@ export default function StudentNoticesPage() {
             const data = await response.json();
             setNotices(data.notices);
             setPagination(data.pagination);
+
+            const latestNoticeCreatedAt: string | null = data?.metadata?.latestNoticeCreatedAt ?? null;
+            if (latestNoticeCreatedAt) {
+                localStorage.setItem("studentNoticesLastSeenAt", latestNoticeCreatedAt);
+                window.dispatchEvent(new Event("student-notices-read"));
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "An error occurred");
         } finally {

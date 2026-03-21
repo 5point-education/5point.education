@@ -351,7 +351,7 @@ export default function AdmissionPage() {
                 const activeBatches = data.filter(b => b.isActive !== false);
                 setBatches(activeBatches);
             });
-    }, [enquiryId]);
+    }, [enquiryId, studentForm]);
 
     // Handlers
     const onStudentSubmit = (values: any) => {

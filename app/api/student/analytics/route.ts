@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { AdmissionStatus, Role } from "@prisma/client";
 
 export async function GET(req: Request) {
     try {
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
             where: { userId: user.id },
             include: {
                 admissions: {
-                    where: { fees_pending: { gte: 0 } }, // Get active/recent admissions
+                    where: { status: AdmissionStatus.ACTIVE },
                     orderBy: { createdAt: 'desc' },
                     take: 1,
                     include: { batch: true }
