@@ -30,13 +30,13 @@ import {
   Pencil,
   Search,
   Trash2,
-  Calendar,
   Receipt,
   BookOpen,
   Ticket,
   CreditCard,
+  IndianRupee,
 } from "lucide-react";
-import { MonthBasedPaymentDialog } from "@/components/dashboard/MonthBasedPaymentDialog";
+import { UnifiedPaymentDialog } from "@/components/dashboard/BulkPaymentDialog";
 
 // ==================== TYPES ====================
 
@@ -116,9 +116,9 @@ export default function FeesManagementPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
 
-  // Month-based Payment Dialog State (for Batch Fees)
-  const [monthBasedPaymentOpen, setMonthBasedPaymentOpen] = useState(false);
-  const [monthBasedPaymentStudent, setMonthBasedPaymentStudent] = useState<StudentFeeData | null>(null);
+  // Payment Dialog State
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [paymentDialogStudent, setPaymentDialogStudent] = useState<StudentFeeData | null>(null);
 
   // Admission Charge Payment Dialog State
   const [admissionChargePaymentOpen, setAdmissionChargePaymentOpen] = useState(false);
@@ -580,13 +580,13 @@ export default function FeesManagementPage() {
                               variant="default"
                               size="sm"
                               onClick={() => {
-                                setMonthBasedPaymentStudent(student);
-                                setMonthBasedPaymentOpen(true);
+                                setPaymentDialogStudent(student);
+                                setPaymentDialogOpen(true);
                               }}
                               disabled={student.totalBatchFeesPending === 0}
                             >
-                              <Calendar className="h-4 w-4 mr-1" />
-                              Pay Months
+                              <IndianRupee className="h-4 w-4 mr-1" />
+                              Pay
                             </Button>
                             <Button
                               variant="ghost"
@@ -1038,17 +1038,16 @@ export default function FeesManagementPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Month-Based Payment Dialog for Batch Fees */}
-      {monthBasedPaymentStudent && (
-        <MonthBasedPaymentDialog
-          open={monthBasedPaymentOpen}
-          onOpenChange={setMonthBasedPaymentOpen}
-          studentId={monthBasedPaymentStudent.studentId}
-          studentName={monthBasedPaymentStudent.studentName}
-          admissions={monthBasedPaymentStudent.admissions}
+      {/* Unified Payment Dialog */}
+      {paymentDialogStudent && (
+        <UnifiedPaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          studentId={paymentDialogStudent.studentId}
+          studentName={paymentDialogStudent.studentName}
           onSuccess={() => {
             fetchData();
-            setMonthBasedPaymentStudent(null);
+            setPaymentDialogStudent(null);
           }}
         />
       )}

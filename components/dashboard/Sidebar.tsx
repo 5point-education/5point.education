@@ -126,15 +126,16 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 return (
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/admin" exact onClick={closeMobileSidebar} />
-                        <SidebarItem icon={UserCog} label="Register" href="/dashboard/admin/register" onClick={closeMobileSidebar} />
                         <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Operations</div>
                         <SidebarItem icon={FileText} label="Enquiries" href="/dashboard/reception" exact onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="Students" href="/dashboard/reception/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Layers} label="Batches" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={UserPlus} label="Teachers" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
                         <SidebarItem icon={IndianRupee} label="Fees" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/reception/notices" onClick={closeMobileSidebar} />
-                        <SidebarItem icon={UserPlus} label="Teachers" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
+                        <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Administration</div>
+                        <SidebarItem icon={UserCog} label="Register" href="/dashboard/admin/register" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="Receptionists" href="/dashboard/admin/receptionists" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/admin/profile" onClick={closeMobileSidebar} />
                     </>
@@ -143,13 +144,14 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 return (
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Overview" href="/dashboard/reception" exact onClick={closeMobileSidebar} />
-                        <SidebarItem icon={UserPlus} label="Teacher Onboarding" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
+                        <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Operations</div>
                         <SidebarItem icon={Users} label="Student List" href="/dashboard/reception/students" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Layers} label="Batch Management" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={Calendar} label="Schedule" href="/dashboard/reception/schedule" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={UserPlus} label="Teacher Onboarding" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
                         <SidebarItem icon={IndianRupee} label="Fees Management" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/reception/notices" onClick={closeMobileSidebar} />
-                        <SidebarItem icon={Calendar} label="Schedule" href="/dashboard/reception/schedule" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/reception/profile" onClick={closeMobileSidebar} />
                     </>
                 );
@@ -157,11 +159,13 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 return (
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/teacher" exact onClick={closeMobileSidebar} />
+                        <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Teaching</div>
                         <SidebarItem icon={Users} label="My Students" href="/dashboard/teacher/students" onClick={closeMobileSidebar} />
-                        <SidebarItem icon={BarChart3} label="Reports" href="/dashboard/teacher/reports" onClick={closeMobileSidebar} />
-                        <SidebarItem icon={IndianRupee} label="Payroll" href="/dashboard/teacher/payroll" onClick={closeMobileSidebar} />
                         <SidebarItem icon={ClipboardList} label="Exams" href="/dashboard/teacher/exam" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/teacher/attendance" onClick={closeMobileSidebar} />
+                        <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Insights & HR</div>
+                        <SidebarItem icon={BarChart3} label="Reports" href="/dashboard/teacher/reports" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={IndianRupee} label="Payroll" href="/dashboard/teacher/payroll" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/teacher/notices" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/teacher/profile" onClick={closeMobileSidebar} />
                     </>
@@ -170,10 +174,12 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 return (
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/student" exact onClick={closeMobileSidebar} />
-                        <SidebarItem icon={BarChart3} label="Reports" href="/dashboard/student/reports" onClick={closeMobileSidebar} />
-                        <SidebarItem icon={BookOpen} label="My Courses" href="/dashboard/student/courses" onClick={closeMobileSidebar} />
-                        <SidebarItem icon={IndianRupee} label="Payments" href="/dashboard/student/payments" onClick={closeMobileSidebar} />
+                        <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Learning</div>
+                        <SidebarItem icon={BookOpen} label="Schedule" href="/dashboard/student/courses" onClick={closeMobileSidebar} />
                         <SidebarItem icon={GraduationCap} label="Results" href="/dashboard/student/results" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={BarChart3} label="Reports" href="/dashboard/student/reports" onClick={closeMobileSidebar} />
+                        <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Account</div>
+                        <SidebarItem icon={IndianRupee} label="Payments" href="/dashboard/student/payments" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/student/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem
                             icon={Megaphone}

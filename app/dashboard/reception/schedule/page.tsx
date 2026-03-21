@@ -416,7 +416,7 @@ export default function ReceptionSchedulePage() {
             </div>
             <Button
               asChild
-              className="h-11 rounded-xl bg-[#2D46B9] px-5 font-semibold shadow-md shadow-blue-900/10 hover:bg-[#243a9e] dark:bg-primary dark:hover:bg-primary/90"
+              className="h-11 rounded-xl bg-primary px-5 font-semibold shadow-md shadow-blue-800/10 hover:bg-[#243a9e] dark:bg-primary dark:hover:bg-primary/90"
             >
               <Link href="/dashboard/reception/batches">
                 <Plus className="mr-2 h-4 w-4" />
@@ -478,7 +478,7 @@ export default function ReceptionSchedulePage() {
               </Button>
               <Button
                 variant="secondary"
-                className="h-10 rounded-xl px-4"
+                className="h-10 rounded-xl px-4 text-white"
                 onClick={goToday}
               >
                 Today
