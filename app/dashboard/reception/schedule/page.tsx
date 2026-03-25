@@ -515,7 +515,7 @@ export default function ReceptionSchedulePage() {
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              <Button variant="secondary" className="h-10 rounded-xl" onClick={goToday}>
+              <Button variant="secondary" className="h-10 rounded-xl text-white" onClick={goToday}>
                 Today
               </Button>
             </div>
@@ -581,15 +581,7 @@ export default function ReceptionSchedulePage() {
             </div>
           </div>
           <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="h-11 shrink-0 rounded-xl border-slate-200"
-              >
-                <SlidersHorizontal className="mr-2 h-4 w-4" />
-                Advanced
-              </Button>
-            </PopoverTrigger>
+  
             <PopoverContent className="w-80 rounded-xl" align="end">
               <p className="text-sm font-medium">Quick tips</p>
               <p className="mt-2 text-xs text-muted-foreground">
@@ -615,7 +607,7 @@ export default function ReceptionSchedulePage() {
         ) : (
           <>
             {view === "week" && (
-              <div className="space-y-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/60 dark:bg-card dark:ring-border sm:p-6">
+              <div className="space-y-4 rounded-2xl  bg-white p-4 shadow-sm ring-1 ring-slate-200/60 dark:bg-card dark:ring-border sm:p-6">
                 <div className="flex flex-col gap-6">
                   {DAY_ORDER.map((_, dayIdx) => {
                     const dayEvents = eventsByDayIndex[dayIdx] ?? [];
@@ -720,7 +712,7 @@ export default function ReceptionSchedulePage() {
             {view === "month" && (
               <div className="flex flex-col items-start gap-6 lg:flex-row">
                 {/* 2/3 Width Calendar Grid */}
-                <div className="flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/60 dark:bg-card dark:ring-border w-full">
+                <div className="flex-1 sticky top-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/60 dark:bg-card dark:ring-border w-full">
                   <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/90 dark:border-border dark:bg-muted/30">
                     {DAY_LABELS_SHORT.map((d) => (
                       <div
