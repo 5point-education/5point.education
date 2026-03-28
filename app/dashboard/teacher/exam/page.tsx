@@ -26,7 +26,7 @@ export default async function TeacherExamListPage({ searchParams }: { searchPara
     // Fetch batches for filter and create dialog
     const batches = await db.batch.findMany({
         where: { teacherId: user.id },
-        select: { id: true, name: true },
+        select: { id: true, name: true, subject: true },
         orderBy: { name: 'asc' }
     });
 

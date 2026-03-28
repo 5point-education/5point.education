@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface ExamFilterProps {
-    batches: { id: string; name: string }[];
+    batches: { id: string; name: string; subject: string | null }[];
 }
 
 export function ExamFilter({ batches }: ExamFilterProps) {
@@ -32,7 +32,12 @@ export function ExamFilter({ batches }: ExamFilterProps) {
                     <SelectItem value="all">All Batches</SelectItem>
                     {batches.map((batch) => (
                         <SelectItem key={batch.id} value={batch.id}>
-                            {batch.name}
+                            <div className="flex items-center gap-2">
+                                <span>{batch.name}</span>
+                                {batch.subject && (
+                                    <span className="text-xs text-muted-foreground">- {batch.subject}</span>
+                                )}
+                            </div>
                         </SelectItem>
                     ))}
                 </SelectContent>

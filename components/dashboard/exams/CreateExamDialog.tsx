@@ -9,7 +9,7 @@ import { Plus } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 interface CreateExamDialogProps {
-    batches: { id: string; name: string }[];
+    batches: { id: string; name: string; subject: string | null }[];
 }
 
 export function CreateExamDialog({ batches }: CreateExamDialogProps) {
@@ -49,7 +49,12 @@ export function CreateExamDialog({ batches }: CreateExamDialogProps) {
                             <SelectContent>
                                 {batches.map((batch) => (
                                     <SelectItem key={batch.id} value={batch.id}>
-                                        {batch.name}
+                                        <div className="flex items-center gap-2">
+                                            <span>{batch.name}</span>
+                                            {batch.subject && (
+                                                <span className="text-xs text-muted-foreground">- {batch.subject}</span>
+                                            )}
+                                        </div>
                                     </SelectItem>
                                 ))}
                             </SelectContent>

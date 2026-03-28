@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
-  DollarSign,
+  IndianRupee,
   AlertCircle,
   UserCircle,
   GraduationCap,
@@ -296,7 +296,7 @@ export default function AdminDashboard() {
             <CardHeader className="pb-3 pt-4 px-4">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
-                  <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <IndianRupee className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <CardDescription className="text-xs font-medium text-gray-600 dark:text-gray-400">
                   Total Revenue
