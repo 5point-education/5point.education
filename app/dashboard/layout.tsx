@@ -17,6 +17,10 @@ export default function DashboardLayout({
   const supabase = createClient();
 
   useEffect(() => {
+    // Prevent the body from scrolling while in the dashboard
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const checkUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -33,6 +37,11 @@ export default function DashboardLayout({
     };
 
     checkUser();
+
+    // Cleanup: restore original overflow when unmounting dashboard
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
   }, [router, supabase]);
 
   const handleLogout = () => {
@@ -55,7 +64,7 @@ export default function DashboardLayout({
   if (!user) return null;
 
   return (
-    <div className="flex">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar
         user={{
           name: user.user_metadata?.name || user.email,
@@ -66,7 +75,7 @@ export default function DashboardLayout({
       />
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen bg-slate-50">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50">
         {children}
       </main>
     </div>

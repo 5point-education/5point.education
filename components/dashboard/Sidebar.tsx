@@ -24,6 +24,7 @@ import {
     User,
     BarChart3,
     Megaphone,
+    Crown,
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -135,6 +136,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/reception/notices" onClick={closeMobileSidebar} />
                         <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Administration</div>
+                        <SidebarItem icon={Crown} label="Subscriptions" href="/dashboard/admin/subscriptions" onClick={closeMobileSidebar} />
                         <SidebarItem icon={UserCog} label="Register" href="/dashboard/admin/register" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Users} label="Receptionists" href="/dashboard/admin/receptionists" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/admin/profile" onClick={closeMobileSidebar} />

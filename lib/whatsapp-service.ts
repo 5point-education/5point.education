@@ -128,42 +128,110 @@ export const WhatsAppService = {
 
   /**
    * 1. Student Absence Notification
+   * REQUIRES META TEMPLATE: e.g. "Hello, this is to inform you that {{1}} was marked absent today ({{2}}). If you have any questions, please contact the administration."
    */
   sendAbsenceNotification: async (phone: string, studentName: string, date: string) => {
-    const message = `Hello, this is to inform you that ${studentName} was marked absent today (${date}). If you have any questions, please contact the administration.`;
-    return WhatsAppService.sendMessage(phone, message);
+    return WhatsAppService.sendTemplateMessage(
+      phone,
+      "absence_notification", // Replace with your approved template name
+      "en", // Replace with your template's language code
+      [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: studentName },
+            { type: "text", text: date }
+          ]
+        }
+      ]
+    );
   },
 
   /**
    * 2. Marks Submission
+   * REQUIRES META TEMPLATE
    */
   sendMarksUpdated: async (phone: string, studentName: string, examName: string, score: number) => {
-    const message = `Hello! The results for the "${examName}" exam have been updated. ${studentName} scored ${score}. Log in to the portal for more details.`;
-    return WhatsAppService.sendMessage(phone, message);
+    return WhatsAppService.sendTemplateMessage(
+      phone,
+      "marks_updated",
+      "en",
+      [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: examName },
+            { type: "text", text: studentName },
+            { type: "text", text: score.toString() }
+          ]
+        }
+      ]
+    );
   },
 
   /**
    * 5. Important Announcements
+   * REQUIRES META TEMPLATE: e.g. "Announcement: {{1}}\n\n{{2}}"
    */
   sendAnnouncement: async (phone: string, title: string, body: string) => {
-    const message = `*Announcement: ${title}*\n\n${body}`;
-    return WhatsAppService.sendMessage(phone, message);
+    // Note: If you don't want to use templates for announcements, you might need to broadcast 
+    // using WhatsApp marketing templates.
+    return WhatsAppService.sendTemplateMessage(
+      phone,
+      "announcement_alert", 
+      "en",
+      [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: title },
+            { type: "text", text: body }
+          ]
+        }
+      ]
+    );
   },
 
   /**
    * 6. Fee Due Reminder
+   * REQUIRES META TEMPLATE: e.g. "Reminder: An amount of ₹{{1}} is pending for {{2}} by {{3}}."
    */
   sendFeeReminder: async (phone: string, studentName: string, amount: number, dueDate?: string) => {
-    const dueDateStr = dueDate ? ` by ${dueDate}` : '';
-    const message = `Reminder: An amount of ₹${amount} is pending for ${studentName}${dueDateStr}. Please complete the payment to avoid interruption of services.`;
-    return WhatsAppService.sendMessage(phone, message);
+    const dueDateStr = dueDate ? dueDate : 'soon';
+    return WhatsAppService.sendTemplateMessage(
+      phone,
+      "fee_reminder",
+      "en",
+      [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: amount.toString() },
+            { type: "text", text: studentName },
+            { type: "text", text: dueDateStr }
+          ]
+        }
+      ]
+    );
   },
 
   /**
    * 7. Class Schedule Changes
    */
   sendScheduleChange: async (phone: string, batchName: string, newSchedule: string) => {
-    const message = `Update: The schedule for ${batchName} has been updated. The new schedule is: ${newSchedule}.`;
-    return WhatsAppService.sendMessage(phone, message);
+    return WhatsAppService.sendTemplateMessage(
+      phone,
+      "schedule_change",
+      "en",
+      [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: batchName },
+            { type: "text", text: newSchedule }
+          ]
+        }
+      ]
+    );
   }
 };

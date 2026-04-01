@@ -11,9 +11,13 @@ import {
   IndianRupee,
   Info,
   Percent,
-  CreditCard
+  CreditCard,
+  Crown,
+  Infinity,
+  AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 interface DashboardData {
   overview: {
@@ -63,6 +67,7 @@ interface DashboardData {
 export default function StudentDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [subscriptionData, setSubscriptionData] = useState<any>(null);
 
   const [timeOfDay, setTimeOfDay] = useState("day");
 
@@ -73,6 +78,7 @@ export default function StudentDashboard() {
     else setTimeOfDay("evening");
 
     fetchDashboardData();
+    fetchSubscription();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -84,6 +90,18 @@ export default function StudentDashboard() {
       console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSubscription = async () => {
+    try {
+      const res = await fetch("/api/student/subscription");
+      if (res.ok) {
+        const result = await res.json();
+        setSubscriptionData(result);
+      }
+    } catch (error) {
+      console.error("Error fetching subscription:", error);
     }
   };
 
@@ -143,11 +161,78 @@ export default function StudentDashboard() {
                     </p>
                   </div>
                 </div>
-                {/* <button className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-xs font-bold rounded-full transition-colors">
-                  Pay Now
-                </button> */}
               </div>
             </div>
+          )}
+
+          {/* Subscription Status Card */}
+          {subscriptionData && subscriptionData.hasSubscription && (
+            <Card className={`border-0 shadow-md rounded-2xl overflow-hidden ${
+              subscriptionData.status === 'active'
+                ? 'bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20'
+                : 'bg-gradient-to-r from-red-50 via-rose-50 to-orange-50 dark:from-red-950/20 dark:to-rose-950/20'
+            }`}>
+              <CardContent className="p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className={`h-12 w-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                    subscriptionData.status === 'active'
+                      ? 'bg-amber-100 dark:bg-amber-900/40'
+                      : 'bg-red-100 dark:bg-red-900/40'
+                  }`}>
+                    <Crown className={`h-6 w-6 ${
+                      subscriptionData.status === 'active'
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-red-500 dark:text-red-400'
+                    }`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-slate-800 dark:text-white">
+                        {subscriptionData.subscription.tierName} Plan
+                      </h3>
+                      <Badge className={`text-[10px] ${
+                        subscriptionData.status === 'active'
+                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-400'
+                          : 'bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/40 dark:text-red-400'
+                      }`}>
+                        {subscriptionData.status === 'active' ? 'Active' : 'Expired'}
+                      </Badge>
+                      {subscriptionData.subscription.isUnlimited && (
+                        <Badge className="text-[10px] bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-400">
+                          <Infinity className="h-3 w-3 mr-0.5" /> Unlimited
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        Started: {format(new Date(subscriptionData.subscription.startDate), 'MMM d, yyyy')}
+                      </span>
+                      {subscriptionData.subscription.endDate && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          {subscriptionData.status === 'active' ? 'Expires' : 'Expired'}:{' '}
+                          {format(new Date(subscriptionData.subscription.endDate), 'MMM d, yyyy')}
+                        </span>
+                      )}
+                      {subscriptionData.status === 'active' && subscriptionData.daysRemaining !== null && (
+                        <span className="font-medium text-amber-700 dark:text-amber-400">
+                          {subscriptionData.daysRemaining} day{subscriptionData.daysRemaining !== 1 ? 's' : ''} remaining
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {subscriptionData.status === 'expired' && (
+                  <div className="mt-3 flex items-center gap-2 p-2.5 bg-red-100/60 dark:bg-red-900/20 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                    <p className="text-xs text-red-700 dark:text-red-400">
+                      Your analytics access has expired. Contact the reception to renew your subscription.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
 
           {/* 1. Welcome Banner */}

@@ -189,6 +189,14 @@ export async function GET(req: Request) {
                             where: {
                                 status: 'ACTIVE'
                             }
+                        },
+                        subscriptions: {
+                            where: { isActive: true },
+                            orderBy: { createdAt: 'desc' },
+                            take: 1,
+                            include: {
+                                tier: true
+                            }
                         }
                     }
                 }
@@ -200,35 +208,56 @@ export async function GET(req: Request) {
 
         const formattedStudents = users
             .filter(u => u.studentProfile) // Only return users with a profile
-            .map(u => ({
-                admissionId: "N/A", // This will be handled dynamically based on selected batch
-                studentId: u.studentProfile!.id,
-                userId: u.id,
-                name: u.name,
-                email: u.email,
-                phone: u.studentProfile!.phone,
-                parentName: u.studentProfile!.fatherName,
-                joinDate: u.createdAt,
-                isActive: u.is_active,
-                batches: u.studentProfile!.admissions
-                    .filter(adm => adm.batch)
-                    .map(adm => ({
-                        id: adm.batch!.id,
-                        name: adm.batch!.name,
-                        subject: adm.batch!.subject,
-                        isActive: adm.batch!.isActive
+            .map(u => {
+                const activeSub = u.studentProfile!.subscriptions[0] || null;
+                let subStatus: string | null = null;
+                if (activeSub) {
+                    if (activeSub.endDate === null) {
+                        subStatus = "active";
+                    } else {
+                        subStatus = new Date(activeSub.endDate) > new Date() ? "active" : "expired";
+                    }
+                }
+
+                return {
+                    admissionId: "N/A",
+                    studentId: u.studentProfile!.id,
+                    userId: u.id,
+                    name: u.name,
+                    email: u.email,
+                    phone: u.studentProfile!.phone,
+                    parentName: u.studentProfile!.fatherName,
+                    joinDate: u.createdAt,
+                    isActive: u.is_active,
+                    batches: u.studentProfile!.admissions
+                        .filter(adm => adm.batch)
+                        .map(adm => ({
+                            id: adm.batch!.id,
+                            name: adm.batch!.name,
+                            subject: adm.batch!.subject,
+                            isActive: adm.batch!.isActive
+                        })),
+                    admissions: u.studentProfile!.admissions.map(adm => ({
+                        id: adm.id,
+                        batchId: adm.batchId,
+                        batch: adm.batch ? {
+                            name: adm.batch.name,
+                            subject: adm.batch.subject,
+                            isActive: adm.batch.isActive
+                        } : null
                     })),
-                // Include all admissions for batch management
-                admissions: u.studentProfile!.admissions.map(adm => ({
-                    id: adm.id,
-                    batchId: adm.batchId,
-                    batch: adm.batch ? {
-                        name: adm.batch.name,
-                        subject: adm.batch.subject,
-                        isActive: adm.batch.isActive
-                    } : null
-                }))
-            }));
+                    subscription: activeSub ? {
+                        id: activeSub.id,
+                        tierName: activeSub.tier.name,
+                        tierId: activeSub.tier.id,
+                        durationMonths: activeSub.tier.durationMonths,
+                        startDate: activeSub.startDate,
+                        endDate: activeSub.endDate,
+                        status: subStatus,
+                        isUnlimited: activeSub.endDate === null,
+                    } : null,
+                };
+            });
 
         return NextResponse.json(formattedStudents);
 

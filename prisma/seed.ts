@@ -369,6 +369,24 @@ async function main() {
     },
   });
 
+  // Seed Subscription Tiers
+  await prisma.subscriptionTier.upsert({
+    where: { name: 'Lite' },
+    update: {},
+    create: { name: 'Lite', durationMonths: 2, displayOrder: 1 },
+  });
+  await prisma.subscriptionTier.upsert({
+    where: { name: 'Prime' },
+    update: {},
+    create: { name: 'Prime', durationMonths: 4, displayOrder: 2 },
+  });
+  await prisma.subscriptionTier.upsert({
+    where: { name: 'Premium' },
+    update: {},
+    create: { name: 'Premium', durationMonths: null, displayOrder: 3 },
+  });
+  console.log('Created subscription tiers');
+
   console.log('Seed completed successfully!');
 }
 

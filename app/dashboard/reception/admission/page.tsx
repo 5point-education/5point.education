@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, CheckCircle2, Copy, Plus, Trash2, GraduationCap, X, CreditCard, Receipt, User } from "lucide-react";
+import { Loader2, CheckCircle2, Copy, Plus, Trash2, GraduationCap, X, CreditCard, Receipt, User, Crown, Infinity } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -190,6 +190,10 @@ export default function AdmissionPage() {
     // Payment toward admission charge (separate from batch payments)
     const [payingAdmissionCharge, setPayingAdmissionCharge] = useState<string>("");
 
+    // Subscription Tier State
+    const [subscriptionTiers, setSubscriptionTiers] = useState<{ id: string; name: string; durationMonths: number | null; isActive: boolean }[]>([]);
+    const [selectedTierId, setSelectedTierId] = useState<string>("");
+
     // Helper function to get total scheduled days from batch
     const getScheduledDaysCount = (batch: Batch): number => {
         if (!batch.schedule) return 0;
@@ -351,6 +355,14 @@ export default function AdmissionPage() {
                 const activeBatches = data.filter(b => b.isActive !== false);
                 setBatches(activeBatches);
             });
+
+        // Fetch subscription tiers
+        fetch("/api/admin/subscriptions?active_only=true")
+            .then(res => res.json())
+            .then((data) => {
+                setSubscriptionTiers(data);
+            })
+            .catch(err => console.error("Failed to fetch subscription tiers", err));
     }, [enquiryId, studentForm]);
 
     // Handlers
@@ -522,7 +534,19 @@ export default function AdmissionPage() {
                 }
             }
 
-            // 4. Update Enquiry
+            // 4. Create Subscription (if tier selected)
+            if (selectedTierId) {
+                await fetch("/api/subscriptions", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        studentId,
+                        tierId: selectedTierId,
+                    }),
+                });
+            }
+
+            // 5. Update Enquiry
             if (enquiryId) {
                 await fetch(`/api/enquiry/${enquiryId}`, {
                     method: "PATCH",
@@ -1241,6 +1265,64 @@ export default function AdmissionPage() {
                                             />
                                         </div>
                                     </div>
+                                </div>
+                            </section>
+
+                            <Separator />
+
+                            {/* Section: Subscription Tier */}
+                            <section>
+                                <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
+                                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold">
+                                        <Crown className="h-3.5 w-3.5" />
+                                    </span>
+                                    Subscription Tier
+                                    <Badge variant="outline" className="font-normal text-xs ml-1">Analytics Access</Badge>
+                                </h3>
+
+                                <div className="space-y-3">
+                                    <Label className="text-sm font-medium">Choose Subscription</Label>
+                                    <Select value={selectedTierId} onValueChange={setSelectedTierId}>
+                                        <SelectTrigger className="h-11 bg-background">
+                                            <SelectValue placeholder="Select a subscription tier..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {subscriptionTiers.map(tier => (
+                                                <SelectItem key={tier.id} value={tier.id} className="py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <Crown className="h-3.5 w-3.5 text-amber-500" />
+                                                        <span className="font-medium">{tier.name}</span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {tier.durationMonths === null ? (
+                                                                <span className="flex items-center gap-1 text-amber-600">
+                                                                    <Infinity className="h-3 w-3" /> Unlimited
+                                                                </span>
+                                                            ) : (
+                                                                `${tier.durationMonths} month${tier.durationMonths !== 1 ? "s" : ""}`
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {selectedTierId && (() => {
+                                        const tier = subscriptionTiers.find(t => t.id === selectedTierId);
+                                        if (!tier) return null;
+                                        return (
+                                            <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                                <Crown className="h-4 w-4 text-amber-600" />
+                                                <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                                                    {tier.name} — {tier.durationMonths === null ? "Unlimited access to analytics" : `${tier.durationMonths} month${tier.durationMonths !== 1 ? "s" : ""} analytics access`}
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
+                                    {!selectedTierId && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Select a subscription tier to grant analytics access. If skipped, the student won&apos;t have analytics access.
+                                        </p>
+                                    )}
                                 </div>
                             </section>
 

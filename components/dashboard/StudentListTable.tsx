@@ -21,11 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, User, Phone, Eye, PlusCircle, Pencil, Ban, CheckCircle, Loader2, Trash2 } from "lucide-react";
+import { Search, User, Phone, Eye, PlusCircle, Pencil, Ban, CheckCircle, Loader2, Trash2, Crown, Infinity, Clock } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { AddStudentToBatchModal } from "./AddStudentToBatchModal";
 import { StudentDetailsModal } from "./StudentDetailsModal";
 import { EditStudentModal } from "./EditStudentModal";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +44,7 @@ interface BatchInfo {
 }
 
 interface Student {
-  admissionId: string; // Will be the specific admission ID when viewing a batch
+  admissionId: string;
   studentId: string;
   userId: string;
   name: string;
@@ -62,6 +63,23 @@ interface Student {
       isActive?: boolean;
     };
   }>;
+  subscription?: {
+    id: string;
+    tierName: string;
+    tierId: string;
+    durationMonths: number | null;
+    startDate: string;
+    endDate: string | null;
+    status: string;
+    isUnlimited: boolean;
+  } | null;
+}
+
+interface SubscriptionTier {
+  id: string;
+  name: string;
+  durationMonths: number | null;
+  isActive: boolean;
 }
 
 interface Batch {
@@ -120,6 +138,13 @@ export default function StudentListTable({
     batchName: string;
   } | null>(null);
 
+  // Subscription Renewal Modal State
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [selectedStudentForSub, setSelectedStudentForSub] = useState<Student | null>(null);
+  const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
+  const [selectedTierId, setSelectedTierId] = useState<string>("");
+  const [subLoading, setSubLoading] = useState(false);
+
   const openDetailsModal = (student: Student) => {
     setSelectedStudentDetails(student);
     setIsDetailsOpen(true);
@@ -165,6 +190,16 @@ export default function StudentListTable({
 
     fetchStudents();
   }, [selectedBatch, refreshKey, role]);
+
+  // Fetch subscription tiers
+  useEffect(() => {
+    if (role === 'receptionist' || role === 'admin') {
+      fetch("/api/admin/subscriptions?active_only=true")
+        .then(res => res.json())
+        .then(data => setSubscriptionTiers(data))
+        .catch(err => console.error("Failed to fetch tiers", err));
+    }
+  }, [role]);
 
   // Apply search filter
   useEffect(() => {
@@ -303,6 +338,50 @@ export default function StudentListTable({
     }
   };
 
+  const openSubscriptionModal = (student: Student) => {
+    setSelectedStudentForSub(student);
+    setSelectedTierId(student.subscription?.tierId || "");
+    setIsSubscriptionModalOpen(true);
+  };
+
+  const handleUpdateSubscription = async () => {
+    if (!selectedStudentForSub || !selectedTierId) return;
+
+    setSubLoading(true);
+    try {
+      const res = await fetch("/api/subscriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: selectedStudentForSub.studentId,
+          tierId: selectedTierId,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
+
+      toast({
+        title: "Subscription Updated",
+        description: `Subscription for ${selectedStudentForSub.name} has been updated.`,
+      });
+
+      setIsSubscriptionModalOpen(false);
+      setSelectedStudentForSub(null);
+      setRefreshKey(prev => prev + 1);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update subscription",
+      });
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
   return (
     <>
       <Card>
@@ -369,6 +448,9 @@ export default function StudentListTable({
                           <TableHead>Name</TableHead>
                           <TableHead>Phone</TableHead>
                           <TableHead>Batches</TableHead>
+                          {(role === 'receptionist' || role === 'admin') && (
+                            <TableHead>Subscription</TableHead>
+                          )}
                           <TableHead>Join Date</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -436,6 +518,37 @@ export default function StudentListTable({
                                 )}
                               </div>
                             </TableCell>
+                            {(role === 'receptionist' || role === 'admin') && (
+                              <TableCell>
+                                {student.subscription ? (
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <Crown className="h-3.5 w-3.5 text-amber-500" />
+                                      <span className="text-sm font-medium">{student.subscription.tierName}</span>
+                                      <Badge
+                                        variant="secondary"
+                                        className={`text-[10px] px-1.5 py-0 ${
+                                          student.subscription.status === 'active'
+                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+                                            : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                                        }`}
+                                      >
+                                        {student.subscription.status === 'active' ? 'Active' : 'Expired'}
+                                      </Badge>
+                                    </div>
+                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                      {student.subscription.isUnlimited ? (
+                                        <><Infinity className="h-2.5 w-2.5" /> Unlimited</>  
+                                      ) : student.subscription.endDate ? (
+                                        <><Clock className="h-2.5 w-2.5" /> Ends: {new Date(student.subscription.endDate).toLocaleDateString('en-IN')}</>  
+                                      ) : null}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">No subscription</span>
+                                )}
+                              </TableCell>
+                            )}
                             <TableCell>{formatDate(student.joinDate)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
@@ -474,6 +587,16 @@ export default function StudentListTable({
                                       ) : (
                                         <Ban className="h-4 w-4" />
                                       )}
+                                    </Button>
+                                    {/* Subscription Button */}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openSubscriptionModal(student)}
+                                      title={student.subscription ? "Update subscription" : "Assign subscription"}
+                                      className="text-amber-600 hover:text-amber-700"
+                                    >
+                                      <Crown className="h-4 w-4" />
                                     </Button>
                                   </>
                                 )}
@@ -608,6 +731,116 @@ export default function StudentListTable({
               className="bg-orange-600 hover:bg-orange-700"
             >
               {removeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Remove from Batch"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subscription Renewal/Assignment Dialog */}
+      <Dialog open={isSubscriptionModalOpen} onOpenChange={setIsSubscriptionModalOpen}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-amber-500" />
+              {selectedStudentForSub?.subscription ? 'Update Subscription' : 'Assign Subscription'}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedStudentForSub?.subscription
+                ? `Update or renew the subscription for ${selectedStudentForSub?.name}.`
+                : `Assign a subscription tier to ${selectedStudentForSub?.name}.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Current Subscription Info */}
+          {selectedStudentForSub?.subscription && (
+            <div className="p-3 bg-muted/50 rounded-lg border text-sm space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Current tier</span>
+                <span className="font-medium flex items-center gap-1">
+                  <Crown className="h-3.5 w-3.5 text-amber-500" />
+                  {selectedStudentForSub.subscription.tierName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <Badge
+                  variant="secondary"
+                  className={`text-[10px] ${
+                    selectedStudentForSub.subscription.status === 'active'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}
+                >
+                  {selectedStudentForSub.subscription.status === 'active' ? 'Active' : 'Expired'}
+                </Badge>
+              </div>
+              {selectedStudentForSub.subscription.startDate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Started</span>
+                  <span className="text-xs">{new Date(selectedStudentForSub.subscription.startDate).toLocaleDateString('en-IN')}</span>
+                </div>
+              )}
+              {selectedStudentForSub.subscription.endDate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{selectedStudentForSub.subscription.status === 'active' ? 'Expires' : 'Expired'}</span>
+                  <span className="text-xs">{new Date(selectedStudentForSub.subscription.endDate).toLocaleDateString('en-IN')}</span>
+                </div>
+              )}
+              {selectedStudentForSub.subscription.isUnlimited && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Duration</span>
+                  <span className="text-xs flex items-center gap-1"><Infinity className="h-3 w-3" /> Unlimited</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-3 pt-2">
+            <Label className="text-sm font-medium">
+              {selectedStudentForSub?.subscription ? 'New Subscription Tier' : 'Select Tier'}
+            </Label>
+            <Select value={selectedTierId} onValueChange={setSelectedTierId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a tier..." />
+              </SelectTrigger>
+              <SelectContent>
+                {subscriptionTiers.map(tier => (
+                  <SelectItem key={tier.id} value={tier.id} className="py-3">
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-3.5 w-3.5 text-amber-500" />
+                      <span className="font-medium">{tier.name}</span>
+                      <span className="text-xs text-muted-foreground ml-1">
+                        {tier.durationMonths === null
+                          ? '— Unlimited'
+                          : `— ${tier.durationMonths} month${tier.durationMonths !== 1 ? 's' : ''}`}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {selectedStudentForSub?.subscription
+                ? 'Selecting a new tier will replace the current subscription. A new start date will be set from today.'
+                : 'The subscription will start from today.'}
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSubscriptionModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateSubscription}
+              disabled={subLoading || !selectedTierId}
+              className="bg-amber-600 hover:bg-amber-700 gap-1"
+            >
+              {subLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Crown className="h-4 w-4" />
+              )}
+              {selectedStudentForSub?.subscription ? 'Update' : 'Assign'}
             </Button>
           </DialogFooter>
         </DialogContent>
