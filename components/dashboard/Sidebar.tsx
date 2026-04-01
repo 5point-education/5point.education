@@ -177,7 +177,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                     <>
                         <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/dashboard/student" exact onClick={closeMobileSidebar} />
                         <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Learning</div>
-                        <SidebarItem icon={BookOpen} label="Schedule" href="/dashboard/student/courses" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={BookOpen} label="Schedule" href="/dashboard/student/schedule" onClick={closeMobileSidebar} />
                         <SidebarItem icon={GraduationCap} label="Results" href="/dashboard/student/results" onClick={closeMobileSidebar} />
                         <SidebarItem icon={BarChart3} label="Reports" href="/dashboard/student/reports" onClick={closeMobileSidebar} />
                         <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Account</div>
