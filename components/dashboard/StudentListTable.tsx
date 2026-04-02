@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -106,7 +106,9 @@ export default function StudentListTable({
   role
 }: StudentListTableProps) {
   const router = useRouter();
-  const [selectedBatch, setSelectedBatch] = useState<string>("all");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [selectedBatch, setSelectedBatch] = useState<string>(searchParams.get("batchId") || "all");
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>(initialStudents);
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -219,6 +221,14 @@ export default function StudentListTable({
     setCurrentPage(1); // Reset to first page when search changes
   }, [searchTerm, students]);
 
+  // Sync state with URL search params
+  useEffect(() => {
+    const batchIdFromUrl = searchParams.get("batchId") || "all";
+    if (batchIdFromUrl !== selectedBatch) {
+      setSelectedBatch(batchIdFromUrl);
+    }
+  }, [searchParams, selectedBatch]);
+
   // Pagination
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -226,6 +236,13 @@ export default function StudentListTable({
 
   const handleBatchChange = (value: string) => {
     setSelectedBatch(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "all") {
+      params.delete("batchId");
+    } else {
+      params.set("batchId", value);
+    }
+    router.push(`${pathname}?${params.toString()}`);
     setSearchTerm("");
     setCurrentPage(1);
   };

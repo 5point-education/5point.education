@@ -20,7 +20,7 @@ export function CreateExamDialog({ batches }: CreateExamDialogProps) {
     const handleCreate = () => {
         if (!selectedBatchId) return;
         setOpen(false);
-        router.push(`/dashboard/teacher/batch/${selectedBatchId}/exams/new`);
+        router.push(`/dashboard/teacher/exam/new?batchId=${selectedBatchId}`);
     };
 
     return (

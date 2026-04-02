@@ -186,7 +186,7 @@ export default function TeacherDashboard() {
                               size="sm"
                               variant="default"
                               className="h-8 text-xs font-medium"
-                              onClick={() => router.push(`/dashboard/teacher/batch/${batch.id}`)}
+                              onClick={() => router.push(`/dashboard/teacher/students?batchId=${batch.id}`)}
                             >
                               View
                             </Button>
@@ -194,7 +194,7 @@ export default function TeacherDashboard() {
                               size="sm"
                               variant="outline"
                               className="h-8 text-xs font-medium"
-                              onClick={() => router.push(`/dashboard/teacher/batch/${batch.id}/exams`)}
+                              onClick={() => router.push(`/dashboard/teacher/exam?batchId=${batch.id}`)}
                             >
                               Exams
                             </Button>

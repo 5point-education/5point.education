@@ -1,13 +1,17 @@
 import { db } from "@/lib/db";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CreateExamForm } from "@/components/dashboard/exams/CreateExamForm";
 
 export default async function CreateExamPage({
-    params,
+    searchParams,
 }: {
-    params: Promise<{ id: string }>;
+    searchParams: Promise<{ batchId?: string }>;
 }) {
-    const { id: batchId } = await params;
+    const { batchId } = await searchParams;
+
+    if (!batchId) {
+        redirect("/dashboard/teacher/exam");
+    }
 
     const batch = await db.batch.findUnique({
         where: { id: batchId },
@@ -23,7 +27,7 @@ export default async function CreateExamPage({
             <CreateExamForm
                 batchId={batch.id}
                 batchName={batch.name}
-                batchSubject={batch.subject}
+                batchSubject={batch.subject || undefined}
             />
         </div>
     );
