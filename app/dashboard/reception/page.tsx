@@ -38,7 +38,7 @@ export default function ReceptionDashboard() {
     try {
       const response = await fetch("/api/enquiry");
       const data = await response.json();
-      setEnquiries(data);
+      setEnquiries(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching enquiries:", error);
     } finally {
@@ -46,7 +46,7 @@ export default function ReceptionDashboard() {
     }
   };
 
-  const filteredEnquiries = enquiries
+  const filteredEnquiries = (Array.isArray(enquiries) ? enquiries : [])
     .filter(e => {
       if (filter !== "ALL" && e.status !== filter) return false;
       if (subjectFilter && !e.subjects.toLowerCase().includes(subjectFilter.toLowerCase())) return false;
@@ -55,10 +55,10 @@ export default function ReceptionDashboard() {
     });
 
   const stats = {
-    total: enquiries.length,
-    pending: enquiries.filter(e => e.status === "PENDING").length,
-    discussed: enquiries.filter(e => e.status === "FEES_DISCUSSED").length,
-    admitted: enquiries.filter(e => e.status === "ADMITTED").length,
+    total: Array.isArray(enquiries) ? enquiries.length : 0,
+    pending: (Array.isArray(enquiries) ? enquiries : []).filter(e => e.status === "PENDING").length,
+    discussed: (Array.isArray(enquiries) ? enquiries : []).filter(e => e.status === "FEES_DISCUSSED").length,
+    admitted: (Array.isArray(enquiries) ? enquiries : []).filter(e => e.status === "ADMITTED").length,
   };
 
   const getStatusColor = (status: string) => {
