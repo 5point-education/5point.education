@@ -6,7 +6,7 @@ import { Providers } from "@/components/providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "5 Point Education Hub - Coaching Center Management",
+  title: "5 Point Education",
   description: "Comprehensive coaching center management system for tuition batches and home tutoring",
 };
 
