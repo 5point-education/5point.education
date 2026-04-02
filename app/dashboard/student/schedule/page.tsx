@@ -241,7 +241,7 @@ export default function StudentSchedulePage() {
   );
 
   const today = new Date();
-  
+
   const legacySchedules = useMemo(() => {
     return batches.filter((b) => !parseScheduleItems(b.schedule));
   }, [batches]);
@@ -395,7 +395,7 @@ export default function StudentSchedulePage() {
               No classes currently scheduled
             </p>
             <p className="mt-1 text-sm text-slate-500">
-              You aren't enrolled in any active batches.
+              You aren&apos;t enrolled in any active batches.
             </p>
           </div>
         ) : (
@@ -466,7 +466,7 @@ export default function StudentSchedulePage() {
                                     "border-l-4",
                                     isNowSlot ? ACCENT_BG[ci] : "bg-white dark:bg-card",
                                     isNowSlot &&
-                                      "ring-2 ring-[#2D46B9] dark:ring-primary"
+                                    "ring-2 ring-[#2D46B9] dark:ring-primary"
                                   )}
                                 >
                                   <div className="flex items-start justify-between">
