@@ -4,7 +4,7 @@ A comprehensive, production-ready web application for managing coaching centers 
 
 --
 
-## 🚀 Features
+## 🚀 Features.
 
 ### Public Feature
 
