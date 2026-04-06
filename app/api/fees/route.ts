@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { calculatePendingFees } from "@/lib/fees-utils";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
     try {
         const supabase = createAdminClient();
