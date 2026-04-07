@@ -34,10 +34,10 @@ export async function updateSession(request: NextRequest) {
         }
     );
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (isPublicPath) {
-        if (session) {
+        if (user) {
             const url = request.nextUrl.clone();
             url.pathname = "/dashboard";
             return NextResponse.redirect(url);
@@ -45,13 +45,12 @@ export async function updateSession(request: NextRequest) {
         return supabaseResponse;
     }
 
-    if (!session) {
+    if (!user) {
         const url = request.nextUrl.clone();
         url.pathname = "/auth/login";
         return NextResponse.redirect(url);
     }
 
-    const user = session.user;
     const role = user.user_metadata?.role as string;
 
     if (path === "/dashboard") {
@@ -94,8 +93,3 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
 }
 
-export const config = {
-    matcher: [
-        "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-    ],
-};
