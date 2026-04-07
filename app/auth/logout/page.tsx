@@ -21,7 +21,7 @@ export default function LogoutPage() {
 
     const handleCancel = () => {
         setOpen(false);
-        router.replace("/dashboard");
+        router.replace("/auth/login");
     };
 
     const doLogout = async () => {
@@ -36,7 +36,7 @@ export default function LogoutPage() {
                 open={open}
                 onOpenChange={(o) => {
                     setOpen(o);
-                    if (!o) router.replace("/dashboard");
+                    if (!o) router.replace("/auth/login");
                 }}
             >
                 <DialogContent className="sm:max-w-[400px]">
