@@ -49,7 +49,8 @@ export default function TeachersPage() {
       const response = await fetch("/api/teachers");
       if (response.ok) {
         const data = await response.json();
-        setTeachers(data);
+        const sortedData = [...data].sort((a, b) => a.name.localeCompare(b.name));
+        setTeachers(sortedData);
       }
     } catch (error) {
       console.error("Error fetching teachers:", error);

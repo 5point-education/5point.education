@@ -174,7 +174,8 @@ export default function StudentListTable({
           const response = await fetch(url);
           if (response.ok) {
             const data = await response.json();
-            setStudents(data);
+            const sortedData = [...data].sort((a, b) => a.name.localeCompare(b.name));
+            setStudents(sortedData);
           } else {
             console.error("Failed to fetch students");
             setStudents([]);
