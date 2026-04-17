@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, User, Phone, Eye, PlusCircle, Pencil, Ban, CheckCircle, Loader2, Trash2, Crown, Infinity, Clock } from "lucide-react";
+import { Search, User, Phone, Eye, PlusCircle, Pencil, Ban, CheckCircle, Loader2, Trash2, Crown, Infinity, Clock, MoreVertical } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { AddStudentToBatchModal } from "./AddStudentToBatchModal";
 import { StudentDetailsModal } from "./StudentDetailsModal";
@@ -35,6 +35,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface BatchInfo {
   id: string;
@@ -140,12 +147,22 @@ export default function StudentListTable({
     batchName: string;
   } | null>(null);
 
+  // Manage Batches Modal State
+  const [isManageBatchesOpen, setIsManageBatchesOpen] = useState(false);
+  const [selectedStudentForManage, setSelectedStudentForManage] = useState<Student | null>(null);
+  const [removingBatchIds, setRemovingBatchIds] = useState<Set<string>>(new Set());
+
   // Subscription Renewal Modal State
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [selectedStudentForSub, setSelectedStudentForSub] = useState<Student | null>(null);
   const [subscriptionTiers, setSubscriptionTiers] = useState<SubscriptionTier[]>([]);
   const [selectedTierId, setSelectedTierId] = useState<string>("");
   const [subLoading, setSubLoading] = useState(false);
+
+  // Delete Student Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [selectedStudentForDelete, setSelectedStudentForDelete] = useState<Student | null>(null);
 
   const openDetailsModal = (student: Student) => {
     setSelectedStudentDetails(student);
@@ -312,6 +329,66 @@ export default function StudentListTable({
     setIsRemoveBatchOpen(true);
   };
 
+  const openManageBatchesModal = (student: Student) => {
+    setSelectedStudentForManage(student);
+    setRemovingBatchIds(new Set());
+    setIsManageBatchesOpen(true);
+  };
+
+  const handleRemoveFromBatchList = (batchId: string) => {
+    setRemovingBatchIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(batchId)) {
+        newSet.delete(batchId);
+      } else {
+        newSet.add(batchId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleRemoveSelectedBatches = async () => {
+    if (!selectedStudentForManage || removingBatchIds.size === 0) return;
+
+    const admissions = selectedStudentForManage.admissions || [];
+    const removedAdmissions = admissions.filter(a => removingBatchIds.has(a.batchId!));
+
+    setRemoveLoading(true);
+    try {
+      await Promise.all(
+        removedAdmissions.map(async (admission) => {
+          if (!admission.id) return;
+          await fetch(`/api/admissions/${admission.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "remove_from_batch",
+              endDate: new Date().toISOString()
+            }),
+          });
+        })
+      );
+
+      toast({
+        title: "Success",
+        description: `Removed from ${removingBatchIds.size} batch${removingBatchIds.size > 1 ? 'es' : ''}`,
+      });
+
+      setIsManageBatchesOpen(false);
+      setSelectedStudentForManage(null);
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error("Error removing from batches:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove from some batches",
+        variant: "destructive",
+      });
+    } finally {
+      setRemoveLoading(false);
+    }
+  };
+
   const handleRemoveFromBatch = async () => {
     if (!selectedStudentForRemoval) return;
 
@@ -397,6 +474,46 @@ export default function StudentListTable({
       });
     } finally {
       setSubLoading(false);
+    }
+  };
+
+  const openDeleteModal = (student: Student) => {
+    setSelectedStudentForDelete(student);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!selectedStudentForDelete) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`/api/students/${selectedStudentForDelete.studentId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to delete student");
+      }
+
+      toast({
+        title: "Success",
+        description: `Student ${selectedStudentForDelete.name} has been deleted.`,
+      });
+
+      // Close modal and refresh list
+      setIsDeleteModalOpen(false);
+      setSelectedStudentForDelete(null);
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error("Error deleting student:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete student Try removing from the batch first",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -500,29 +617,7 @@ export default function StudentListTable({
                                         <span title={batch.name} className="truncate">
                                           {batch.name}
                                         </span>
-                                        {(role === "receptionist" || role === "admin") && (
-                                          <button
-                                            type="button"
-                                            className="text-orange-600 hover:text-orange-700"
-                                            title={`Remove from ${batch.name}`}
-                                            onClick={() => {
-                                              const matchingAdmission = student.admissions?.find(
-                                                (admission) => admission.batchId === batch.id
-                                              );
-                                              if (matchingAdmission?.id) {
-                                                openRemoveBatchModal(student, matchingAdmission.id, batch.name);
-                                              } else {
-                                                toast({
-                                                  title: "Admission not found",
-                                                  description: "Unable to identify this batch enrollment for removal.",
-                                                  variant: "destructive",
-                                                });
-                                              }
-                                            }}
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </button>
-                                        )}
+                                        
                                       </div>
                                     ))}
                                     {student.batches.length > 4 && (
@@ -569,63 +664,66 @@ export default function StudentListTable({
                             )}
                             <TableCell>{formatDate(student.joinDate)}</TableCell>
                             <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                {/* Only show Add to Batch & Edit if role is receptionist or admin */}
-                                {(role === 'receptionist' || role === 'admin') && (
-                                  <>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openEditModal(student)}
-                                      title="Edit details"
-                                    >
-                                      <Pencil className="h-4 w-4" />
+                              <div className="flex justify-end">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                      <MoreVertical className="h-4 w-4" />
                                     </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openAddBatchModal(student)}
-                                      title="Add to another batch"
-                                    >
-                                      <PlusCircle className="h-4 w-4" />
-                                    </Button>
-                                    {/* Disable/Enable Button */}
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleToggleStudentStatus(student)}
-                                      disabled={toggleLoading === student.studentId}
-                                      title={student.isActive !== false ? "Disable student" : "Enable student"}
-                                      className={student.isActive === false ? "text-green-600 hover:text-green-700" : "text-destructive hover:text-destructive"}
-                                    >
-                                      {toggleLoading === student.studentId ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : student.isActive === false ? (
-                                        <CheckCircle className="h-4 w-4" />
-                                      ) : (
-                                        <Ban className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                    {/* Subscription Button */}
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openSubscriptionModal(student)}
-                                      title={student.subscription ? "Update subscription" : "Assign subscription"}
-                                      className="text-amber-600 hover:text-amber-700"
-                                    >
-                                      <Crown className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                )}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openDetailsModal(student)}
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  View
-                                </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openDetailsModal(student)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      View Details
+                                    </DropdownMenuItem>
+                                    {(role === 'receptionist' || role === 'admin') && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => openEditModal(student)}>
+                                          <Pencil className="mr-2 h-4 w-4" />
+                                          Edit Details
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => openManageBatchesModal(student)}>
+                                          <Crown className="mr-2 h-4 w-4" />
+                                          Manage Batches
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => openAddBatchModal(student)}>
+                                          <PlusCircle className="mr-2 h-4 w-4" />
+                                          Add to Batch
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={() => handleToggleStudentStatus(student)}
+                                          disabled={toggleLoading === student.studentId}
+                                        >
+                                          {toggleLoading === student.studentId ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          ) : student.isActive === false ? (
+                                            <>
+                                              <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                                              Enable Student
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Ban className="mr-2 h-4 w-4 text-destructive" />
+                                              Disable Student
+                                            </>
+                                          )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => openSubscriptionModal(student)}>
+                                          <Crown className="mr-2 h-4 w-4 text-amber-600" />
+                                          {student.subscription ? "Update Subscription" : "Assign Subscription"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={() => openDeleteModal(student)}
+                                          className="text-destructive"
+                                        >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Delete Student
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -754,6 +852,76 @@ export default function StudentListTable({
         </DialogContent>
       </Dialog>
 
+      {/* Manage Batches Dialog */}
+      <Dialog open={isManageBatchesOpen} onOpenChange={setIsManageBatchesOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Manage Batches</DialogTitle>
+            <DialogDescription>
+              Select batches to remove {selectedStudentForManage?.name} from.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-2 py-2">
+            {selectedStudentForManage?.batches && selectedStudentForManage.batches.length > 0 ? (
+              selectedStudentForManage.batches.map((batch) => {
+                const admission = selectedStudentForManage.admissions?.find(a => a.batchId === batch.id);
+                const isSelected = removingBatchIds.has(batch.id);
+                return (
+                  <div
+                    key={batch.id}
+                    onClick={() => handleRemoveFromBatchList(batch.id)}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      isSelected 
+                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30' 
+                        : 'border-border hover:bg-muted/50'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                      isSelected 
+                        ? 'bg-orange-500 border-orange-500' 
+                        : 'border-muted-foreground'
+                    }`}>
+                      {isSelected && <CheckCircle className="h-3 w-3 text-white" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">{batch.name}</div>
+                      <div className="text-xs text-muted-foreground">{batch.subject}</div>
+                    </div>
+                    {admission?.batch?.isActive === false && (
+                      <Badge variant="secondary" className="text-[10px]">Inactive</Badge>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                No batches enrolled
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsManageBatchesOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRemoveSelectedBatches}
+              disabled={removeLoading || removingBatchIds.size === 0}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {removeLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : removingBatchIds.size > 0 ? (
+                `Remove from ${removingBatchIds.size} Batch${removingBatchIds.size > 1 ? 's' : ''}`
+              ) : (
+                "Remove"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Subscription Renewal/Assignment Dialog */}
       <Dialog open={isSubscriptionModalOpen} onOpenChange={setIsSubscriptionModalOpen}>
         <DialogContent className="sm:max-w-[460px]">
@@ -859,6 +1027,37 @@ export default function StudentListTable({
                 <Crown className="h-4 w-4" />
               )}
               {selectedStudentForSub?.subscription ? 'Update' : 'Assign'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Student Confirmation Dialog */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Student</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedStudentForDelete?.name}?
+              <br /><br />
+              <strong className="text-destructive">This action cannot be undone.</strong> The student will be permanently removed from the system.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteStudent}
+              disabled={deleteLoading}
+              variant="destructive"
+            >
+              {deleteLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete Student
             </Button>
           </DialogFooter>
         </DialogContent>

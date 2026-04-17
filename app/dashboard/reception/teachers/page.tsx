@@ -25,7 +25,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { UserPlus, Loader2, Search, X, Archive, Pencil, RotateCcw, Users, Eye, EyeOff, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { UserPlus, Loader2, Search, X, Archive, Pencil, RotateCcw, Users, Eye, EyeOff, Trash2, MoreVertical } from "lucide-react";
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -166,7 +173,8 @@ export default function TeachersPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to archive teacher");
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to archive teacher");
       }
 
       toast({
@@ -194,7 +202,8 @@ export default function TeachersPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to restore teacher");
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to restore teacher");
       }
 
       toast({
@@ -205,7 +214,7 @@ export default function TeachersPage() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to restore teacher",
         variant: "destructive",
       });
     }
@@ -347,49 +356,36 @@ export default function TeachersPage() {
                   <TableCell>{teacher.teacherProfile?.experience_years || 0} years</TableCell>
                   <TableCell>{new Date(teacher.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {!isArchived ? (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditClick(teacher)}
-                            title="Edit teacher"
-                            className="h-8 w-8"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleArchiveTeacher(teacher)}
-                            title="Archive teacher"
-                            className="h-8 w-8"
-                          >
-                            <Archive className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteClick(teacher)}
-                            title="Delete teacher"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRestoreTeacher(teacher)}
-                          title="Restore teacher"
-                          className="h-8 w-8"
-                        >
-                          <RotateCcw className="h-4 w-4" />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {!isArchived ? (
+                          <>
+                            <DropdownMenuItem onClick={() => handleEditClick(teacher)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteClick(teacher)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Teacher
+                            </DropdownMenuItem>
+                          </>
+                        ) : (
+                          <DropdownMenuItem onClick={() => handleRestoreTeacher(teacher)}>
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Restore Teacher
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -423,49 +419,36 @@ export default function TeachersPage() {
                     <h3 className="font-medium text-sm truncate">{teacher.name}</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">{teacher.email}</p>
                   </div>
-                  <div className="flex gap-1">
-                    {!isArchived ? (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditClick(teacher)}
-                          title="Edit teacher"
-                          className="h-8 w-8"
-                        >
-                          <Pencil className="h-4 w-4" />
+<DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleArchiveTeacher(teacher)}
-                          title="Archive teacher"
-                          className="h-8 w-8"
-                        >
-                          <Archive className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteClick(teacher)}
-                          title="Delete teacher"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRestoreTeacher(teacher)}
-                        title="Restore teacher"
-                        className="h-8 w-8"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {!isArchived ? (
+                          <>
+                            <DropdownMenuItem onClick={() => handleEditClick(teacher)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteClick(teacher)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Teacher
+                            </DropdownMenuItem>
+                          </>
+                        ) : (
+                          <DropdownMenuItem onClick={() => handleRestoreTeacher(teacher)}>
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Restore Teacher
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>

@@ -126,7 +126,7 @@ export default function AdmissionPage() {
         resolver: zodResolver(studentSchema),
         defaultValues: {
             program_level: "SECONDARY",
-            board: "CBSE",
+            board: "ICSE",
             class_level: "",
             stream: "",
             aspirant_of: "",
@@ -644,8 +644,8 @@ export default function AdmissionPage() {
                                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                                     <SelectContent>
-                                                        <SelectItem value="CBSE">CBSE</SelectItem>
                                                         <SelectItem value="ICSE">ICSE</SelectItem>
+                                                        <SelectItem value="CBSE">CBSE</SelectItem>
                                                         <SelectItem value="WBBSE">WBBSE</SelectItem>
                                                         <SelectItem value="OTHER">Other</SelectItem>
                                                     </SelectContent>
@@ -982,7 +982,7 @@ export default function AdmissionPage() {
                                             </div>
                                             <div className="col-span-3">
                                                 <FormField control={academicForm.control} name={`records.${index}.exam`} render={({ field }) => (
-                                                    <FormItem><FormLabel>Exam/Board</FormLabel><FormControl><Input {...field} placeholder="e.g CBSE" /></FormControl></FormItem>
+                                                    <FormItem><FormLabel>Exam/Board</FormLabel><FormControl><Input {...field} placeholder="e.g ICSE" /></FormControl></FormItem>
                                                 )} />
                                             </div>
                                             <div className="col-span-2">
