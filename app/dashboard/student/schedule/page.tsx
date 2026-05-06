@@ -71,9 +71,7 @@ const ACCENT_BG = [
   "bg-cyan-50/90 dark:bg-cyan-950/40",
 ];
 
-/** 8:00 – 20:00 window for the grid */
-const GRID_START_MIN = 8 * 60;
-const GRID_END_MIN = 20 * 60;
+
 
 function parseScheduleItems(schedule: string): ScheduleItem[] | null {
   if (!schedule?.trim()) return null;
@@ -175,11 +173,9 @@ function buildEventsFromBatches(
       const dayIndex = normalizeDayIndex(item.day);
       if (dayIndex < 0) continue;
 
-      let startM = timeToMinutes(item.startTime);
+      const startM = timeToMinutes(item.startTime);
       let endM = timeToMinutes(item.endTime);
       if (endM <= startM) endM = startM + 60;
-      startM = Math.max(GRID_START_MIN, startM);
-      endM = Math.min(GRID_END_MIN, Math.max(endM, startM + 15));
 
       let ci = colorMap.get(batch.id);
       if (ci === undefined) {

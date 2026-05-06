@@ -27,6 +27,7 @@ import { AddStudentToBatchModal } from "./AddStudentToBatchModal";
 import { StudentDetailsModal } from "./StudentDetailsModal";
 import { EditStudentModal } from "./EditStudentModal";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -862,44 +863,54 @@ export default function StudentListTable({
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-2 py-2">
-            {selectedStudentForManage?.batches && selectedStudentForManage.batches.length > 0 ? (
-              selectedStudentForManage.batches.map((batch) => {
-                const admission = selectedStudentForManage.admissions?.find(a => a.batchId === batch.id);
-                const isSelected = removingBatchIds.has(batch.id);
-                return (
-                  <div
-                    key={batch.id}
-                    onClick={() => handleRemoveFromBatchList(batch.id)}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      isSelected 
-                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30' 
-                        : 'border-border hover:bg-muted/50'
-                    }`}
-                  >
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                      isSelected 
-                        ? 'bg-orange-500 border-orange-500' 
-                        : 'border-muted-foreground'
-                    }`}>
-                      {isSelected && <CheckCircle className="h-3 w-3 text-white" />}
+          <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+            <div className="space-y-3">
+              {selectedStudentForManage?.batches && selectedStudentForManage.batches.length > 0 ? (
+                selectedStudentForManage.batches.map((batch) => {
+                  const admission = selectedStudentForManage.admissions?.find(a => a.batchId === batch.id);
+                  const isSelected = removingBatchIds.has(batch.id);
+                  return (
+                    <div
+                      key={batch.id}
+                      onClick={() => handleRemoveFromBatchList(batch.id)}
+                      className={`group flex items-center gap-4 p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
+                        isSelected 
+                          ? 'border-orange-500 bg-orange-50/80 shadow-sm dark:bg-orange-500/10' 
+                          : 'border-border/60 hover:border-orange-300 hover:bg-orange-50/30 hover:shadow-sm dark:hover:border-orange-500/30 dark:hover:bg-orange-500/5'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all duration-200 flex-shrink-0 ${
+                        isSelected 
+                          ? 'bg-orange-500 border-orange-500 text-white scale-110 shadow-sm' 
+                          : 'border-muted-foreground/40 bg-background group-hover:border-orange-400/60'
+                      }`}>
+                        {isSelected && <CheckCircle className="h-3.5 w-3.5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-medium text-sm truncate transition-colors ${isSelected ? 'text-orange-900 dark:text-orange-100' : 'text-foreground'}`}>
+                          {batch.name}
+                        </div>
+                        <div className={`text-xs truncate transition-colors ${isSelected ? 'text-orange-700/80 dark:text-orange-200/70' : 'text-muted-foreground'}`}>
+                          {batch.subject}
+                        </div>
+                      </div>
+                      {admission?.batch?.isActive === false && (
+                        <Badge variant="outline" className={`text-[10px] ml-2 shrink-0 ${isSelected ? 'border-orange-300 text-orange-700 dark:border-orange-700 dark:text-orange-300' : ''}`}>Inactive</Badge>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium">{batch.name}</div>
-                      <div className="text-xs text-muted-foreground">{batch.subject}</div>
-                    </div>
-                    {admission?.batch?.isActive === false && (
-                      <Badge variant="secondary" className="text-[10px]">Inactive</Badge>
-                    )}
+                  );
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center h-full">
+                  <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                    <Infinity className="h-6 w-6 text-muted-foreground/40" />
                   </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-6 text-muted-foreground">
-                No batches enrolled
-              </div>
-            )}
-          </div>
+                  <p className="text-sm font-medium text-foreground">No batches enrolled</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">This student is not currently enrolled in any batches.</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsManageBatchesOpen(false)}>
