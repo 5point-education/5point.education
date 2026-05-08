@@ -33,6 +33,7 @@ interface PayrollData {
 export default function TeacherPayrollPage() {
     const [data, setData] = useState<PayrollData | null>(null);
     const [loading, setLoading] = useState(true);
+    const developmentFees = 25;
     const [selectedMonth, setSelectedMonth] = useState(() => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -154,7 +155,9 @@ export default function TeacherPayrollPage() {
                                 <TableRow className="hover:bg-muted/30">
                                     <TableHead className="font-medium">Student Name</TableHead>
                                     <TableHead className="font-medium">Batch</TableHead>
-                                    <TableHead className="text-right font-medium">Amount</TableHead>
+                                    <TableHead className="text-right font-medium">Fees/Weightage</TableHead>
+                                    <TableHead className="font-medium">Devlopment Fees</TableHead>
+                                    <TableHead className="font-medium">Total Remuneration</TableHead>
                                     <TableHead className="font-medium">Date</TableHead>
                                     <TableHead className="font-medium">Mode</TableHead>
                                     <TableHead className="font-medium">Receipt No.</TableHead>
@@ -179,8 +182,14 @@ export default function TeacherPayrollPage() {
                                                     {payment.batchName}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="text-right font-semibold">
+                                            <TableCell className="text-center font-semibold">
                                                 ₹{payment.amount.toLocaleString('en-IN')}
+                                            </TableCell>
+                                            <TableCell className="text-center font-semibold">
+                                                ₹{developmentFees}
+                                            </TableCell>
+                                            <TableCell className="text-center font-semibold">
+                                                ₹{(payment.amount - developmentFees).toLocaleString('en-IN')}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
                                                 {format(new Date(payment.date), "MMM dd, yyyy")}
