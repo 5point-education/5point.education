@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, User, Mail, Phone, Calendar, MapPin, Users } from "lucide-react";
+import { Loader2, User, Mail, Phone, Calendar, MapPin, Users, GraduationCap } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import {
     Select,
@@ -14,6 +14,25 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+
+const ENGINEERING_STREAMS = [
+    "B.Tech",
+    "B.E.",
+    "B.Sc",
+    "M.Tech",
+    "M.E.",
+    "M.Sc",
+    "BCA",
+    "MCA",
+    "BBA",
+    "MBA",
+    "B.Pharm",
+    "M.Pharm",
+    "B.Arch",
+    "B.Des",
+    "Diploma in Engineering",
+    "Other",
+] as const;
 
 interface Student {
     studentId: string;
@@ -60,6 +79,10 @@ export function EditStudentModal({
         board: "" as string,
     });
 
+    // Program level state — inferred from existing stream value
+    const [programLevel, setProgramLevel] = useState<string>("");
+    const isEngineering = programLevel === "ENGINEERING";
+
     useEffect(() => {
         if (student) {
             setFormData({
@@ -77,6 +100,7 @@ export function EditStudentModal({
             const res = await fetch(`/api/students/${studentId}`);
             if (res.ok) {
                 const data = await res.json();
+                const streamVal = data.stream || "";
                 setProfileData({
                     gender: data.gender || "",
                     dob: data.dob ? data.dob.split("T")[0] : "",
@@ -86,9 +110,12 @@ export function EditStudentModal({
                     permanentAddress: data.permanentAddress || "",
                     classLevel: data.classLevel?.toString() || "",
                     age: data.age?.toString() || "",
-                    stream: data.stream || "",
+                    stream: streamVal,
                     board: data.board || "",
                 });
+                // Infer program level from stream value
+                const isEngrStream = ENGINEERING_STREAMS.some(s => s === streamVal);
+                setProgramLevel(isEngrStream ? "ENGINEERING" : "");
             }
         } catch (error) {
             console.error("Error fetching profile:", error);
@@ -101,21 +128,35 @@ export function EditStudentModal({
 
         setLoading(true);
         try {
+            // Build a combined payload with both basic info and profile fields
+            const payload: Record<string, unknown> = {
+                ...formData,
+            };
+
+            // Add profile fields
+            if (profileData.gender) payload.gender = profileData.gender;
+            if (profileData.dob) payload.dob = profileData.dob;
+            if (profileData.fatherName) payload.fatherName = profileData.fatherName;
+            if (profileData.motherName) payload.motherName = profileData.motherName;
+            if (profileData.parentMobile) payload.parentMobile = profileData.parentMobile;
+            if (profileData.permanentAddress) payload.permanentAddress = profileData.permanentAddress;
+            if (profileData.classLevel) payload.classLevel = parseInt(profileData.classLevel);
+            if (profileData.age) payload.age = parseInt(profileData.age);
+            // Always include stream and board (even if empty, to allow clearing)
+            payload.stream = profileData.stream || null;
+            payload.board = profileData.board || null;
+
             const response = await fetch(`/api/students/${student.studentId}`, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
                 const error = await response.text();
                 throw new Error(error || "Failed to update student");
-            }
-
-            if (profileData.gender || profileData.dob || profileData.fatherName) {
-                await saveProfile();
             }
 
             toast({
@@ -133,34 +174,6 @@ export function EditStudentModal({
             });
         } finally {
             setLoading(false);
-        }
-    };
-
-    const saveProfile = async () => {
-        if (!student) return;
-        setSavingProfile(true);
-        try {
-            const profilePayload: Record<string, unknown> = {};
-            if (profileData.gender) profilePayload.gender = profileData.gender;
-            if (profileData.dob) profilePayload.dob = profileData.dob;
-            if (profileData.fatherName) profilePayload.fatherName = profileData.fatherName;
-            if (profileData.motherName) profilePayload.motherName = profileData.motherName;
-            if (profileData.parentMobile) profilePayload.parentMobile = profileData.parentMobile;
-            if (profileData.permanentAddress) profilePayload.permanentAddress = profileData.permanentAddress;
-            if (profileData.classLevel) profilePayload.classLevel = parseInt(profileData.classLevel);
-            if (profileData.age) profilePayload.age = parseInt(profileData.age);
-            if (profileData.stream) profilePayload.stream = profileData.stream;
-            if (profileData.board) profilePayload.board = profileData.board;
-
-            await fetch(`/api/students/${student.studentId}/profile`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(profilePayload),
-            });
-        } catch (error) {
-            console.error("Error saving profile:", error);
-        } finally {
-            setSavingProfile(false);
         }
     };
 
@@ -276,24 +289,27 @@ export function EditStudentModal({
                                     onChange={(e) => setProfileData(prev => ({ ...prev, age: e.target.value }))}
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="classLevel">Class</Label>
-                                <Select
-                                    value={profileData.classLevel}
-                                    onValueChange={(val) => setProfileData(prev => ({ ...prev, classLevel: val }))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select class" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {[...Array(12)].map((_, i) => (
-                                            <SelectItem key={i + 1} value={(i + 1).toString()}>
-                                                Class {i + 1}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            {/* Class - hidden for Engineering */}
+                            {!isEngineering && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="classLevel">Class</Label>
+                                    <Select
+                                        value={profileData.classLevel}
+                                        onValueChange={(val) => setProfileData(prev => ({ ...prev, classLevel: val }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select class" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {[...Array(12)].map((_, i) => (
+                                                <SelectItem key={i + 1} value={(i + 1).toString()}>
+                                                    Class {i + 1}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -338,44 +354,89 @@ export function EditStudentModal({
                     {/* Academic Details */}
                     <div className="space-y-3">
                         <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                            <MapPin className="h-4 w-4" /> Academic Details
+                            <GraduationCap className="h-4 w-4" /> Academic Details
                         </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="stream">Stream</Label>
+                                <Label htmlFor="programLevel">Program Level</Label>
                                 <Select
-                                    value={profileData.stream}
-                                    onValueChange={(val) => setProfileData(prev => ({ ...prev, stream: val }))}
+                                    value={programLevel}
+                                    onValueChange={(val) => {
+                                        setProgramLevel(val);
+                                        // Clear board and class when switching to engineering
+                                        if (val === "ENGINEERING") {
+                                            setProfileData(prev => ({ ...prev, board: "", classLevel: "", stream: "" }));
+                                        } else {
+                                            setProfileData(prev => ({ ...prev, stream: "" }));
+                                        }
+                                    }}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select stream" />
+                                        <SelectValue placeholder="Select program level" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Science">Science</SelectItem>
-                                        <SelectItem value="Commerce">Commerce</SelectItem>
-                                        <SelectItem value="Arts">Arts</SelectItem>
-                                        <SelectItem value="N/A">N/A</SelectItem>
+                                        <SelectItem value="PRIMARY">Class (1-7)</SelectItem>
+                                        <SelectItem value="SECONDARY">Secondary (Class 8-10)</SelectItem>
+                                        <SelectItem value="HIGHER_SECONDARY">Higher Secondary (11-12)</SelectItem>
+                                        <SelectItem value="ENGINEERING">Engineering</SelectItem>
+                                        <SelectItem value="ROBOTICS">Robotics</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {/* Stream - dropdown with engineering streams when Engineering, regular otherwise */}
                             <div className="space-y-2">
-                                <Label htmlFor="board">Board</Label>
-                                <Select
-                                    value={profileData.board}
-                                    onValueChange={(val) => setProfileData(prev => ({ ...prev, board: val }))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select board" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="CBSE">CBSE</SelectItem>
-                                        <SelectItem value="ICSE">ICSE</SelectItem>
-                                        <SelectItem value="STATE">State Board</SelectItem>
-                                        <SelectItem value="IB">IB</SelectItem>
-                                        <SelectItem value="CAMBRIDGE">Cambridge</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Label htmlFor="stream">{isEngineering ? "Stream / Degree" : "Stream"}</Label>
+                                {isEngineering ? (
+                                    <Select
+                                        value={profileData.stream}
+                                        onValueChange={(val) => setProfileData(prev => ({ ...prev, stream: val }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select stream" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {ENGINEERING_STREAMS.map((stream) => (
+                                                <SelectItem key={stream} value={stream}>{stream}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <Select
+                                        value={profileData.stream}
+                                        onValueChange={(val) => setProfileData(prev => ({ ...prev, stream: val }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select stream" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Science">Science</SelectItem>
+                                            <SelectItem value="Commerce">Commerce</SelectItem>
+                                            <SelectItem value="Arts">Arts</SelectItem>
+                                            <SelectItem value="N/A">N/A</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             </div>
+                            {/* Board - hidden for Engineering */}
+                            {!isEngineering && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="board">Board</Label>
+                                    <Select
+                                        value={profileData.board}
+                                        onValueChange={(val) => setProfileData(prev => ({ ...prev, board: val }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select board" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="CBSE">CBSE</SelectItem>
+                                            <SelectItem value="ICSE">ICSE</SelectItem>
+                                            <SelectItem value="WBBSE">WBBSE</SelectItem>
+                                            <SelectItem value="OTHER">Other</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                             <div className="space-y-2 sm:col-span-2">
                                 <Label htmlFor="permanentAddress">Permanent Address</Label>
                                 <div className="relative">

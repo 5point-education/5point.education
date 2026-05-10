@@ -27,12 +27,31 @@ import { Separator } from "@/components/ui/separator";
 
 // --- Schemas ---
 
+const ENGINEERING_STREAMS = [
+    "B.Tech",
+    "B.E.",
+    "B.Sc",
+    "M.Tech",
+    "M.E.",
+    "M.Sc",
+    "BCA",
+    "MCA",
+    "BBA",
+    "MBA",
+    "B.Pharm",
+    "M.Pharm",
+    "B.Arch",
+    "B.Des",
+    "Diploma in Engineering",
+    "Other",
+] as const;
+
 const studentSchema = z.object({
     // Course / Programme
     program_level: z.enum(["PRIMARY", "SECONDARY", "HIGHER_SECONDARY", "ENGINEERING", "ROBOTICS"]),
-    board: z.enum(["ICSE", "CBSE", "WBBSE", "OTHER"]),
-    class_level: z.string().transform((v) => parseInt(v, 10)),
-    stream: z.string().optional(), // Science/Commerce
+    board: z.enum(["ICSE", "CBSE", "WBBSE", "OTHER"]).optional(),
+    class_level: z.string().optional().transform((v) => v ? parseInt(v, 10) : undefined),
+    stream: z.string().optional(), // Science/Commerce or Engineering stream
     aspirant_of: z.string().optional(), // JEE/NEET
     subjects: z.string().min(2, "Subjects required"),
 
@@ -125,9 +144,9 @@ export default function AdmissionPage() {
     const studentForm = useForm({
         resolver: zodResolver(studentSchema),
         defaultValues: {
-            program_level: "SECONDARY",
-            board: "ICSE",
-            class_level: "",
+            program_level: "SECONDARY" as string,
+            board: "ICSE" as string,
+            class_level: "" as string,
             stream: "",
             aspirant_of: "",
             subjects: "",
@@ -156,6 +175,10 @@ export default function AdmissionPage() {
             declaration_accepted: false
         }
     });
+
+    // Watch program_level to conditionally show/hide fields
+    const watchProgramLevel = studentForm.watch("program_level");
+    const isEngineering = watchProgramLevel === "ENGINEERING";
 
     // --- Form 2: Academic Records ---
     const academicForm = useForm({
@@ -626,7 +649,16 @@ export default function AdmissionPage() {
                                         <FormField control={studentForm.control} name="program_level" render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>Program Level</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <Select onValueChange={(val) => {
+                                                    field.onChange(val);
+                                                    if (val === "ENGINEERING") {
+                                                        studentForm.setValue("board", "" as any);
+                                                        studentForm.setValue("class_level", "");
+                                                        studentForm.setValue("stream", "");
+                                                    } else {
+                                                        studentForm.setValue("stream", "");
+                                                    }
+                                                }} defaultValue={field.value}>
                                                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                                     <SelectContent>
                                                         <SelectItem value="PRIMARY">Class (1-7)</SelectItem>
@@ -638,26 +670,49 @@ export default function AdmissionPage() {
                                                 </Select>
                                             </FormItem>
                                         )} />
-                                        <FormField control={studentForm.control} name="board" render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Board</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="ICSE">ICSE</SelectItem>
-                                                        <SelectItem value="CBSE">CBSE</SelectItem>
-                                                        <SelectItem value="WBBSE">WBBSE</SelectItem>
-                                                        <SelectItem value="OTHER">Other</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </FormItem>
-                                        )} />
-                                        <FormField control={studentForm.control} name="class_level" render={({ field }) => (
-                                            <FormItem><FormLabel>Class</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-                                        )} />
-                                        <FormField control={studentForm.control} name="stream" render={({ field }) => (
-                                            <FormItem><FormLabel>Stream (if HS)</FormLabel><FormControl><Input placeholder="Science/Commerce/Arts" {...field} /></FormControl></FormItem>
-                                        )} />
+                                        {/* Board - hidden for Engineering */}
+                                        {!isEngineering && (
+                                            <FormField control={studentForm.control} name="board" render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Board</FormLabel>
+                                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                                        <SelectContent>
+                                                            <SelectItem value="ICSE">ICSE</SelectItem>
+                                                            <SelectItem value="CBSE">CBSE</SelectItem>
+                                                            <SelectItem value="WBBSE">WBBSE</SelectItem>
+                                                            <SelectItem value="OTHER">Other</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </FormItem>
+                                            )} />
+                                        )}
+                                        {/* Class - hidden for Engineering */}
+                                        {!isEngineering && (
+                                            <FormField control={studentForm.control} name="class_level" render={({ field }) => (
+                                                <FormItem><FormLabel>Class</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                                            )} />
+                                        )}
+                                        {/* Stream - dropdown with engineering streams when Engineering, text input otherwise */}
+                                        {isEngineering ? (
+                                            <FormField control={studentForm.control} name="stream" render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Stream / Degree</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                                                        <FormControl><SelectTrigger><SelectValue placeholder="Select stream" /></SelectTrigger></FormControl>
+                                                        <SelectContent>
+                                                            {ENGINEERING_STREAMS.map((stream) => (
+                                                                <SelectItem key={stream} value={stream}>{stream}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </FormItem>
+                                            )} />
+                                        ) : (
+                                            <FormField control={studentForm.control} name="stream" render={({ field }) => (
+                                                <FormItem><FormLabel>Stream (if HS)</FormLabel><FormControl><Input placeholder="Science/Commerce/Arts" {...field} /></FormControl></FormItem>
+                                            )} />
+                                        )}
                                         <FormField control={studentForm.control} name="aspirant_of" render={({ field }) => (
                                             <FormItem><FormLabel>Aspirant Of</FormLabel><FormControl><Input placeholder="JEE / NEET / WBJEE" {...field} /></FormControl></FormItem>
                                         )} />

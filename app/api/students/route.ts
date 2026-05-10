@@ -105,7 +105,7 @@ export async function POST(req: Request) {
                     age: age ? parseInt(age) : undefined,
 
                     // Academic
-                    board: board as Board,
+                    board: board ? (board as Board) : null,
                     class_level: class_level ? parseInt(class_level) : undefined,
                     stream,
                     aspirant_of,

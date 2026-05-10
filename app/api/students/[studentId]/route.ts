@@ -169,8 +169,8 @@ export async function PATCH(
         if (profileFields.permanentAddress) profileUpdateData.permanentAddress = profileFields.permanentAddress;
         if (profileFields.classLevel) profileUpdateData.class_level = parseInt(profileFields.classLevel);
         if (profileFields.age) profileUpdateData.age = parseInt(profileFields.age);
-        if (profileFields.stream) profileUpdateData.stream = profileFields.stream;
-        if (profileFields.board) profileUpdateData.board = profileFields.board;
+        if (profileFields.stream !== undefined) profileUpdateData.stream = profileFields.stream;
+        if (profileFields.board !== undefined) profileUpdateData.board = profileFields.board;
 
         // Update user and profile in a transaction
         const result = await db.$transaction(async (tx) => {
