@@ -1,0 +1,21 @@
+
+> 5-point-education-hub@0.1.0 dev D:\my projects\5-point-Engineering-Website
+> next dev "-p" "3000"
+
+  ▲ Next.js 14.2.18
+  - Local:        http://localhost:3000
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 2.8s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 685ms (123 modules)
+ ✓ Compiled /api/teacher-fee-sheets in 344ms (116 modules)
+ GET /api/teacher-fee-sheets?month=2026-05 401 in 503ms
+ GET /api/teacher-fee-sheets?month=2026-05 401 in 73ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 642ms (144 modules)
+ GET /favicon.ico 200 in 805ms
+ GET /api/teacher-fee-sheets?month=2026-05 401 in 113ms
+ GET /favicon.ico 200 in 36ms
+ ELIFECYCLE  Command failed with exit code 4294967295.

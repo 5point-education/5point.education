@@ -1,0 +1,16 @@
+
+> 5-point-education-hub@0.1.0 dev D:\my projects\5-point-Engineering-Website
+> next dev "-p" "3000"
+
+  ▲ Next.js 14.2.18
+  - Local:        http://localhost:3000
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 2.1s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 669ms (123 modules)
+ ○ Compiling /auth/login ...
+ ✓ Compiled /auth/login in 7.9s (740 modules)
+ GET /auth/login 200 in 8474ms
+ ✓ Compiled in 596ms (362 modules)
