@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Save, User, Users } from "lucide-react";
+import { AlertCircle, Loader2, Save, User, Users } from "lucide-react";
 
 interface TeacherOption {
   id: string;
@@ -75,17 +75,33 @@ export default function ReceptionTeacherFeesPage() {
   const [loadingSheet, setLoadingSheet] = useState(false);
   const [saving, setSaving] = useState(false);
   const [headerInfo, setHeaderInfo] = useState<{ batchName: string; teacherName: string } | null>(null);
+  const [metaError, setMetaError] = useState<string | null>(null);
+  const [sheetError, setSheetError] = useState<string | null>(null);
 
   const selectedTeacherId = teacherId === "all" ? undefined : teacherId;
+  const hasHardFailure = Boolean(metaError || sheetError);
+
+  const buildApiError = (status: number, endpointLabel: string, serverMessage?: string) => {
+    const fallback = `${endpointLabel} failed (${status}).`;
+    const details = serverMessage?.trim() ? ` ${serverMessage.trim()}` : "";
+    if (status >= 500) {
+      return `${fallback} Server/API error. Check DATABASE_URL and restart the dev server.${details}`;
+    }
+    return `${fallback}${details}`;
+  };
 
   const fetchMeta = useCallback(async () => {
     setLoadingMeta(true);
+    setMetaError(null);
     try {
       const params = new URLSearchParams({ month });
       if (selectedTeacherId) params.set("teacherId", selectedTeacherId);
 
       const response = await fetch(`/api/teacher-fee-sheets?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to load teachers and batches");
+      if (!response.ok) {
+        const serverText = await response.text();
+        throw new Error(buildApiError(response.status, "Filter metadata request", serverText));
+      }
       const data = await response.json();
 
       setTeachers(data.teachers || []);
@@ -96,9 +112,16 @@ export default function ReceptionTeacherFeesPage() {
       }
     } catch (error: any) {
       console.error(error);
+      const message = error.message || "Failed to load teacher fees metadata";
+      setMetaError(message);
+      setTeachers([]);
+      setBatches([]);
+      setRows([]);
+      setHeaderInfo(null);
+      setBatchId("");
       toast({
         title: "Error",
-        description: error.message || "Failed to load teacher fees metadata",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -107,19 +130,31 @@ export default function ReceptionTeacherFeesPage() {
   }, [month, selectedTeacherId, batchId, toast]);
 
   const fetchSheet = useCallback(async () => {
-    if (!batchId) {
+    if (loadingMeta) return;
+    if (metaError) {
       setRows([]);
       setHeaderInfo(null);
       return;
     }
 
+    if (!batchId) {
+      setRows([]);
+      setHeaderInfo(null);
+      setSheetError(null);
+      return;
+    }
+
     setLoadingSheet(true);
+    setSheetError(null);
     try {
       const params = new URLSearchParams({ month, batchId });
       if (selectedTeacherId) params.set("teacherId", selectedTeacherId);
 
       const response = await fetch(`/api/teacher-fee-sheets?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to load teacher fee sheet");
+      if (!response.ok) {
+        const serverText = await response.text();
+        throw new Error(buildApiError(response.status, "Teacher fee sheet request", serverText));
+      }
       const data = await response.json();
 
       setRows(data.rows || []);
@@ -133,9 +168,11 @@ export default function ReceptionTeacherFeesPage() {
       }
     } catch (error: any) {
       console.error(error);
+      const message = error.message || "Failed to load sheet details";
+      setSheetError(message);
       toast({
         title: "Error",
-        description: error.message || "Failed to load sheet details",
+        description: message,
         variant: "destructive",
       });
       setRows([]);
@@ -143,7 +180,7 @@ export default function ReceptionTeacherFeesPage() {
     } finally {
       setLoadingSheet(false);
     }
-  }, [month, batchId, selectedTeacherId, toast]);
+  }, [month, batchId, selectedTeacherId, toast, loadingMeta, metaError]);
 
   useEffect(() => {
     fetchMeta();
@@ -291,7 +328,7 @@ export default function ReceptionTeacherFeesPage() {
           </div>
           <div className="space-y-2">
             <Label>Batch</Label>
-            <Select value={batchId} onValueChange={setBatchId} disabled={loadingMeta || batches.length === 0}>
+            <Select value={batchId} onValueChange={setBatchId} disabled={loadingMeta || batches.length === 0 || hasHardFailure}>
               <SelectTrigger>
                 <SelectValue placeholder={loadingMeta ? "Loading batches..." : "Select batch"} />
               </SelectTrigger>
@@ -306,6 +343,20 @@ export default function ReceptionTeacherFeesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {metaError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3 text-red-800">
+              <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Could not load filter data</p>
+                <p className="text-sm mt-1">{metaError}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {headerInfo && (
         <Card>
@@ -335,13 +386,29 @@ export default function ReceptionTeacherFeesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {sheetError && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3 text-red-800">
+                  <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Could not load teacher fee sheet</p>
+                    <p className="text-sm mt-1">{sheetError}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {loadingSheet ? (
             <div className="flex items-center justify-center py-10 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
               Loading sheet...
             </div>
-          ) : rows.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">No student rows found for this batch.</div>
+          ) : rows.length === 0 && !sheetError ? (
+            <div className="text-center py-10 text-muted-foreground">
+              {batchId ? "No student rows found for this batch." : "Select a batch to load teacher fee rows."}
+            </div>
           ) : (
             <div className="border rounded-lg overflow-x-auto">
               <Table>
@@ -433,7 +500,7 @@ export default function ReceptionTeacherFeesPage() {
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving || loadingSheet || !batchId}>
+            <Button onClick={handleSave} disabled={saving || loadingSheet || !batchId || hasHardFailure}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Save Sheet
             </Button>
