@@ -9,6 +9,7 @@ export default function AttendancePage() {
         title="Take Attendance"
         description="Mark attendance for your assigned batches"
         batchApiEndpoint="/api/teacher/batches"
+        teacherTodayFocus
       />
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -31,6 +31,7 @@ interface AttendanceComponentProps {
   title: string;
   description: string;
   batchApiEndpoint: string;
+  teacherTodayFocus?: boolean;
 }
 
 interface AttendanceHistory {
@@ -54,23 +55,83 @@ interface StudentAttendance {
   isPresent: boolean | null;
 }
 
+interface BatchItem {
+  id: string;
+  name: string;
+  subject: string;
+  schedule?: string;
+  teacher?: {
+    name?: string;
+  };
+}
+
+const DAY_INDEX_MAP: Record<string, number> = {
+  sun: 0,
+  sunday: 0,
+  mon: 1,
+  monday: 1,
+  tue: 2,
+  tues: 2,
+  tuesday: 2,
+  wed: 3,
+  wednesday: 3,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  thursday: 4,
+  fri: 5,
+  friday: 5,
+  sat: 6,
+  saturday: 6,
+};
+
+function parseScheduledDayIndexes(schedule: string | undefined): number[] {
+  if (!schedule) return [];
+
+  try {
+    const parsed = JSON.parse(schedule);
+    if (Array.isArray(parsed)) {
+      const days = parsed
+        .map((entry: { day?: string }) => entry?.day?.toString().trim().toLowerCase())
+        .map((day) => (day ? DAY_INDEX_MAP[day] : undefined))
+        .filter((value): value is number => value !== undefined);
+      if (days.length > 0) return Array.from(new Set(days));
+    }
+  } catch {
+    // Legacy schedule format (plain text) falls through to string parsing.
+  }
+
+  const normalized = schedule.toLowerCase();
+  const keysByLength = Object.keys(DAY_INDEX_MAP).sort((a, b) => b.length - a.length);
+  const matchedDays = new Set<number>();
+  for (const key of keysByLength) {
+    if (normalized.includes(key)) {
+      matchedDays.add(DAY_INDEX_MAP[key]);
+    }
+  }
+
+  return Array.from(matchedDays);
+}
+
 const AttendanceComponent = ({
   title,
   description,
-  batchApiEndpoint
+  batchApiEndpoint,
+  teacherTodayFocus = false,
 }: AttendanceComponentProps) => {
   const { toast } = useToast();
-  const [batches, setBatches] = useState<any[]>([]);
+  const [batches, setBatches] = useState<BatchItem[]>([]);
   const [students, setStudents] = useState<StudentAttendance[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState({ present: 0, absent: 0, total: 0 });
+  const [showOtherBatches, setShowOtherBatches] = useState(false);
 
   // History states
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'new' | 'history'>('history');
+  const [activeTab, setActiveTab] = useState<'new' | 'history'>(teacherTodayFocus ? 'new' : 'history');
 
   // Filter states
   const [filterBatch, setFilterBatch] = useState<string>('all');
@@ -105,6 +166,46 @@ const AttendanceComponent = ({
 
     fetchBatches();
   }, [batchApiEndpoint, toast]);
+
+  const todayDayIndex = useMemo(() => new Date().getDay(), []);
+
+  const todaysBatches = useMemo(() => {
+    if (!teacherTodayFocus) return batches;
+    return batches.filter((batch) => parseScheduledDayIndexes(batch.schedule).includes(todayDayIndex));
+  }, [batches, teacherTodayFocus, todayDayIndex]);
+
+  const primaryTeacherBatches = useMemo(() => {
+    if (!teacherTodayFocus) return batches;
+    if (todaysBatches.length === 0) return batches;
+    return todaysBatches;
+  }, [batches, teacherTodayFocus, todaysBatches]);
+
+  const otherTeacherBatches = useMemo(() => {
+    if (!teacherTodayFocus) return [];
+    const primarySet = new Set(primaryTeacherBatches.map((batch) => batch.id));
+    return batches.filter((batch) => !primarySet.has(batch.id));
+  }, [batches, teacherTodayFocus, primaryTeacherBatches]);
+
+  useEffect(() => {
+    if (!teacherTodayFocus) return;
+    setActiveTab('new');
+  }, [teacherTodayFocus]);
+
+  useEffect(() => {
+    if (!teacherTodayFocus) return;
+    if (primaryTeacherBatches.length === 0) {
+      setSelectedBatch('');
+      return;
+    }
+
+    setSelectedBatch((currentBatch) => {
+      if (currentBatch && primaryTeacherBatches.some((batch) => batch.id === currentBatch)) {
+        return currentBatch;
+      }
+      if (primaryTeacherBatches.length === 1) return primaryTeacherBatches[0].id;
+      return primaryTeacherBatches[0].id;
+    });
+  }, [teacherTodayFocus, primaryTeacherBatches]);
 
   // Fetch attendance history
   const fetchAttendanceHistory = useCallback(async () => {
@@ -697,20 +798,85 @@ const AttendanceComponent = ({
             {/* Filters Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="batch" className="text-sm font-medium text-gray-700">Select Batch</Label>
-                <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Choose a batch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {batches.map(batch => (
-                      <SelectItem key={batch.id} value={batch.id}>
-                        {batch.name} - {batch.subject}
-                        {batch.teacher?.name && ` (Teacher: ${batch.teacher.name})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="batch" className="text-sm font-medium text-gray-700">
+                  {teacherTodayFocus ? "Today's Batches" : "Select Batch"}
+                </Label>
+
+                {teacherTodayFocus ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {primaryTeacherBatches.map((batch) => (
+                        <Button
+                          key={batch.id}
+                          type="button"
+                          variant={selectedBatch === batch.id ? "default" : "outline"}
+                          className={cn(
+                            "justify-start h-auto py-2 px-3 whitespace-normal text-left",
+                            selectedBatch === batch.id
+                              ? "bg-blue-600 hover:bg-blue-700 text-white"
+                              : "hover:border-blue-300"
+                          )}
+                          onClick={() => setSelectedBatch(batch.id)}
+                        >
+                          <span className="block">
+                            <span className="font-medium">{batch.name}</span>
+                            <span className={cn("block text-xs", selectedBatch === batch.id ? "text-blue-100" : "text-muted-foreground")}>
+                              {batch.subject}
+                            </span>
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+
+                    {otherTeacherBatches.length > 0 && (
+                      <div className="space-y-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="px-0 text-blue-700 hover:text-blue-800 hover:bg-transparent"
+                          onClick={() => setShowOtherBatches((current) => !current)}
+                        >
+                          {showOtherBatches ? "Hide Other Batches" : "View Other Batches"}
+                        </Button>
+
+                        {showOtherBatches && (
+                          <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Choose from other batches" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {otherTeacherBatches.map((batch) => (
+                                <SelectItem key={batch.id} value={batch.id}>
+                                  {batch.name} - {batch.subject}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    )}
+
+                    {primaryTeacherBatches.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No batches found for this teacher.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Choose a batch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {batches.map(batch => (
+                        <SelectItem key={batch.id} value={batch.id}>
+                          {batch.name} - {batch.subject}
+                          {batch.teacher?.name && ` (Teacher: ${batch.teacher.name})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div className="space-y-2">

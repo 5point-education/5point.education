@@ -13,63 +13,57 @@ export async function GET(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
-    const selectedMonth = searchParams.get("month") || new Date().toISOString().slice(0, 7); // "2026-02"
+    const selectedMonth = searchParams.get("month") || new Date().toISOString().slice(0, 7); // "YYYY-MM"
     const selectedBatchId = searchParams.get("batchId") || "all";
+    const teacherIdParam = searchParams.get("teacherId");
+    const teacherId = user.user_metadata.role === Role.TEACHER ? user.id : teacherIdParam;
 
-    // Get teacher's batches
-    const batchWhere: any = { teacherId: user.id };
+    if (!teacherId) {
+      return new NextResponse("teacherId is required for admin view", { status: 400 });
+    }
+
+    const batchWhere: any = { teacherId };
+
     const batches = await db.batch.findMany({
       where: batchWhere,
       select: { id: true, name: true, subject: true },
       orderBy: { name: 'asc' },
     });
 
-    // Build payment query: payments linked to admissions in teacher's batches
-    const batchIds = selectedBatchId === "all"
-      ? batches.map(b => b.id)
-      : [selectedBatchId];
+    const batchIds = selectedBatchId === "all" ? batches.map((batch) => batch.id) : [selectedBatchId];
+    if (selectedBatchId !== "all" && !batches.some((batch) => batch.id === selectedBatchId)) {
+      return new NextResponse("Unauthorized batch access", { status: 403 });
+    }
 
-    const payments = await db.payment.findMany({
+    const sheets = await db.teacherFeeSheet.findMany({
       where: {
-        admission: {
-          batchId: { in: batchIds },
-        },
-        coveredMonths: { has: selectedMonth },
+        teacherId,
+        month: selectedMonth,
+        batchId: { in: batchIds },
       },
       include: {
-        student: {
-          include: {
-            user: { select: { name: true } },
-          },
-        },
-        admission: {
-          include: {
-            batch: { select: { name: true, subject: true } },
-          },
-        },
+        batch: { select: { id: true, name: true, subject: true } },
       },
-      orderBy: { date: 'desc' },
+      orderBy: { updatedAt: 'desc' },
     });
 
-    const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
-
-    const formatted = payments.map(p => ({
-      id: p.id,
-      studentName: p.student?.user?.name || "Unknown",
-      batchName: p.admission?.batch
-        ? `${p.admission.batch.name} - ${p.admission.batch.subject}`
-        : "N/A",
-      amount: p.amount,
-      date: p.date.toISOString(),
-      mode: p.mode,
-      receipt_no: p.receipt_no,
-    }));
+    const totalTeacherAmount = sheets.reduce((sum, sheet) => sum + sheet.totalTeacherAmount, 0);
+    const totalReceived = sheets.reduce((sum, sheet) => sum + sheet.totalReceived, 0);
 
     return NextResponse.json({
-      payments: formatted,
-      totalCollected,
-      totalPayments: payments.length,
-      batches: batches.map(b => ({
+      sheets: sheets.map((sheet) => ({
+        id: sheet.id,
+        batchId: sheet.batchId,
+        batchName: `${sheet.batch.name} - ${sheet.batch.subject}`,
+        totalReceived: sheet.totalReceived,
+        totalDeductions: sheet.totalDeductions,
+        totalTeacherAmount: sheet.totalTeacherAmount,
+        updatedAt: sheet.updatedAt.toISOString(),
+      })),
+      totalTeacherAmount,
+      totalReceived,
+      totalSheets: sheets.length,
+      batches: batches.map((b) => ({
         id: b.id,
         name: `${b.name} - ${b.subject}`,
       })),

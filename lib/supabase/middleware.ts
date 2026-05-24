@@ -4,8 +4,18 @@ import { type NextRequest, NextResponse } from "next/server";
 export async function updateSession(request: NextRequest) {
     const path = request.nextUrl.pathname;
 
-    const publicPaths = ["/auth/login", "/auth/forgot-password", "/auth/update-password"];
-    const isPublicPath = publicPaths.some(p => path.startsWith(p));
+    const publicPaths = [
+        "/",
+        "/enquiry",
+        "/auth/login",
+        "/auth/forgot-password",
+        "/auth/update-password",
+        "/auth/callback",
+        "/auth/auth-code-error",
+    ];
+    const isPublicPath = publicPaths.some(p => path === p || (p !== "/" && path.startsWith(p)));
+    const allowWithSessionPaths = ["/auth/update-password", "/auth/auth-code-error"];
+    const canAccessWhileLoggedIn = allowWithSessionPaths.some(p => path === p || path.startsWith(`${p}/`));
 
     if (path.startsWith("/_next") || path.startsWith("/api") || path.includes(".")) {
         return NextResponse.next({ request });
@@ -37,7 +47,7 @@ export async function updateSession(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (isPublicPath) {
-        if (user) {
+        if (user && !canAccessWhileLoggedIn && !path.startsWith("/auth/callback")) {
             const url = request.nextUrl.clone();
             url.pathname = "/dashboard";
             return NextResponse.redirect(url);

@@ -21,6 +21,22 @@ export async function GET(req: Request) {
       return new NextResponse("Missing required parameters: batchId and date", { status: 400 });
     }
 
+    if (user.user_metadata.role === Role.TEACHER) {
+      const batch = await db.batch.findFirst({
+        where: {
+          id: batchId,
+          teacherId: user.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!batch) {
+        return new NextResponse("You are not authorized to view attendance for this batch", { status: 403 });
+      }
+    }
+
     // Parse the date to create a date range for the entire day (in UTC to match storage)
     const [year, month, day] = date.split('-').map(Number);
     const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));

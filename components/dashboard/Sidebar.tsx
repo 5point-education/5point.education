@@ -133,6 +133,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={Layers} label="Batches" href="/dashboard/reception/batches" onClick={closeMobileSidebar} />
                         <SidebarItem icon={UserPlus} label="Teachers" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
                         <SidebarItem icon={IndianRupee} label="Fees" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={IndianRupee} label="Teachers Fees" href="/dashboard/reception/teacher-fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/reception/notices" onClick={closeMobileSidebar} />
                         <div className="px-4 pt-6 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Administration</div>
@@ -152,6 +153,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                         <SidebarItem icon={Calendar} label="Schedule" href="/dashboard/reception/schedule" onClick={closeMobileSidebar} />
                         <SidebarItem icon={UserPlus} label="Teacher Onboarding" href="/dashboard/reception/teachers" onClick={closeMobileSidebar} />
                         <SidebarItem icon={IndianRupee} label="Fees Management" href="/dashboard/reception/fees" onClick={closeMobileSidebar} />
+                        <SidebarItem icon={IndianRupee} label="Teachers Fees" href="/dashboard/reception/teacher-fees" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Calendar} label="Attendance" href="/dashboard/reception/attendance" onClick={closeMobileSidebar} />
                         <SidebarItem icon={Megaphone} label="Notices" href="/dashboard/reception/notices" onClick={closeMobileSidebar} />
                         <SidebarItem icon={User} label="Profile" href="/dashboard/reception/profile" onClick={closeMobileSidebar} />

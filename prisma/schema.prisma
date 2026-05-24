@@ -80,6 +80,8 @@ model User {
   batches        Batch[]
   enquiries      Enquiry[]
   noticesCreated Notice[]         @relation("NoticesCreated")
+  teacherFeeSheetsAsTeacher TeacherFeeSheet[] @relation("TeacherFeeSheetTeacher")
+  teacherFeeSheetsCreated   TeacherFeeSheet[] @relation("TeacherFeeSheetCreatedBy")
 
   @@map("users")
 }
@@ -136,6 +138,7 @@ model StudentProfile {
   attendances  Attendance[]
   noticeRecipients NoticeRecipient[]
   subscriptions StudentSubscription[]
+  teacherFeeSheetRows TeacherFeeSheetRow[]
 
   @@map("student_profiles")
 }
@@ -224,6 +227,7 @@ model Batch {
   exams      Exam[]
   attendances  Attendance[]
   notices      Notice[]
+  teacherFeeSheets TeacherFeeSheet[]
 
   @@map("batches")
 }
@@ -254,6 +258,7 @@ model Admission {
   student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   batch            Batch?               @relation(fields: [batchId], references: [id])
   payments         Payment[]           // Direct relation to payments
+  teacherFeeSheetRows TeacherFeeSheetRow[]
 
   @@map("admissions")
 }
@@ -279,6 +284,51 @@ model Payment {
   admission        Admission?           @relation(fields: [admissionId], references: [id])
 
   @@map("payments")
+}
+
+model TeacherFeeSheet {
+  id                String   @id @default(cuid())
+  month             String   // YYYY-MM
+  batchId           String
+  teacherId         String
+  createdById       String
+  totalReceived     Float    @default(0)
+  totalDeductions   Float    @default(0)
+  totalTeacherAmount Float   @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  batch      Batch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  teacher    User   @relation("TeacherFeeSheetTeacher", fields: [teacherId], references: [id])
+  createdBy  User   @relation("TeacherFeeSheetCreatedBy", fields: [createdById], references: [id])
+  rows       TeacherFeeSheetRow[]
+
+  @@unique([month, batchId])
+  @@index([teacherId, month])
+  @@map("teacher_fee_sheets")
+}
+
+model TeacherFeeSheetRow {
+  id              String   @id @default(cuid())
+  sheetId         String
+  studentId       String?
+  admissionId     String?
+  studentName     String
+  totalReceived   Float    @default(0)
+  fivePointFees   Float    @default(0)
+  developmentFees Float    @default(0)
+  discount        Float    @default(0)
+  teacherAmount   Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sheet     TeacherFeeSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  student   StudentProfile? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  admission Admission?      @relation(fields: [admissionId], references: [id], onDelete: SetNull)
+
+  @@index([sheetId])
+  @@index([admissionId])
+  @@map("teacher_fee_sheet_rows")
 }
 
 model Exam {
