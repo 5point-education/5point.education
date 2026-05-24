@@ -3,6 +3,22 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 
+type PayrollBatch = {
+  id: string;
+  name: string;
+  subject: string;
+};
+
+type PayrollSheet = {
+  id: string;
+  batchId: string;
+  totalReceived: number;
+  totalDeductions: number;
+  totalTeacherAmount: number;
+  updatedAt: Date;
+  batch: PayrollBatch;
+};
+
 export async function GET(req: Request) {
   try {
     const supabase = createAdminClient();
@@ -22,20 +38,20 @@ export async function GET(req: Request) {
       return new NextResponse("teacherId is required for admin view", { status: 400 });
     }
 
-    const batchWhere: any = { teacherId };
+    const batchWhere: { teacherId: string } = { teacherId };
 
-    const batches = await db.batch.findMany({
+    const batches = (await db.batch.findMany({
       where: batchWhere,
       select: { id: true, name: true, subject: true },
       orderBy: { name: 'asc' },
-    });
+    })) as PayrollBatch[];
 
-    const batchIds = selectedBatchId === "all" ? batches.map((batch) => batch.id) : [selectedBatchId];
-    if (selectedBatchId !== "all" && !batches.some((batch) => batch.id === selectedBatchId)) {
+    const batchIds = selectedBatchId === "all" ? batches.map((batch: PayrollBatch) => batch.id) : [selectedBatchId];
+    if (selectedBatchId !== "all" && !batches.some((batch: PayrollBatch) => batch.id === selectedBatchId)) {
       return new NextResponse("Unauthorized batch access", { status: 403 });
     }
 
-    const sheets = await db.teacherFeeSheet.findMany({
+    const sheets = (await db.teacherFeeSheet.findMany({
       where: {
         teacherId,
         month: selectedMonth,
@@ -45,13 +61,13 @@ export async function GET(req: Request) {
         batch: { select: { id: true, name: true, subject: true } },
       },
       orderBy: { updatedAt: 'desc' },
-    });
+    })) as PayrollSheet[];
 
-    const totalTeacherAmount = sheets.reduce((sum, sheet) => sum + sheet.totalTeacherAmount, 0);
-    const totalReceived = sheets.reduce((sum, sheet) => sum + sheet.totalReceived, 0);
+    const totalTeacherAmount = sheets.reduce((sum: number, sheet: PayrollSheet) => sum + sheet.totalTeacherAmount, 0);
+    const totalReceived = sheets.reduce((sum: number, sheet: PayrollSheet) => sum + sheet.totalReceived, 0);
 
     return NextResponse.json({
-      sheets: sheets.map((sheet) => ({
+      sheets: sheets.map((sheet: PayrollSheet) => ({
         id: sheet.id,
         batchId: sheet.batchId,
         batchName: `${sheet.batch.name} - ${sheet.batch.subject}`,
@@ -63,7 +79,7 @@ export async function GET(req: Request) {
       totalTeacherAmount,
       totalReceived,
       totalSheets: sheets.length,
-      batches: batches.map((b) => ({
+      batches: batches.map((b: PayrollBatch) => ({
         id: b.id,
         name: `${b.name} - ${b.subject}`,
       })),

@@ -15,6 +15,97 @@ type SheetRowInput = {
   discount?: number | string | null;
 };
 
+type ExistingSheetRow = {
+  studentId: string | null;
+  admissionId: string | null;
+  studentName: string;
+  totalReceived: number;
+  fivePointFees: number;
+  developmentFees: number;
+  discount: number;
+};
+
+type TeacherFeeRow = ExistingSheetRow & {
+  teacherAmount: number;
+  isArchived: boolean;
+};
+
+type AdmissionWithStudentName = {
+  id: string;
+  studentId: string;
+  student: {
+    user: {
+      name: string;
+    };
+  };
+};
+
+type PaymentRecord = {
+  admissionId: string | null;
+  amount: number;
+};
+
+type TeacherBatch = {
+  id: string;
+  name: string;
+  subject: string;
+};
+
+type TeacherOption = {
+  id: string;
+  name: string;
+};
+
+type BatchWithTeacher = {
+  id: string;
+  name: string;
+  subject: string;
+  teacherId: string;
+  teacher: {
+    id: string;
+    name: string;
+  };
+};
+
+type SelectedBatch = {
+  id: string;
+  name: string;
+  subject: string;
+  teacherId: string;
+  teacher: {
+    id: string;
+    name: string;
+  };
+};
+
+type TeacherSheetWithBatch = {
+  id: string;
+  batchId: string;
+  totalReceived: number;
+  totalDeductions: number;
+  totalTeacherAmount: number;
+  updatedAt: Date;
+  batch: {
+    id: string;
+    name: string;
+    subject: string;
+  };
+};
+
+type SheetWithRows = {
+  id: string;
+  month: string;
+  batchId: string;
+  teacherId: string;
+  updatedAt: Date;
+  rows: ExistingSheetRow[];
+};
+
+type AdmissionReference = {
+  id: string;
+  studentId: string;
+};
+
 function getCurrentMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -55,17 +146,9 @@ function calculateTeacherAmount(
 async function buildRowsForBatch(
   batchId: string,
   month: string,
-  existingRows: Array<{
-    studentId: string | null;
-    admissionId: string | null;
-    studentName: string;
-    totalReceived: number;
-    fivePointFees: number;
-    developmentFees: number;
-    discount: number;
-  }>
-) {
-  const admissions = await db.admission.findMany({
+  existingRows: ExistingSheetRow[]
+): Promise<TeacherFeeRow[]> {
+  const admissions = (await db.admission.findMany({
     where: { batchId },
     select: {
       id: true,
@@ -87,14 +170,14 @@ async function buildRowsForBatch(
         },
       },
     },
-  });
+  })) as AdmissionWithStudentName[];
 
   const admissionIds = admissions.map((admission) => admission.id);
   const { start, end } = getMonthRange(month);
-  const payments =
+  const payments: PaymentRecord[] =
     admissionIds.length === 0
       ? []
-      : await db.payment.findMany({
+      : ((await db.payment.findMany({
           where: {
             admissionId: { in: admissionIds },
             date: {
@@ -106,7 +189,7 @@ async function buildRowsForBatch(
             admissionId: true,
             amount: true,
           },
-        });
+        })) as PaymentRecord[]);
 
   const receivedByAdmission = new Map<string, number>();
   for (const payment of payments) {
@@ -117,18 +200,18 @@ async function buildRowsForBatch(
 
   const existingByAdmissionId = new Map(
     existingRows
-      .filter((row) => row.admissionId)
-      .map((row) => [row.admissionId as string, row])
+      .filter((row): row is ExistingSheetRow & { admissionId: string } => Boolean(row.admissionId))
+      .map((row) => [row.admissionId, row] as const)
   );
   const existingByStudentId = new Map(
     existingRows
-      .filter((row) => row.studentId)
-      .map((row) => [row.studentId as string, row])
+      .filter((row): row is ExistingSheetRow & { studentId: string } => Boolean(row.studentId))
+      .map((row) => [row.studentId, row] as const)
   );
 
   const matchedKeys = new Set<string>();
 
-  const rows = admissions.map((admission) => {
+  const rows = admissions.map((admission: AdmissionWithStudentName) => {
     const existing =
       existingByAdmissionId.get(admission.id) ||
       existingByStudentId.get(admission.studentId);
@@ -167,11 +250,11 @@ async function buildRowsForBatch(
   });
 
   const archivedRows = existingRows
-    .filter((row) => {
+    .filter((row: ExistingSheetRow) => {
       const rowKey = row.admissionId || row.studentId || "";
       return rowKey && !matchedKeys.has(rowKey);
     })
-    .map((row) => {
+    .map((row: ExistingSheetRow) => {
       const totalReceived = Math.round((row.totalReceived + Number.EPSILON) * 100) / 100;
       const fivePointFees = Math.round((row.fivePointFees + Number.EPSILON) * 100) / 100;
       const developmentFees = Math.round((row.developmentFees + Number.EPSILON) * 100) / 100;
@@ -221,13 +304,13 @@ export async function GET(req: Request) {
     const batchId = url.searchParams.get("batchId");
 
     if (user.user_metadata.role === Role.TEACHER) {
-      const teacherBatches = await db.batch.findMany({
+      const teacherBatches = (await db.batch.findMany({
         where: { teacherId: user.id },
         select: { id: true, name: true, subject: true },
         orderBy: { name: "asc" },
-      });
+      })) as TeacherBatch[];
 
-      if (batchId && !teacherBatches.some((batch) => batch.id === batchId)) {
+      if (batchId && !teacherBatches.some((batch: TeacherBatch) => batch.id === batchId)) {
         return new NextResponse("Unauthorized batch access", { status: 403 });
       }
 
@@ -241,7 +324,7 @@ export async function GET(req: Request) {
       };
       if (batchId) where.batchId = batchId;
 
-      const sheets = await db.teacherFeeSheet.findMany({
+      const sheets = (await db.teacherFeeSheet.findMany({
         where,
         include: {
           batch: {
@@ -255,15 +338,15 @@ export async function GET(req: Request) {
         orderBy: {
           updatedAt: "desc",
         },
-      });
+      })) as TeacherSheetWithBatch[];
 
       return NextResponse.json({
         month,
-        batches: teacherBatches.map((batch) => ({
+        batches: teacherBatches.map((batch: TeacherBatch) => ({
           id: batch.id,
           name: `${batch.name} - ${batch.subject}`,
         })),
-        sheets: sheets.map((sheet) => ({
+        sheets: sheets.map((sheet: TeacherSheetWithBatch) => ({
           id: sheet.id,
           batchId: sheet.batchId,
           batchName: `${sheet.batch.name} - ${sheet.batch.subject}`,
@@ -272,17 +355,20 @@ export async function GET(req: Request) {
           totalTeacherAmount: sheet.totalTeacherAmount,
           updatedAt: sheet.updatedAt,
         })),
-        totalTeacherAmount: sheets.reduce((sum, sheet) => sum + sheet.totalTeacherAmount, 0),
+        totalTeacherAmount: sheets.reduce(
+          (sum: number, sheet: TeacherSheetWithBatch) => sum + sheet.totalTeacherAmount,
+          0
+        ),
       });
     }
 
-    const teachers = await db.user.findMany({
+    const teachers = (await db.user.findMany({
       where: { role: Role.TEACHER },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
-    });
+    })) as TeacherOption[];
 
-    const batches = await db.batch.findMany({
+    const batches = (await db.batch.findMany({
       where: teacherIdFilter ? { teacherId: teacherIdFilter } : undefined,
       include: {
         teacher: {
@@ -295,13 +381,13 @@ export async function GET(req: Request) {
       orderBy: {
         name: "asc",
       },
-    });
+    })) as BatchWithTeacher[];
 
     if (!batchId) {
       return NextResponse.json({
         month,
         teachers,
-        batches: batches.map((batch) => ({
+        batches: batches.map((batch: BatchWithTeacher) => ({
           id: batch.id,
           name: batch.name,
           subject: batch.subject,
@@ -313,7 +399,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const batch = await db.batch.findUnique({
+    const batch = (await db.batch.findUnique({
       where: { id: batchId },
       include: {
         teacher: {
@@ -323,7 +409,7 @@ export async function GET(req: Request) {
           },
         },
       },
-    });
+    })) as SelectedBatch | null;
 
     if (!batch) {
       return new NextResponse("Batch not found", { status: 404 });
@@ -335,7 +421,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const sheet = await db.teacherFeeSheet.findUnique({
+    const sheet = (await db.teacherFeeSheet.findUnique({
       where: {
         month_batchId: {
           month,
@@ -345,20 +431,24 @@ export async function GET(req: Request) {
       include: {
         rows: true,
       },
-    });
+    })) as SheetWithRows | null;
 
-    const rows = await buildRowsForBatch(batchId, month, sheet?.rows || []);
-    const totalReceived = rows.reduce((sum, row) => sum + row.totalReceived, 0);
+    const rows: TeacherFeeRow[] = await buildRowsForBatch(batchId, month, sheet?.rows || []);
+    const totalReceived = rows.reduce((sum: number, row: TeacherFeeRow) => sum + row.totalReceived, 0);
     const totalDeductions = rows.reduce(
-      (sum, row) => sum + row.fivePointFees + row.developmentFees + row.discount,
+      (sum: number, row: TeacherFeeRow) =>
+        sum + row.fivePointFees + row.developmentFees + row.discount,
       0
     );
-    const totalTeacherAmount = rows.reduce((sum, row) => sum + row.teacherAmount, 0);
+    const totalTeacherAmount = rows.reduce(
+      (sum: number, row: TeacherFeeRow) => sum + row.teacherAmount,
+      0
+    );
 
     return NextResponse.json({
       month,
       teachers,
-      batches: batches.map((item) => ({
+      batches: batches.map((item: BatchWithTeacher) => ({
         id: item.id,
         name: item.name,
         subject: item.subject,
@@ -436,12 +526,14 @@ export async function POST(req: Request) {
       return new NextResponse("Batch not found", { status: 404 });
     }
 
-    const admissions = await db.admission.findMany({
+    const admissions = (await db.admission.findMany({
       where: { batchId },
       select: { id: true, studentId: true },
-    });
-    const validAdmissionIds = new Set(admissions.map((admission) => admission.id));
-    const validStudentIds = new Set(admissions.map((admission) => admission.studentId));
+    })) as AdmissionReference[];
+    const validAdmissionIds = new Set(admissions.map((admission: AdmissionReference) => admission.id));
+    const validStudentIds = new Set(
+      admissions.map((admission: AdmissionReference) => admission.studentId)
+    );
 
     const sanitizedRows = rows.map((row, index) => {
       const totalReceived = normalizeAmount(row.totalReceived, `row ${index + 1} totalReceived`);
