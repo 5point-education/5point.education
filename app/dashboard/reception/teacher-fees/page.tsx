@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +77,8 @@ export default function ReceptionTeacherFeesPage() {
   const [headerInfo, setHeaderInfo] = useState<{ batchName: string; teacherName: string } | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [sheetError, setSheetError] = useState<string | null>(null);
+  const metaRequestIdRef = useRef(0);
+  const sheetRequestIdRef = useRef(0);
 
   const selectedTeacherId = teacherId === "all" ? undefined : teacherId;
   const hasHardFailure = Boolean(metaError || sheetError);
@@ -91,6 +93,7 @@ export default function ReceptionTeacherFeesPage() {
   };
 
   const fetchMeta = useCallback(async () => {
+    const requestId = ++metaRequestIdRef.current;
     setLoadingMeta(true);
     setMetaError(null);
     try {
@@ -103,14 +106,19 @@ export default function ReceptionTeacherFeesPage() {
         throw new Error(buildApiError(response.status, "Filter metadata request", serverText));
       }
       const data = await response.json();
+      if (requestId !== metaRequestIdRef.current) return;
 
-      setTeachers(data.teachers || []);
-      setBatches(data.batches || []);
-      const batchIds = (data.batches || []).map((item: BatchOption) => item.id);
-      if (!batchId || !batchIds.includes(batchId)) {
-        setBatchId(batchIds[0] || "");
-      }
+      const nextTeachers = (data.teachers || []) as TeacherOption[];
+      const nextBatches = (data.batches || []) as BatchOption[];
+      const batchIds = nextBatches.map((item) => item.id);
+
+      setTeachers(nextTeachers);
+      setBatches(nextBatches);
+      setBatchId((previousBatchId) =>
+        previousBatchId && batchIds.includes(previousBatchId) ? previousBatchId : (batchIds[0] || "")
+      );
     } catch (error: any) {
+      if (requestId !== metaRequestIdRef.current) return;
       console.error(error);
       const message = error.message || "Failed to load teacher fees metadata";
       setMetaError(message);
@@ -125,9 +133,11 @@ export default function ReceptionTeacherFeesPage() {
         variant: "destructive",
       });
     } finally {
-      setLoadingMeta(false);
+      if (requestId === metaRequestIdRef.current) {
+        setLoadingMeta(false);
+      }
     }
-  }, [month, selectedTeacherId, batchId, toast]);
+  }, [month, selectedTeacherId, toast]);
 
   const fetchSheet = useCallback(async () => {
     if (loadingMeta) return;
@@ -144,6 +154,22 @@ export default function ReceptionTeacherFeesPage() {
       return;
     }
 
+    const selectedBatch = batches.find((item) => item.id === batchId);
+    if (!selectedBatch) {
+      setRows([]);
+      setHeaderInfo(null);
+      setSheetError(null);
+      return;
+    }
+
+    if (selectedTeacherId && selectedBatch.teacherId !== selectedTeacherId) {
+      setRows([]);
+      setHeaderInfo(null);
+      setSheetError(null);
+      return;
+    }
+
+    const requestId = ++sheetRequestIdRef.current;
     setLoadingSheet(true);
     setSheetError(null);
     try {
@@ -156,6 +182,7 @@ export default function ReceptionTeacherFeesPage() {
         throw new Error(buildApiError(response.status, "Teacher fee sheet request", serverText));
       }
       const data = await response.json();
+      if (requestId !== sheetRequestIdRef.current) return;
 
       setRows(data.rows || []);
       if (data.batch) {
@@ -167,6 +194,7 @@ export default function ReceptionTeacherFeesPage() {
         setHeaderInfo(null);
       }
     } catch (error: any) {
+      if (requestId !== sheetRequestIdRef.current) return;
       console.error(error);
       const message = error.message || "Failed to load sheet details";
       setSheetError(message);
@@ -178,9 +206,11 @@ export default function ReceptionTeacherFeesPage() {
       setRows([]);
       setHeaderInfo(null);
     } finally {
-      setLoadingSheet(false);
+      if (requestId === sheetRequestIdRef.current) {
+        setLoadingSheet(false);
+      }
     }
-  }, [month, batchId, selectedTeacherId, toast, loadingMeta, metaError]);
+  }, [month, batchId, selectedTeacherId, toast, loadingMeta, metaError, batches]);
 
   useEffect(() => {
     fetchMeta();
@@ -189,6 +219,14 @@ export default function ReceptionTeacherFeesPage() {
   useEffect(() => {
     fetchSheet();
   }, [fetchSheet]);
+
+  const handleTeacherChange = (value: string) => {
+    setTeacherId(value);
+    setBatchId("");
+    setRows([]);
+    setHeaderInfo(null);
+    setSheetError(null);
+  };
 
   const handleNumericEdit = (
     rowIndex: number,
@@ -312,7 +350,7 @@ export default function ReceptionTeacherFeesPage() {
           </div>
           <div className="space-y-2">
             <Label>Teacher</Label>
-            <Select value={teacherId} onValueChange={setTeacherId}>
+            <Select value={teacherId} onValueChange={handleTeacherChange}>
               <SelectTrigger>
                 <SelectValue placeholder="All teachers" />
               </SelectTrigger>
