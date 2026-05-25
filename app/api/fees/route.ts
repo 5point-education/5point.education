@@ -162,8 +162,14 @@ export async function GET(req: Request) {
 
         return NextResponse.json(feesData);
 
-    } catch (error) {
+    } catch (error: any) {
         console.log("[FEES_GET]", error);
+        if (error?.code === "P1001") {
+            return new NextResponse(
+                "Database connection failed (P1001). Check DATABASE_URL runtime connection.",
+                { status: 503 }
+            );
+        }
         return new NextResponse("Internal Error", { status: 500 });
     }
 }

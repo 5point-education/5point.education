@@ -180,10 +180,19 @@ async function buildRowsForBatch(
       : ((await db.payment.findMany({
           where: {
             admissionId: { in: admissionIds },
-            date: {
-              gte: start,
-              lte: end,
-            },
+            OR: [
+              {
+                coveredMonths: {
+                  has: month,
+                },
+              },
+              {
+                date: {
+                  gte: start,
+                  lte: end,
+                },
+              },
+            ],
           },
           select: {
             admissionId: true,
