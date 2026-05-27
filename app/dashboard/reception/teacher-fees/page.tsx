@@ -63,9 +63,12 @@ function calculateTeacherAmount(row: Pick<SheetRow, "totalReceived" | "fivePoint
   return safeRound(row.totalReceived - row.fivePointFees - row.developmentFees - row.discount);
 }
 
+type FilterMode = "teacher" | "batch";
+
 export default function ReceptionTeacherFeesPage() {
   const { toast } = useToast();
   const [month, setMonth] = useState(formatCurrentMonth());
+  const [filterMode, setFilterMode] = useState<FilterMode>("teacher");
   const [teacherId, setTeacherId] = useState("all");
   const [batchId, setBatchId] = useState("");
   const [teachers, setTeachers] = useState<TeacherOption[]>([]);
@@ -220,9 +223,30 @@ export default function ReceptionTeacherFeesPage() {
     fetchSheet();
   }, [fetchSheet]);
 
+  const handleFilterModeChange = (mode: FilterMode) => {
+    setFilterMode(mode);
+    setTeacherId("all");
+    setBatchId("");
+    setRows([]);
+    setHeaderInfo(null);
+    setSheetError(null);
+  };
+
   const handleTeacherChange = (value: string) => {
     setTeacherId(value);
     setBatchId("");
+    setRows([]);
+    setHeaderInfo(null);
+    setSheetError(null);
+  };
+
+  const handleBatchDirectChange = (value: string) => {
+    setBatchId(value);
+    // Auto-resolve teacher from the selected batch
+    const selectedBatch = batches.find((b) => b.id === value);
+    if (selectedBatch) {
+      setTeacherId(selectedBatch.teacherId);
+    }
     setRows([]);
     setHeaderInfo(null);
     setSheetError(null);
@@ -341,44 +365,90 @@ export default function ReceptionTeacherFeesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Select month, teacher, and batch to prepare the sheet.</CardDescription>
+          <CardDescription>Select month, then choose to filter by teacher or by batch.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="month">Month</Label>
-            <Input id="month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="month">Month</Label>
+              <Input id="month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Filter By</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={filterMode === "teacher" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => handleFilterModeChange("teacher")}
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  By Teacher
+                </Button>
+                <Button
+                  type="button"
+                  variant={filterMode === "batch" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => handleFilterModeChange("batch")}
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  By Batch
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Teacher</Label>
-            <Select value={teacherId} onValueChange={handleTeacherChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="All teachers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All teachers</SelectItem>
-                {teachers.map((teacher) => (
-                  <SelectItem key={teacher.id} value={teacher.id}>
-                    {teacher.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Batch</Label>
-            <Select value={batchId} onValueChange={setBatchId} disabled={loadingMeta || batches.length === 0 || hasHardFailure}>
-              <SelectTrigger>
-                <SelectValue placeholder={loadingMeta ? "Loading batches..." : "Select batch"} />
-              </SelectTrigger>
-              <SelectContent>
-                {batches.map((batch) => (
-                  <SelectItem key={batch.id} value={batch.id}>
-                    {batch.name} - {batch.subject}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+
+          {filterMode === "teacher" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Teacher</Label>
+                <Select value={teacherId} onValueChange={handleTeacherChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a teacher" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All teachers</SelectItem>
+                    {teachers.map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Batch</Label>
+                <Select value={batchId} onValueChange={setBatchId} disabled={loadingMeta || batches.length === 0 || hasHardFailure}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingMeta ? "Loading batches..." : "Select batch"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {batches.map((batch) => (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        {batch.name} - {batch.subject}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Batch</Label>
+              <Select value={batchId} onValueChange={handleBatchDirectChange} disabled={loadingMeta || batches.length === 0 || hasHardFailure}>
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingMeta ? "Loading batches..." : "Select a batch"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {batches.map((batch) => (
+                    <SelectItem key={batch.id} value={batch.id}>
+                      {batch.name} - {batch.subject}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </CardContent>
       </Card>
 

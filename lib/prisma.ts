@@ -4,6 +4,25 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+function normalizeDatabaseUrl(rawUrl: string | undefined) {
+  if (!rawUrl) return rawUrl;
+
+  try {
+    const parsed = new URL(rawUrl);
+    const isSupabasePooler = parsed.hostname.endsWith(".pooler.supabase.com");
+    if (!isSupabasePooler) return rawUrl;
+
+    // Preserve the configured pooler mode/port from env and only enforce SSL.
+    if (!parsed.searchParams.has("sslmode")) {
+      parsed.searchParams.set("sslmode", "require");
+    }
+
+    return parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 const RETRYABLE_READ_ACTIONS = new Set([
   "findUnique",
   "findUniqueOrThrow",
@@ -28,7 +47,24 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const basePrisma = globalForPrisma.prisma ?? new PrismaClient();
+const normalizedDatabaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+if (normalizedDatabaseUrl) {
+  process.env.DATABASE_URL = normalizedDatabaseUrl;
+}
+
+const basePrisma =
+  globalForPrisma.prisma ??
+  new PrismaClient(
+    normalizedDatabaseUrl
+      ? {
+          datasources: {
+            db: {
+              url: normalizedDatabaseUrl,
+            },
+          },
+        }
+      : undefined
+  );
 
 basePrisma.$use(async (params, next) => {
   const maxRetries = Number(process.env.PRISMA_READ_RETRIES ?? 2);

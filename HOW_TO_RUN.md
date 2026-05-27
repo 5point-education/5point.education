@@ -24,6 +24,12 @@ pnpm.cmd install
 
 ## 3) Prisma setup
 
+Set DB URLs in `.env` before running:
+
+- `DATABASE_URL`: Supavisor **Session pooler** string (`aws-...pooler.supabase.com:5432`) for local `next dev`
+- `DIRECT_URL`: direct DB string (`db.<project_ref>.supabase.co:5432`) for Prisma `db push` / migrations
+- `:6543` transaction pooler is for serverless/auto-scaling deployments, not default local runtime
+
 Validate schema and generate client:
 
 ```powershell

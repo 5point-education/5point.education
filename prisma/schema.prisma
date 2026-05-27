@@ -28,6 +28,7 @@ enum Board {
   ICSE
   CBSE
   WBBSE
+  OTHER
 }
 
 enum EnquiryStatus {
