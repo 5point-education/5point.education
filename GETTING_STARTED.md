@@ -55,27 +55,6 @@ I've created a **production-ready** coaching center management system with the f
 npm install
 ```
 
-### Step 2: Set Up Database
-Create `.env` file:
-```env
-DATABASE_URL="postgresql://username:password@localhost:5432/5point_edu"
-NEXTAUTH_SECRET="development-secret-key-123456"
-NEXTAUTH_URL="http://localhost:3000"
-```
-
-Initialize database:
-```powershell
-npm run db:push
-npx prisma generate
-npm run db:seed
-```
-
-### Step 3: Run
-```powershell
-npm run dev
-```
-
-Visit: http://localhost:3000
 
 ## 🎯 What Works Right Now
 
