@@ -1,0 +1,83 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
+import { Sidebar } from "@/components/dashboard/Sidebar";
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    // Prevent the body from scrolling while in the dashboard
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.replace("/auth/login");
+        } else {
+          setUser(user);
+        }
+      } catch (error) {
+        router.replace("/auth/login");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkUser();
+
+    // Cleanup: restore original overflow when unmounting dashboard
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [router, supabase]);
+
+  const handleLogout = () => {
+    router.push("/auth/logout");
+  };
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!user) return null;
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar
+        user={{
+          name: user.user_metadata?.name || user.email,
+          role: user.user_metadata?.role,
+          email: user.email,
+        }}
+        onLogout={handleLogout}
+      />
+
+      {/* Main Content */}
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50">
+        {children}
+      </main>
+    </div>
+  );
+}

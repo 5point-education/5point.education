@@ -1,0 +1,478 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Enums
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  TEACHER
+  STUDENT
+}
+
+enum ServiceType {
+  HOME_TUTOR
+  TUITION_BATCH
+}
+
+enum Board {
+  ICSE
+  CBSE
+  WBBSE
+  OTHER
+}
+
+enum EnquiryStatus {
+  PENDING
+  FEES_DISCUSSED
+  ADMITTED
+  LOST
+}
+
+enum LostReason {
+  FEES
+  TIMING
+  SUBJECT_ISSUES
+  OTHER
+}
+
+enum AdmissionStatus {
+  ACTIVE      // Student is active
+  COMPLETED   // Batch ended, student completed
+  WITHDRAWN   // Student left before batch ended
+  CANCELLED   // Admission cancelled
+}
+
+enum NoticeScope {
+  GLOBAL
+  BATCH
+  INDIVIDUAL
+}
+
+enum NoticePriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// Models
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+
+  role          Role
+  image         String?
+  is_active     Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  studentProfile StudentProfile?
+  teacherProfile TeacherProfile?
+  batches        Batch[]
+  enquiries      Enquiry[]
+  noticesCreated Notice[]         @relation("NoticesCreated")
+  teacherFeeSheetsAsTeacher TeacherFeeSheet[] @relation("TeacherFeeSheetTeacher")
+  teacherFeeSheetsCreated   TeacherFeeSheet[] @relation("TeacherFeeSheetCreatedBy")
+
+  @@map("users")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model StudentProfile {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  // Personal Details
+  gender                  Gender?
+  dob                     DateTime?
+  fatherName              String?
+  motherName              String?
+  parentMobile            String?
+  permanentAddress        String?
+  correspondenceAddress   String?  // Current Address
+  aadharNo                String?
+  nationality             String?  @default("Indian")
+  
+  // Transport & Legal (NEW)
+  transport_facility      Boolean  @default(false)
+  pickup_location         String?
+  terms_accepted          Boolean  @default(false)
+  declaration_accepted    Boolean  @default(false)
+  
+  // Previous fields mapped or kept
+  age                     Int?     // Calculated from DOB usually, but keeping for legacy compatibility or quick access
+  phone                   String   // Student's own mobile
+  
+  // Academic & Course Info
+  board                   Board?
+  class_level             Int?
+  stream                  String?  // Science, Commerce, Arts
+  aspirant_of             String?  // JEE, NEET, etc.
+  competitive_exams       String?  // NEW: Comma separated list of exams (NEET, JEE, CAT, etc.)
+  service_type            ServiceType
+  
+  // Complex Data
+  subjects                String?  // Comma separated list of subjects
+  chosen_courses          Json?    // Stores checkbox selections: { engineering: [], robotics: [], extra: [] }
+  source_of_enquiry       String?
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admissions Admission[]
+  payments  Payment[]
+  results   Result[]
+  examScores ExamScore[]
+  academicRecords AcademicRecord[]
+  attendances  Attendance[]
+  noticeRecipients NoticeRecipient[]
+  subscriptions StudentSubscription[]
+  teacherFeeSheetRows TeacherFeeSheetRow[]
+
+  @@map("student_profiles")
+}
+
+model AcademicRecord {
+  id              String   @id @default(cuid())
+  studentId       String
+  qualification   String   // Class 10, 12, etc.
+  exam            String?  // Board Exam Name
+  year            String?  // YYYY-YYYY
+  institution     String?
+  percentage      String?
+  
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("academic_records")
+}
+
+model TeacherProfile {
+  id                      String @id @default(cuid())
+  userId                  String @unique
+  qualifications          String
+  experience_years        Int
+  subjects_specialization String // Store as comma-separated or JSON
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("teacher_profiles")
+}
+
+model Enquiry {
+  id                    String        @id @default(cuid())
+  name                  String
+  phone                 String
+  email                 String?
+  class_level           Int
+  subjects              String
+  service_type          ServiceType
+  status                EnquiryStatus @default(PENDING)
+  follow_up_date        DateTime?
+  lost_reason           LostReason?
+  assigned_counselor_id String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  assignedCounselor User? @relation(fields: [assigned_counselor_id], references: [id])
+
+  @@map("enquiries")
+}
+
+enum FeeModel {
+  ONE_TIME    // Single payment for the entire course
+  MONTHLY     // Monthly recurring payments
+  QUARTERLY   // Quarterly (every 3 months)
+  CUSTOM      // Custom installment schedule
+}
+
+model Batch {
+  id         String   @id @default(cuid())
+  name       String
+  subject    String
+  classLevel String?  // Class level (1-12) or course name (JEE, ECE, etc.)
+  board      String?  // e.g. ICSE, CBSE, WB, WBBSE — entered manually when creating batch
+  teacherId  String
+  schedule   String
+  capacity  Int?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // NEW: Start and end dates
+  startDate DateTime? // Batch start date
+  endDate   DateTime? // When batch ends/archived
+
+  // Fee Configuration
+  feeModel     FeeModel? // Type of fee structure
+  feeAmount    Float?    // Base fee amount
+  installments Json?     // For CUSTOM: [{ name: "Installment 1", amount: 5000, dueDate: "2026-02-01" }]
+
+  // Days-wise Fee Configuration
+  daysWiseFeesEnabled Boolean @default(false)
+  daysWiseFees        Json?   // { "1": 500, "2": 900, "3": 1200, "4": 1500 }
+
+  teacher    User        @relation(fields: [teacherId], references: [id])
+  admissions Admission[]
+  exams      Exam[]
+  attendances  Attendance[]
+  notices      Notice[]
+  teacherFeeSheets TeacherFeeSheet[]
+
+  @@map("batches")
+}
+
+model Admission {
+  id                       String   @id @default(cuid())
+  studentId                String
+  batchId                  String?
+  admission_date           DateTime @default(now())
+  total_fees               Float    // Batch fee (used for recurring)
+  admission_charge         Float    @default(0) // One-time extra charge during admission
+  admission_charge_pending Float    @default(0) // Pending amount of admission charge
+  fees_pending             Float    // Pending batch fees only (not including admission charge)
+  selectedDays             Int?     // For days-wise fees: number of days per week selected
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  // NEW: End date and status
+  endDate        DateTime?        // When student left or batch ended
+  status         AdmissionStatus @default(ACTIVE)
+  admission_in_charge String?      // NEW: Admission In-charge name
+
+
+  // Discount fields
+  discount_value   Float    @default(0)  // Fixed discount amount in rupees (deducted from monthly fee)
+  discount_type    String?              // Optional: "Sibling Discount", "Early Bird", etc.
+
+  student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batch            Batch?               @relation(fields: [batchId], references: [id])
+  payments         Payment[]           // Direct relation to payments
+  teacherFeeSheetRows TeacherFeeSheetRow[]
+
+  @@map("admissions")
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  studentId  String
+  admissionId String? // NEW: Link to specific admission
+  amount     Float
+  date       DateTime @default(now())
+  mode       String // Cash/UPI/Bank
+  receipt_no String   @unique
+  createdAt  DateTime @default(now())
+
+  // NEW: Month-based coverage
+  coveredMonths   String[] // Array of month strings: ["2025-01", "2025-02"]
+  coveredFromDate DateTime? // Auto-generated from coveredMonths
+  coveredToDate   DateTime? // Auto-generated from coveredMonths
+  
+  notes           String?  // Optional notes
+
+  student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  admission        Admission?           @relation(fields: [admissionId], references: [id])
+
+  @@map("payments")
+}
+
+model TeacherFeeSheet {
+  id                String   @id @default(cuid())
+  month             String   // YYYY-MM
+  batchId           String
+  teacherId         String
+  createdById       String
+  totalReceived     Float    @default(0)
+  totalDeductions   Float    @default(0)
+  totalTeacherAmount Float   @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  batch      Batch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  teacher    User   @relation("TeacherFeeSheetTeacher", fields: [teacherId], references: [id])
+  createdBy  User   @relation("TeacherFeeSheetCreatedBy", fields: [createdById], references: [id])
+  rows       TeacherFeeSheetRow[]
+
+  @@unique([month, batchId])
+  @@index([teacherId, month])
+  @@map("teacher_fee_sheets")
+}
+
+model TeacherFeeSheetRow {
+  id              String   @id @default(cuid())
+  sheetId         String
+  studentId       String?
+  admissionId     String?
+  studentName     String
+  totalReceived   Float    @default(0)
+  fivePointFees   Float    @default(0)
+  developmentFees Float    @default(0)
+  discount        Float    @default(0)
+  teacherAmount   Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sheet     TeacherFeeSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  student   StudentProfile? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  admission Admission?      @relation(fields: [admissionId], references: [id], onDelete: SetNull)
+
+  @@index([sheetId])
+  @@index([admissionId])
+  @@map("teacher_fee_sheet_rows")
+}
+
+model Exam {
+  id          String   @id @default(cuid())
+  batchId     String
+  date        DateTime
+  total_marks Int
+  name        String
+  createdAt   DateTime @default(now())
+
+  batch    Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  chapters Chapter[]
+  results  Result[]
+
+  @@index([batchId])
+  @@map("exams")
+}
+
+model Chapter {
+  id        String @id @default(cuid())
+  examId    String
+  name      String
+  max_marks Float
+  order     Int    @default(0)
+
+  exam   Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  scores ExamScore[]
+
+  @@index([examId])
+  @@map("chapters")
+}
+
+model ExamScore {
+  id        String @id @default(cuid())
+  chapterId String
+  studentId String
+  marks     Float
+
+  chapter Chapter        @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, studentId])
+  @@index([studentId])
+  @@map("exam_scores")
+}
+
+model Result {
+  id        String   @id @default(cuid())
+  examId    String
+  studentId String
+  score     Float
+  remarks   String?
+  createdAt DateTime @default(now())
+
+  exam    Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, studentId])
+  @@map("results")
+}
+
+model Attendance {
+  id         String   @id @default(cuid())
+  date       DateTime @default(now())
+  batchId    String
+  studentId  String
+  status     Boolean  @default(true) // true = Present, false = Absent
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  batch   Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([date, batchId, studentId])
+  @@map("attendances")
+}
+
+model Notice {
+  id          String         @id @default(cuid())
+  title       String
+  body        String
+  scope       NoticeScope
+  priority    NoticePriority @default(NORMAL)
+  expiresAt   DateTime?
+  createdById String
+  batchId     String?
+  isDeleted   Boolean        @default(false)
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  creator    User              @relation("NoticesCreated", fields: [createdById], references: [id])
+  batch      Batch?            @relation(fields: [batchId], references: [id])
+  recipients NoticeRecipient[]
+
+  @@index([scope, batchId])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("notices")
+}
+
+model NoticeRecipient {
+  id        String @id @default(cuid())
+  noticeId  String
+  studentId String
+
+  notice  Notice         @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([noticeId, studentId])
+  @@index([studentId])
+  @@map("notice_recipients")
+}
+
+// Subscription Management
+model SubscriptionTier {
+  id             String    @id @default(cuid())
+  name           String    @unique
+  durationMonths Int?                   // null = unlimited
+  isActive       Boolean   @default(true) // Soft-disable, never hard-delete
+  displayOrder   Int       @default(0)    // For sorted dropdown rendering
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  subscriptions StudentSubscription[]
+
+  @@map("subscription_tiers")
+}
+
+model StudentSubscription {
+  id        String    @id @default(cuid())
+  studentId String
+  tierId    String
+  startDate DateTime  @default(now())
+  endDate   DateTime?               // null = unlimited (Premium)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  student StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  tier    SubscriptionTier @relation(fields: [tierId], references: [id])
+
+  @@index([studentId])
+  @@index([tierId])
+  @@map("student_subscriptions")
+}

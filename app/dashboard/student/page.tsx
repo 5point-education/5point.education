@@ -1,0 +1,547 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from "recharts";
+import {
+  BookOpen,
+  TrendingUp,
+  Clock,
+  CheckCircle2,
+  IndianRupee,
+  Info,
+  Percent,
+  CreditCard,
+  Crown,
+  Infinity,
+  AlertTriangle
+} from "lucide-react";
+import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+
+interface DashboardData {
+  overview: {
+    totalExams: number;
+    averageScore: number;
+    pendingFees: number;
+    totalFeesPending: number;
+    totalAdmissionChargePending: number;
+    totalDiscounts: number;
+    nextClass: string;
+  };
+  feesBreakdown: Array<{
+    admissionId: string;
+    batchName: string;
+    feesPending: number;
+    admissionChargePending: number;
+    totalPending: number;
+    monthlyFee: number;
+    pendingMonths: number;
+    discountVal: number;
+    discountType?: string;
+    status: string;
+  }>;
+  discountsBreakdown: Array<{
+    batchName: string;
+    discountValue: number;
+    discountType?: string;
+    status: string;
+  }>;
+  performanceData: Array<{
+    examName: string;
+    score: number;
+    totalMarks: number;
+    date: string;
+  }>;
+  recentResults: Array<{
+    id: string;
+    examName: string;
+    subject: string;
+    score: number;
+    totalMarks: number;
+    remarks: string;
+    date: string;
+  }>;
+}
+
+export default function StudentDashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [subscriptionData, setSubscriptionData] = useState<any>(null);
+
+  const [timeOfDay, setTimeOfDay] = useState("day");
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setTimeOfDay("morning");
+    else if (hour < 18) setTimeOfDay("afternoon");
+    else setTimeOfDay("evening");
+
+    fetchDashboardData();
+    fetchSubscription();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      const response = await fetch("/api/student/dashboard");
+      const result = await response.json();
+      setData(result);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSubscription = async () => {
+    try {
+      const res = await fetch("/api/student/subscription");
+      if (res.ok) {
+        const result = await res.json();
+        setSubscriptionData(result);
+      }
+    } catch (error) {
+      console.error("Error fetching subscription:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="text-center py-12">
+        <h3 className="text-xl font-semibold text-slate-700">Unable to load dashboard data</h3>
+        <p className="text-slate-500 mt-2">Please try refreshing the page</p>
+      </div>
+    );
+  }
+
+  const chartData = data.performanceData.map((item) => ({
+    name: item.examName,
+    score: item.score,
+    percentage: parseFloat(((item.score / item.totalMarks) * 100).toFixed(1)),
+  }));
+
+  // Parse Schedule safely
+  let scheduleItems: any[] = [];
+  try {
+    const parsed = JSON.parse(data.overview.nextClass);
+    if (Array.isArray(parsed)) scheduleItems = parsed;
+    else scheduleItems = [{ day: "General", time: data.overview.nextClass }];
+  } catch {
+    scheduleItems = [{ day: "Info", time: data.overview.nextClass }];
+  }
+
+  return (
+    <div className="p-4 pt-20 md:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 bg-slate-50/50 min-h-screen">
+
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+
+        {/* LEFT MAIN COLUMN */}
+        <div className="xl:col-span-3 space-y-6">
+
+          {/* 0. Pending Payment Banner */}
+          {data.overview.pendingFees > 0 && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-sm mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <IndianRupee className="h-5 w-5 text-yellow-600 mr-2" />
+                  <div>
+                    <p className="text-sm font-bold text-yellow-800">
+                      Payment Pending: ₹{data.overview.pendingFees.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      Please clear your dues to avoid service interruption.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Subscription Status Card */}
+          {subscriptionData && subscriptionData.hasSubscription && (
+            <Card className={`border-0 shadow-md rounded-2xl overflow-hidden ${
+              subscriptionData.status === 'active'
+                ? 'bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20'
+                : 'bg-gradient-to-r from-red-50 via-rose-50 to-orange-50 dark:from-red-950/20 dark:to-rose-950/20'
+            }`}>
+              <CardContent className="p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className={`h-12 w-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                    subscriptionData.status === 'active'
+                      ? 'bg-amber-100 dark:bg-amber-900/40'
+                      : 'bg-red-100 dark:bg-red-900/40'
+                  }`}>
+                    <Crown className={`h-6 w-6 ${
+                      subscriptionData.status === 'active'
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-red-500 dark:text-red-400'
+                    }`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-slate-800 dark:text-white">
+                        {subscriptionData.subscription.tierName} Plan
+                      </h3>
+                      <Badge className={`text-[10px] ${
+                        subscriptionData.status === 'active'
+                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-400'
+                          : 'bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/40 dark:text-red-400'
+                      }`}>
+                        {subscriptionData.status === 'active' ? 'Active' : 'Expired'}
+                      </Badge>
+                      {subscriptionData.subscription.isUnlimited && (
+                        <Badge className="text-[10px] bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-400">
+                          <Infinity className="h-3 w-3 mr-0.5" /> Unlimited
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        Started: {format(new Date(subscriptionData.subscription.startDate), 'MMM d, yyyy')}
+                      </span>
+                      {subscriptionData.subscription.endDate && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          {subscriptionData.status === 'active' ? 'Expires' : 'Expired'}:{' '}
+                          {format(new Date(subscriptionData.subscription.endDate), 'MMM d, yyyy')}
+                        </span>
+                      )}
+                      {subscriptionData.status === 'active' && subscriptionData.daysRemaining !== null && (
+                        <span className="font-medium text-amber-700 dark:text-amber-400">
+                          {subscriptionData.daysRemaining} day{subscriptionData.daysRemaining !== 1 ? 's' : ''} remaining
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {subscriptionData.status === 'expired' && (
+                  <div className="mt-3 flex items-center gap-2 p-2.5 bg-red-100/60 dark:bg-red-900/20 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                    <p className="text-xs text-red-700 dark:text-red-400">
+                      Your analytics access has expired. Contact the reception to renew your subscription.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 1. Welcome Banner */}
+          <div className="relative overflow-hidden rounded-3xl bg-[#2563eb] p-8 text-white shadow-xl shadow-blue-200">
+            <div className="relative z-10 flex flex-col justify-center h-full max-w-2xl">
+              <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white mb-2">
+                Good {timeOfDay}, Student! 👋
+              </h1>
+              <p className="text-blue-100 text-base md:text-xl font-light leading-relaxed">
+                You&apos;ve completed <span className="font-semibold text-white">{data.overview.totalExams} exams</span> so far.
+                Keep pushing your limits!
+              </p>
+            </div>
+
+            {/* Abstract Illustration Elements */}
+            <div className="absolute right-0 bottom-0 opacity-20 transform translate-x-1/4 translate-y-1/4">
+              <svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#FFFFFF" d="M44.7,-76.4C58.9,-69.2,71.8,-59.1,81.6,-46.6C91.4,-34.1,98.1,-19.2,95.8,-5.4C93.5,8.4,82.2,21.1,70.9,32.2C59.6,43.3,48.3,52.8,36.4,60.6C24.5,68.4,12,74.5,-0.3,75C-12.6,75.5,-25.1,70.4,-36.4,63.1C-47.7,55.8,-57.8,46.3,-66.2,35.1C-74.6,23.9,-81.3,11,-80.4,-1.5C-79.5,-13.9,-71,-25.9,-61.4,-36.3C-51.8,-46.7,-41.1,-55.5,-29.4,-64.1C-17.7,-72.7,-5,-81.1,5.9,-91.3L16.8,-101.5L44.7,-76.4Z" transform="translate(100 100)" />
+              </svg>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* 2. Performance Chart (Takes 2/3) */}
+            <Card className="lg:col-span-2 border-none shadow-sm rounded-3xl bg-white">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 bg-transparent">
+                <div className="space-y-1">
+                  <CardTitle className="text-lg md:text-xl font-bold text-slate-800">Overall Performance</CardTitle>
+                  <CardDescription>Score trajectory over time</CardDescription>
+                </div>
+                <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-bold shadow-sm">
+                  Avg: {data.overview.averageScore}%
+                </div>
+              </CardHeader>
+              <CardContent className="pl-0">
+                <div className="h-[250px] md:h-[400px] w-full mt-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#94a3b8', fontSize: 12 }}
+                        dy={10}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#94a3b8', fontSize: 12 }}
+                        tickFormatter={(val) => `${val}%`}
+                      />
+                      <Tooltip
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                        itemStyle={{ color: '#1e293b', fontWeight: 600 }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="percentage"
+                        stroke="#3b82f6"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorScore)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 3. Statistics Stack (Takes 1/3) */}
+            <div className="flex flex-col gap-4">
+
+              {/* Stat 1: Pending Fees */}
+              <Card className="flex-1 border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow bg-white z-20 overflow-visible">
+                <div className="p-4 flex items-center h-full">
+                  <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mr-4 ${data.overview.pendingFees > 0 ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-green-600'}`}>
+                    <IndianRupee className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xl md:text-2xl font-bold text-slate-800">
+                      {data.overview.pendingFees > 0 ? `₹${data.overview.pendingFees.toLocaleString('en-IN')}` : 'Clear'}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-slate-500 font-medium">
+                        {data.overview.pendingFees > 0 ? 'Total Pending Fees' : 'All Dues Cleared'}
+                      </p>
+                      {data.overview.pendingFees > 0 && (
+                        <div className="group relative">
+                          <Info className="h-4 w-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
+
+                          <div className="absolute left-1/2 bottom-full mb-3 -translate-x-1/2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none group-hover:pointer-events-auto origin-bottom z-50">
+                            <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 rotate-45 w-3 h-3 bg-white border-r border-b border-slate-100"></div>
+                            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-2 border-b border-slate-50">Fee Breakdown</p>
+                            <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                              {data.feesBreakdown.map((item, idx) => (
+                                <div key={idx} className="space-y-1">
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-xs font-semibold text-slate-700 line-clamp-1 flex-1 mr-2">{item.batchName}</span>
+                                    <span className="text-xs font-bold text-rose-600 whitespace-nowrap">₹{item.totalPending.toLocaleString('en-IN')}</span>
+                                  </div>
+                                  {item.discountVal > 0 && (
+                                    <div className="flex items-center text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded w-fit">
+                                      <span>Disc: -₹{item.discountVal.toLocaleString('en-IN')}</span>
+                                    </div>
+                                  )}
+                                  {item.pendingMonths > 0 && (
+                                    <p className="text-[10px] text-slate-400">
+                                      {item.pendingMonths} month(s) pending
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Stat 2: Admission Charge Pending - Only show if student has pending admission charges */}
+              {data.overview.totalAdmissionChargePending > 0 && (
+                <Card className="flex-1 border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow bg-white z-20 overflow-visible">
+                  <div className="p-4 flex items-center h-full">
+                    <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 mr-4">
+                      <CreditCard className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xl md:text-2xl font-bold text-slate-800">
+                        ₹{data.overview.totalAdmissionChargePending.toLocaleString('en-IN')}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-slate-500 font-medium">Admission Charge Pending</p>
+                        {/* {data.feesBreakdown.filter(item => item.admissionChargePending > 0).length > 0 && (
+                          <div className="group relative">
+                            <Info className="h-4 w-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
+
+                            <div className="absolute left-1/2 bottom-full mb-3 -translate-x-1/2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none group-hover:pointer-events-auto origin-bottom z-50">
+                              <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 rotate-45 w-3 h-3 bg-white border-r border-b border-slate-100"></div>
+                              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-2 border-b border-slate-50">Admission Charge Breakdown</p>
+                              <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                                {data.feesBreakdown.filter(item => item.admissionChargePending > 0).map((item, idx) => (
+                                  <div key={idx} className="space-y-1">
+                                    <div className="flex justify-between items-start">
+                                      <span className="text-xs font-semibold text-slate-700 line-clamp-1 flex-1 mr-2">{item.batchName}</span>
+                                      <span className="text-xs font-bold text-amber-600 whitespace-nowrap">₹{item.admissionChargePending.toLocaleString('en-IN')}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )} */}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Stat 3: Total Discounts - Only show if student has discounts */}
+              {data.overview.totalDiscounts > 0 && (
+                <Card className="flex-1 border-none shadow-sm rounded-2xl hover:shadow-md transition-shadow bg-white z-20 overflow-visible">
+                  <div className="p-4 flex items-center h-full">
+                    <div className="h-12 w-12 rounded-2xl bg-green-50 flex items-center justify-center text-green-600 mr-4">
+                      <Percent className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xl md:text-2xl font-bold text-slate-800">
+                        ₹{data.overview.totalDiscounts.toLocaleString('en-IN')}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-slate-500 font-medium">Total Discounts</p>
+                        {data.discountsBreakdown.length > 0 && (
+                          <div className="group relative">
+                            <Info className="h-4 w-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
+
+                            <div className="absolute left-1/2 bottom-full mb-3 -translate-x-1/2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none group-hover:pointer-events-auto origin-bottom z-50">
+                              <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 rotate-45 w-3 h-3 bg-white border-r border-b border-slate-100"></div>
+                              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 pb-2 border-b border-slate-50">Discount Breakdown</p>
+                              <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                                {data.discountsBreakdown.map((item, idx) => (
+                                  <div key={idx} className="space-y-1">
+                                    <div className="flex justify-between items-start">
+                                      <span className="text-xs font-semibold text-slate-700 line-clamp-1 flex-1 mr-2">{item.batchName}</span>
+                                      <span className="text-xs font-bold text-green-600 whitespace-nowrap">-₹{item.discountValue.toLocaleString('en-IN')}</span>
+                                    </div>
+                                    {item.discountType && (
+                                      <div className="flex items-center text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded w-fit">
+                                        <span>{item.discountType.replace('_', ' ')}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Stat 3: Total Exams */}
+              <Card className="flex-1 border-none shadow-sm rounded-2xl flex items-center p-4 hover:shadow-md transition-shadow">
+                <div className="h-12 w-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600 mr-4">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-xl md:text-2xl font-bold text-slate-800">{data.overview.totalExams}</p>
+                  <p className="text-sm text-slate-500 font-medium">Total Exams</p>
+                </div>
+              </Card>
+
+              {/* Stat 4: Average Score */}
+              <Card className="flex-1 border-none shadow-sm rounded-2xl flex items-center p-4 hover:shadow-md transition-shadow">
+                <div className="h-12 w-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 mr-4">
+                  <TrendingUp className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-xl md:text-2xl font-bold text-slate-800">{data.overview.averageScore}%</p>
+                  <p className="text-sm text-slate-500 font-medium">Average Score</p>
+                </div>
+              </Card>
+            </div>
+
+          </div>
+
+
+
+        </div>
+
+        {/* RIGHT SIDEBAR COLUMN */}
+        <div className="xl:col-span-1 space-y-6">
+
+          {/* 5. Upcoming Classes Widget */}
+          <Card className="border-none shadow-sm rounded-3xl bg-white h-auto">
+            <CardHeader className="pb-3 border-b border-slate-50">
+              <CardTitle className="text-lg font-bold text-slate-800 flex items-center justify-between">
+                <span>Upcoming Classes</span>
+                <span className="text-xs bg-slate-100 px-2 py-1 rounded-full text-slate-500 font-normal">{scheduleItems.length} active</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              {scheduleItems.map((item: any, idx) => (
+                <div key={idx} className="flex flex-col p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100 hover:bg-indigo-50 transition-colors">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-indigo-900">{item.day}</span>
+
+                  </div>
+                  <div className="flex items-center text-sm text-slate-600">
+                    <Clock className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
+                    {item.time ? item.time : (item.startTime && item.endTime ? `${item.startTime} - ${item.endTime}` : "Time check required")}
+                  </div>
+                </div>
+              ))}
+
+              <button className="w-full py-2 text-sm text-indigo-600 font-medium hover:bg-indigo-50 rounded-xl transition-colors mt-2">
+                View Full Schedule
+              </button>
+            </CardContent>
+          </Card>
+
+          {/* 6. Recent Results Widget */}
+          <Card className="border-none shadow-sm rounded-3xl bg-white">
+            <CardHeader className="pb-3 border-b border-slate-50">
+              <CardTitle className="text-lg font-bold text-slate-800 flex items-center justify-between">
+                <span>Recent Results</span>
+                <span className="text-xs bg-slate-100 px-2 py-1 rounded-full text-slate-500 font-normal">History</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              {data.recentResults.slice(0, 5).map((result) => {
+                const percentage = (result.score / result.totalMarks) * 100;
+                return (
+                  <div key={result.id} className="flex items-center justify-between p-1">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${percentage >= 80 ? 'bg-green-100 text-green-600' : percentage >= 50 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800 line-clamp-1">{result.examName}</p>
+                        <p className="text-xs text-slate-500">{result.subject}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-slate-800">{percentage.toFixed(0)}%</p>
+                      <p className="text-[10px] text-slate-400">{format(new Date(result.date), "MMM dd")}</p>
+                    </div>
+                  </div>
+                )
+              })}
+              <div className="pt-2">
+                <p className="text-center text-xs text-slate-400">Average Score: <span className="text-slate-700 font-semibold">{data.overview.averageScore}%</span></p>
+              </div>
+            </CardContent>
+          </Card>
+
+        </div>
+      </div>
+    </div>
+  );
+}
