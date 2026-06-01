@@ -87,12 +87,7 @@ npm install
 Create a `.env` file in the root directory:
 
 ```env
-# Database - Replace with your PostgreSQL connection string
-DATABASE_URL="postgresql://username:password@localhost:5432/5point_edu?schema=public"
 
-# NextAuth - Generate a random secret: openssl rand -base64 32
-NEXTAUTH_SECRET="your-secret-key-here"
-NEXTAUTH_URL="http://localhost:3000"
 ```
 
 ---
@@ -121,7 +116,7 @@ npm run dev
 Visit:
 
 ```
-http://localhost:3000
+
 ```
 
 ---
