@@ -65,6 +65,13 @@ interface BatchItem {
   };
 }
 
+interface BatchAttendanceState {
+  students: StudentAttendance[];
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+}
+
 const DAY_INDEX_MAP: Record<string, number> = {
   sun: 0,
   sunday: 0,
@@ -113,6 +120,33 @@ function parseScheduledDayIndexes(schedule: string | undefined): number[] {
   return Array.from(matchedDays);
 }
 
+function normalizeStudentsForAttendance(students: StudentAttendance[]) {
+  return students.map((student) => ({
+    ...student,
+    isPresent: student.isPresent === null ? false : student.isPresent,
+  }));
+}
+
+function getAttendanceSummary(students: StudentAttendance[]) {
+  const present = students.filter((student) => student.isPresent === true).length;
+  const absent = students.filter((student) => student.isPresent === false).length;
+
+  return {
+    present,
+    absent,
+    total: students.length,
+  };
+}
+
+function createEmptyBatchAttendanceState(): BatchAttendanceState {
+  return {
+    students: [],
+    loading: false,
+    saving: false,
+    error: null,
+  };
+}
+
 const AttendanceComponent = ({
   title,
   description,
@@ -122,11 +156,11 @@ const AttendanceComponent = ({
   const { toast } = useToast();
   const [batches, setBatches] = useState<BatchItem[]>([]);
   const [students, setStudents] = useState<StudentAttendance[]>([]);
+  const [teacherBatchStates, setTeacherBatchStates] = useState<Record<string, BatchAttendanceState>>({});
   const [selectedBatch, setSelectedBatch] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState({ present: 0, absent: 0, total: 0 });
-  const [showOtherBatches, setShowOtherBatches] = useState(false);
 
   // History states
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceHistory[]>([]);
@@ -174,38 +208,18 @@ const AttendanceComponent = ({
     return batches.filter((batch) => parseScheduledDayIndexes(batch.schedule).includes(todayDayIndex));
   }, [batches, teacherTodayFocus, todayDayIndex]);
 
-  const primaryTeacherBatches = useMemo(() => {
-    if (!teacherTodayFocus) return batches;
-    if (todaysBatches.length === 0) return batches;
-    return todaysBatches;
-  }, [batches, teacherTodayFocus, todaysBatches]);
-
-  const otherTeacherBatches = useMemo(() => {
+  const visibleTeacherBatches = useMemo(() => {
     if (!teacherTodayFocus) return [];
-    const primarySet = new Set(primaryTeacherBatches.map((batch) => batch.id));
-    return batches.filter((batch) => !primarySet.has(batch.id));
-  }, [batches, teacherTodayFocus, primaryTeacherBatches]);
+    if (todaysBatches.length === 0) return batches;
+
+    const todayBatchIds = new Set(todaysBatches.map((batch) => batch.id));
+    return [...todaysBatches, ...batches.filter((batch) => !todayBatchIds.has(batch.id))];
+  }, [batches, teacherTodayFocus, todaysBatches]);
 
   useEffect(() => {
     if (!teacherTodayFocus) return;
     setActiveTab('new');
   }, [teacherTodayFocus]);
-
-  useEffect(() => {
-    if (!teacherTodayFocus) return;
-    if (primaryTeacherBatches.length === 0) {
-      setSelectedBatch('');
-      return;
-    }
-
-    setSelectedBatch((currentBatch) => {
-      if (currentBatch && primaryTeacherBatches.some((batch) => batch.id === currentBatch)) {
-        return currentBatch;
-      }
-      if (primaryTeacherBatches.length === 1) return primaryTeacherBatches[0].id;
-      return primaryTeacherBatches[0].id;
-    });
-  }, [teacherTodayFocus, primaryTeacherBatches]);
 
   // Fetch attendance history
   const fetchAttendanceHistory = useCallback(async () => {
@@ -231,9 +245,85 @@ const AttendanceComponent = ({
     fetchAttendanceHistory();
   }, [fetchAttendanceHistory]);
 
+  const updateTeacherBatchState = useCallback(
+    (batchId: string, updater: (currentState: BatchAttendanceState) => BatchAttendanceState) => {
+      setTeacherBatchStates((currentStates) => {
+        const currentState = currentStates[batchId] ?? createEmptyBatchAttendanceState();
+        return {
+          ...currentStates,
+          [batchId]: updater(currentState),
+        };
+      });
+    },
+    []
+  );
+
+  const fetchTeacherBatchAttendance = useCallback(
+    async (batchId: string) => {
+      if (!selectedDate) return;
+
+      updateTeacherBatchState(batchId, (currentState) => ({
+        ...currentState,
+        loading: true,
+        error: null,
+      }));
+
+      try {
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const response = await fetch(`/api/attendance?batchId=${batchId}&date=${dateStr}`);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch students');
+        }
+
+        const data = await response.json();
+        const normalizedStudents = normalizeStudentsForAttendance(data);
+
+        updateTeacherBatchState(batchId, (currentState) => ({
+          ...currentState,
+          students: normalizedStudents,
+          loading: false,
+          error: null,
+        }));
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        updateTeacherBatchState(batchId, (currentState) => ({
+          ...currentState,
+          students: [],
+          loading: false,
+          error: 'Failed to fetch students for this batch.',
+        }));
+      }
+    },
+    [selectedDate, updateTeacherBatchState]
+  );
+
+  useEffect(() => {
+    if (!teacherTodayFocus || activeTab !== 'new') return;
+
+    if (visibleTeacherBatches.length === 0) {
+      setTeacherBatchStates({});
+      return;
+    }
+
+    setTeacherBatchStates((currentStates) => {
+      const nextStates: Record<string, BatchAttendanceState> = {};
+
+      visibleTeacherBatches.forEach((batch) => {
+        nextStates[batch.id] = currentStates[batch.id] ?? createEmptyBatchAttendanceState();
+      });
+
+      return nextStates;
+    });
+
+    visibleTeacherBatches.forEach((batch) => {
+      fetchTeacherBatchAttendance(batch.id);
+    });
+  }, [activeTab, fetchTeacherBatchAttendance, teacherTodayFocus, visibleTeacherBatches]);
+
   // Fetch students when batch and date are selected
   const fetchStudentsForAttendance = useCallback(async () => {
-    if (!selectedBatch || !selectedDate) return;
+    if (teacherTodayFocus || !selectedBatch || !selectedDate) return;
 
     setLoading(true);
     try {
@@ -245,13 +335,7 @@ const AttendanceComponent = ({
       }
 
       const data = await response.json();
-      // Set all students to absent by default if they don't have attendance marked
-      // This ensures no student has null/undefined status and prevents data inconsistency
-      const studentsWithDefaultStatus = data.map((student: StudentAttendance) => ({
-        ...student,
-        isPresent: student.isPresent === null ? false : student.isPresent
-      }));
-      setStudents(studentsWithDefaultStatus);
+      setStudents(normalizeStudentsForAttendance(data));
     } catch (error) {
       console.error('Error fetching students:', error);
       toast({
@@ -262,7 +346,7 @@ const AttendanceComponent = ({
     } finally {
       setLoading(false);
     }
-  }, [selectedBatch, selectedDate, toast]);
+  }, [selectedBatch, selectedDate, teacherTodayFocus, toast]);
 
   useEffect(() => {
     if (selectedBatch && activeTab === 'new') {
@@ -272,16 +356,16 @@ const AttendanceComponent = ({
 
   // Update summary when students change
   useEffect(() => {
-    const presentCount = students.filter(student => student.isPresent === true).length;
-    const absentCount = students.filter(student => student.isPresent === false).length;
-    const totalCount = students.length;
+    if (teacherTodayFocus) return;
+
+    const { present, absent, total } = getAttendanceSummary(students);
 
     setSummary({
-      present: presentCount,
-      absent: absentCount,
-      total: totalCount
+      present,
+      absent,
+      total,
     });
-  }, [students]);
+  }, [students, teacherTodayFocus]);
 
   // Derive filter options
   const uniqueBatches = Array.from(new Set(attendanceHistory.map(h => h.batchName))).sort();
@@ -315,6 +399,15 @@ const AttendanceComponent = ({
     ));
   };
 
+  const handleTeacherAttendanceChange = (batchId: string, studentId: string, isPresent: boolean) => {
+    updateTeacherBatchState(batchId, (currentState) => ({
+      ...currentState,
+      students: currentState.students.map((student) =>
+        student.studentId === studentId ? { ...student, isPresent } : student
+      ),
+    }));
+  };
+
   const handleEditAttendanceChange = (studentId: string, isPresent: boolean) => {
     setEditStudents(prev => prev.map(student =>
       student.studentId === studentId ? { ...student, isPresent } : student
@@ -325,12 +418,19 @@ const AttendanceComponent = ({
     setStudents(prev => prev.map(student => ({ ...student, isPresent: status })));
   };
 
+  const handleTeacherMarkAll = (batchId: string, status: boolean) => {
+    updateTeacherBatchState(batchId, (currentState) => ({
+      ...currentState,
+      students: currentState.students.map((student) => ({ ...student, isPresent: status })),
+    }));
+  };
+
   const handleMarkAllEdit = (status: boolean) => {
     setEditStudents(prev => prev.map(student => ({ ...student, isPresent: status })));
   };
 
   const saveAttendance = async () => {
-    if (!selectedBatch || !selectedDate || students.length === 0) {
+    if (teacherTodayFocus || !selectedBatch || !selectedDate || students.length === 0) {
       toast({
         title: 'Error',
         description: 'Please select a batch and date, and ensure students are loaded',
@@ -393,6 +493,85 @@ const AttendanceComponent = ({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveTeacherAttendance = async (batch: BatchItem) => {
+    const batchState = teacherBatchStates[batch.id] ?? createEmptyBatchAttendanceState();
+
+    if (!selectedDate || batchState.students.length === 0) {
+      toast({
+        title: 'Error',
+        description: `No student attendance is loaded for ${batch.name}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const unmarkedStudents = batchState.students.filter((student) => student.isPresent === null);
+    if (unmarkedStudents.length > 0) {
+      toast({
+        title: 'Error',
+        description: `Please mark attendance for all students in ${batch.name}. ${unmarkedStudents.length} student(s) remaining.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    updateTeacherBatchState(batch.id, (currentState) => ({
+      ...currentState,
+      saving: true,
+      error: null,
+    }));
+
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const attendanceData = batchState.students.map((student) => ({
+        studentId: student.studentId,
+        isPresent: student.isPresent,
+      }));
+
+      const response = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          batchId: batch.id,
+          date: dateStr,
+          attendanceData,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save attendance');
+      }
+
+      const result = await response.json();
+      toast({
+        title: 'Success',
+        description: result.message || `Attendance saved successfully for ${batch.name}`,
+      });
+
+      fetchAttendanceHistory();
+      await fetchTeacherBatchAttendance(batch.id);
+    } catch (error: any) {
+      console.error('Error saving attendance:', error);
+      updateTeacherBatchState(batch.id, (currentState) => ({
+        ...currentState,
+        error: error.message || 'Failed to save attendance',
+      }));
+      toast({
+        title: 'Error',
+        description: error.message || `Failed to save attendance for ${batch.name}`,
+        variant: 'destructive',
+      });
+    } finally {
+      updateTeacherBatchState(batch.id, (currentState) => ({
+        ...currentState,
+        saving: false,
+      }));
     }
   };
 
@@ -505,6 +684,125 @@ const AttendanceComponent = ({
   const formatDate = (dateStr: string) => {
     return format(new Date(dateStr), 'PPP');
   };
+
+  const renderAttendanceStudents = (
+    studentList: StudentAttendance[],
+    onAttendanceChange: (studentId: string, isPresent: boolean) => void,
+    idPrefix: string
+  ) => (
+    <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
+      <div className="md:hidden space-y-4">
+        {studentList.map((student, index) => (
+          <div
+            key={`${idPrefix}-${student.studentId}`}
+            className={`p-4 rounded-lg border ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+          >
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <h4 className="font-medium text-gray-900 text-lg">{student.name}</h4>
+                <p className="text-sm text-gray-600 mt-1">Contact: {student.phone || 'N/A'}</p>
+                <p className="text-sm text-gray-600">Parent: {student.parentName || 'N/A'}</p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => onAttendanceChange(student.studentId, true)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    student.isPresent
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-green-100'
+                  }`}
+                >
+                  Present
+                </button>
+                <button
+                  onClick={() => onAttendanceChange(student.studentId, false)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    !student.isPresent
+                      ? 'bg-red-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-red-100'
+                  }`}
+                >
+                  Absent
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden md:block overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Student Name
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Contact
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Parent/Guardian
+              </th>
+              <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Attendance
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {studentList.map((student, index) => (
+              <tr
+                key={`${idPrefix}-row-${student.studentId}`}
+                className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}
+              >
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-gray-900">{student.name}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-600">{student.phone || 'N/A'}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-600">{student.parentName || 'N/A'}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <div className="flex justify-center space-x-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`${idPrefix}-present-${student.studentId}`}
+                        checked={student.isPresent === true}
+                        onCheckedChange={(checked) => onAttendanceChange(student.studentId, checked as boolean)}
+                        className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 h-5 w-5"
+                      />
+                      <Label
+                        htmlFor={`${idPrefix}-present-${student.studentId}`}
+                        className="text-sm font-medium text-gray-700"
+                      >
+                        Present
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`${idPrefix}-absent-${student.studentId}`}
+                        checked={student.isPresent === false}
+                        onCheckedChange={(checked) => onAttendanceChange(student.studentId, !checked as boolean)}
+                        className="data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500 h-5 w-5"
+                      />
+                      <Label
+                        htmlFor={`${idPrefix}-absent-${student.studentId}`}
+                        className="text-sm font-medium text-gray-700"
+                      >
+                        Absent
+                      </Label>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
   return (
     <div className="container mx-auto py-4 px-4 sm:px-6 lg:px-8">
@@ -795,318 +1093,306 @@ const AttendanceComponent = ({
       {activeTab === 'new' && (
         <Card className="shadow-lg rounded-xl border-0 bg-white overflow-hidden">
           <CardContent className="pt-6">
-            {/* Filters Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="batch" className="text-sm font-medium text-gray-700">
-                  {teacherTodayFocus ? "Today's Batches" : "Select Batch"}
-                </Label>
-
-                {teacherTodayFocus ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {primaryTeacherBatches.map((batch) => (
-                        <Button
-                          key={batch.id}
-                          type="button"
-                          variant={selectedBatch === batch.id ? "default" : "outline"}
-                          className={cn(
-                            "justify-start h-auto py-2 px-3 whitespace-normal text-left",
-                            selectedBatch === batch.id
-                              ? "bg-blue-600 hover:bg-blue-700 text-white"
-                              : "hover:border-blue-300"
-                          )}
-                          onClick={() => setSelectedBatch(batch.id)}
-                        >
-                          <span className="block">
-                            <span className="font-medium">{batch.name}</span>
-                            <span className={cn("block text-xs", selectedBatch === batch.id ? "text-blue-100" : "text-muted-foreground")}>
-                              {batch.subject}
-                            </span>
-                          </span>
-                        </Button>
-                      ))}
-                    </div>
-
-                    {otherTeacherBatches.length > 0 && (
-                      <div className="space-y-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="px-0 text-blue-700 hover:text-blue-800 hover:bg-transparent"
-                          onClick={() => setShowOtherBatches((current) => !current)}
-                        >
-                          {showOtherBatches ? "Hide Other Batches" : "View Other Batches"}
-                        </Button>
-
-                        {showOtherBatches && (
-                          <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Choose from other batches" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {otherTeacherBatches.map((batch) => (
-                                <SelectItem key={batch.id} value={batch.id}>
-                                  {batch.name} - {batch.subject}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+            {teacherTodayFocus ? (
+              <div className="space-y-6 pt-4">
+                <div className="space-y-2 max-w-md">
+                  <Label className="text-sm font-medium text-gray-700">Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !selectedDate && 'text-muted-foreground'
                         )}
-                      </div>
-                    )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(selectedDate, 'PPP') : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => date && setSelectedDate(date)}
+                        disabled={{ after: new Date() }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-                    {primaryTeacherBatches.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        No batches found for this teacher.
-                      </p>
-                    )}
+                {visibleTeacherBatches.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-muted-foreground">
+                    No batches found for this teacher.
                   </div>
                 ) : (
-                  <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Choose a batch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {batches.map(batch => (
-                        <SelectItem key={batch.id} value={batch.id}>
-                          {batch.name} - {batch.subject}
-                          {batch.teacher?.name && ` (Teacher: ${batch.teacher.name})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
+                  <div className="space-y-6">
+                    {visibleTeacherBatches.map((batch, index) => {
+                      const batchState = teacherBatchStates[batch.id] ?? createEmptyBatchAttendanceState();
+                      const batchSummary = getAttendanceSummary(batchState.students);
+                      const isTodayBatch = todaysBatches.some((todayBatch) => todayBatch.id === batch.id);
 
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !selectedDate && 'text-muted-foreground'
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, 'PPP') : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => date && setSelectedDate(date)}
-                      disabled={{ after: new Date() }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-
-            {/* Summary Section */}
-            {selectedBatch && selectedDate && (
-              <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100 shadow-sm">
-                <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                  <span className="bg-blue-100 p-1 rounded-full">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                  Attendance Summary
-                </h3>
-                <div className="flex flex-wrap gap-6">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                    <span className="text-sm font-medium">Present: <span className="font-bold text-green-600">{summary.present}</span></span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-                    <span className="text-sm font-medium">Absent: <span className="font-bold text-red-600">{summary.absent}</span></span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-sm font-medium">Total: <span className="font-bold">{summary.total}</span></span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            {selectedBatch && selectedDate && (
-              <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                <Button
-                  variant="outline"
-                  onClick={() => handleMarkAll(true)}
-                  disabled={loading}
-                  className="flex-1 flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                >
-                  <UserRoundCheck className="h-4 w-4" />
-                  Mark All Present
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleMarkAll(false)}
-                  disabled={loading}
-                  className="flex-1 flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
-                >
-                  <UserRoundX className="h-4 w-4" />
-                  Mark All Absent
-                </Button>
-              </div>
-            )}
-
-            {/* Loading State */}
-            {loading && (
-              <div className="flex justify-center py-10">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              </div>
-            )}
-
-            {/* Attendance Table/List */}
-            {!loading && students.length > 0 && (
-              <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
-                {/* Mobile View - Card Layout */}
-                <div className="md:hidden space-y-4">
-                  {students.map((student, index) => (
-                    <div
-                      key={student.studentId}
-                      className={`p-4 rounded-lg border ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                        }`}
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-medium text-gray-900 text-lg">{student.name}</h4>
-                          <p className="text-sm text-gray-600 mt-1">Contact: {student.phone || 'N/A'}</p>
-                          <p className="text-sm text-gray-600">Parent: {student.parentName || 'N/A'}</p>
-                        </div>
-
-                        <div className="flex flex-col gap-2">
-                          <button
-                            onClick={() => handleAttendanceChange(student.studentId, true)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${student.isPresent
-                              ? 'bg-green-500 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-green-100'
-                              }`}
-                          >
-                            Present
-                          </button>
-                          <button
-                            onClick={() => handleAttendanceChange(student.studentId, false)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!student.isPresent
-                              ? 'bg-red-500 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-red-100'
-                              }`}
-                          >
-                            Absent
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Desktop View - Table Layout */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Student Name
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Contact
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Parent/Guardian
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Attendance
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {students.map((student, index) => (
-                        <tr
-                          key={student.studentId}
-                          className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}
+                      return (
+                        <div
+                          key={batch.id}
+                          className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
                         >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{student.name}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-600">{student.phone || 'N/A'}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-600">{student.parentName || 'N/A'}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <div className="flex justify-center space-x-4">
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`present-${student.studentId}`}
-                                  checked={student.isPresent === true}
-                                  onCheckedChange={(checked) => handleAttendanceChange(student.studentId, checked as boolean)}
-                                  className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 h-5 w-5"
-                                />
-                                <Label
-                                  htmlFor={`present-${student.studentId}`}
-                                  className="text-sm font-medium text-gray-700"
-                                >
-                                  Present
-                                </Label>
+                          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-lg font-semibold text-gray-900">{batch.name}</h3>
+                                {isTodayBatch && (
+                                  <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                                    Today
+                                  </Badge>
+                                )}
+                                {!isTodayBatch && todaysBatches.length > 0 && (
+                                  <Badge variant="outline">Other Batch</Badge>
+                                )}
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`absent-${student.studentId}`}
-                                  checked={student.isPresent === false}
-                                  onCheckedChange={(checked) => handleAttendanceChange(student.studentId, !checked as boolean)}
-                                  className="data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500 h-5 w-5"
-                                />
-                                <Label
-                                  htmlFor={`absent-${student.studentId}`}
-                                  className="text-sm font-medium text-gray-700"
-                                >
-                                  Absent
-                                </Label>
+                              <p className="text-sm text-muted-foreground">{batch.subject}</p>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              Batch {index + 1} of {visibleTeacherBatches.length}
+                            </span>
+                          </div>
+
+                          {batchState.error && (
+                            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                              {batchState.error}
+                            </div>
+                          )}
+
+                          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100 shadow-sm">
+                            <h4 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                              <span className="bg-blue-100 p-1 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                              </span>
+                              Attendance Summary
+                            </h4>
+                            <div className="flex flex-wrap gap-6">
+                              <div className="flex items-center">
+                                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                                <span className="text-sm font-medium">Present: <span className="font-bold text-green-600">{batchSummary.present}</span></span>
+                              </div>
+                              <div className="flex items-center">
+                                <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                                <span className="text-sm font-medium">Absent: <span className="font-bold text-red-600">{batchSummary.absent}</span></span>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium">Total: <span className="font-bold">{batchSummary.total}</span></span>
                               </div>
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+                          </div>
 
-            {/* Save Button */}
-            {selectedBatch && selectedDate && students.length > 0 && (
-              <div className="mt-6 flex justify-end">
-                <Button
-                  onClick={saveAttendance}
-                  disabled={loading}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg transition-all transform hover:scale-105 shadow-md"
-                >
-                  <div className="flex items-center gap-2">
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                        Save Attendance
-                      </>
-                    )}
+                          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                            <Button
+                              variant="outline"
+                              onClick={() => handleTeacherMarkAll(batch.id, true)}
+                              disabled={batchState.loading || batchState.saving || batchState.students.length === 0}
+                              className="flex-1 flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                            >
+                              <UserRoundCheck className="h-4 w-4" />
+                              Mark All Present
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleTeacherMarkAll(batch.id, false)}
+                              disabled={batchState.loading || batchState.saving || batchState.students.length === 0}
+                              className="flex-1 flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                            >
+                              <UserRoundX className="h-4 w-4" />
+                              Mark All Absent
+                            </Button>
+                          </div>
+
+                          {batchState.loading ? (
+                            <div className="flex justify-center py-10">
+                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                            </div>
+                          ) : batchState.students.length > 0 ? (
+                            <>
+                              {renderAttendanceStudents(
+                                batchState.students,
+                                (studentId, isPresent) => handleTeacherAttendanceChange(batch.id, studentId, isPresent),
+                                `teacher-${batch.id}`
+                              )}
+
+                              <div className="mt-6 flex justify-end">
+                                <Button
+                                  onClick={() => saveTeacherAttendance(batch)}
+                                  disabled={batchState.loading || batchState.saving}
+                                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg transition-all transform hover:scale-105 shadow-md"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {batchState.saving ? (
+                                      <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        Saving...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                        Save Attendance
+                                      </>
+                                    )}
+                                  </div>
+                                </Button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-muted-foreground">
+                              No students found for this batch on the selected date.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                </Button>
+                )}
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="batch" className="text-sm font-medium text-gray-700">
+                      Select Batch
+                    </Label>
+                    <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Choose a batch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {batches.map(batch => (
+                          <SelectItem key={batch.id} value={batch.id}>
+                            {batch.name} - {batch.subject}
+                            {batch.teacher?.name && ` (Teacher: ${batch.teacher.name})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !selectedDate && 'text-muted-foreground'
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {selectedDate ? format(selectedDate, 'PPP') : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => date && setSelectedDate(date)}
+                          disabled={{ after: new Date() }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                {selectedBatch && selectedDate && (
+                  <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100 shadow-sm">
+                    <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                      <span className="bg-blue-100 p-1 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                      Attendance Summary
+                    </h3>
+                    <div className="flex flex-wrap gap-6">
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                        <span className="text-sm font-medium">Present: <span className="font-bold text-green-600">{summary.present}</span></span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                        <span className="text-sm font-medium">Absent: <span className="font-bold text-red-600">{summary.absent}</span></span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="text-sm font-medium">Total: <span className="font-bold">{summary.total}</span></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedBatch && selectedDate && (
+                  <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleMarkAll(true)}
+                      disabled={loading}
+                      className="flex-1 flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                    >
+                      <UserRoundCheck className="h-4 w-4" />
+                      Mark All Present
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleMarkAll(false)}
+                      disabled={loading}
+                      className="flex-1 flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                    >
+                      <UserRoundX className="h-4 w-4" />
+                      Mark All Absent
+                    </Button>
+                  </div>
+                )}
+
+                {loading && (
+                  <div className="flex justify-center py-10">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+
+                {!loading && students.length > 0 && renderAttendanceStudents(
+                  students,
+                  handleAttendanceChange,
+                  'reception'
+                )}
+
+                {selectedBatch && selectedDate && students.length > 0 && (
+                  <div className="mt-6 flex justify-end">
+                    <Button
+                      onClick={saveAttendance}
+                      disabled={loading}
+                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg transition-all transform hover:scale-105 shadow-md"
+                    >
+                      <div className="flex items-center gap-2">
+                        {loading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Save Attendance
+                          </>
+                        )}
+                      </div>
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
