@@ -1,0 +1,78 @@
+[
+  {
+    "table": "users",
+    "count": 89
+  },
+  {
+    "table": "student_profiles",
+    "count": 66
+  },
+  {
+    "table": "academic_records",
+    "count": 64
+  },
+  {
+    "table": "teacher_profiles",
+    "count": 15
+  },
+  {
+    "table": "enquiries",
+    "count": 42
+  },
+  {
+    "table": "batches",
+    "count": 212
+  },
+  {
+    "table": "admissions",
+    "count": 175
+  },
+  {
+    "table": "payments",
+    "count": 5
+  },
+  {
+    "table": "teacher_fee_sheets",
+    "count": 2
+  },
+  {
+    "table": "teacher_fee_sheet_rows",
+    "count": 3
+  },
+  {
+    "table": "exams",
+    "count": 38
+  },
+  {
+    "table": "chapters",
+    "count": 38
+  },
+  {
+    "table": "exam_scores",
+    "count": 44
+  },
+  {
+    "table": "results",
+    "count": 44
+  },
+  {
+    "table": "attendances",
+    "count": 326
+  },
+  {
+    "table": "notices",
+    "count": 0
+  },
+  {
+    "table": "notice_recipients",
+    "count": 0
+  },
+  {
+    "table": "subscription_tiers",
+    "count": 3
+  },
+  {
+    "table": "student_subscriptions",
+    "count": 2
+  }
+]

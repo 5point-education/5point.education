@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const batchId = url.searchParams.get("batchId"); // Optional filter by batch
 
-    // Build query condition
+    // Build query condition for attendance records
     const whereCondition: any = {};
     if (batchId) {
       whereCondition.batchId = batchId;
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     // If user is teacher, only show their batches
     if (user.user_metadata.role === Role.TEACHER) {
       const teacherBatches = await db.batch.findMany({
-        where: { teacherId: user.id },
+        where: { teacherId: user.id, isActive: true },
         select: { id: true }
       });
       whereCondition.batchId = { in: teacherBatches.map(b => b.id) };
@@ -91,7 +91,24 @@ export async function GET(req: Request) {
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
-    return NextResponse.json(history);
+    // Also fetch all authorized batches for filter dropdown (even those without history)
+    let authorizedBatches: any[] = [];
+    if (user.user_metadata.role === Role.TEACHER) {
+      authorizedBatches = await db.batch.findMany({
+        where: { teacherId: user.id, isActive: true },
+        select: { id: true, name: true, subject: true, classLevel: true }
+      });
+    } else if (user.user_metadata.role === Role.RECEPTIONIST || user.user_metadata.role === Role.ADMIN) {
+      authorizedBatches = await db.batch.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, subject: true, classLevel: true }
+      });
+    }
+
+    return NextResponse.json({
+      history,
+      authorizedBatches
+    });
   } catch (error) {
     console.log("[ATTENDANCE_HISTORY_GET]", error);
     return new NextResponse("Internal Error", { status: 500 });

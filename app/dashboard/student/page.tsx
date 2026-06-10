@@ -235,8 +235,77 @@ export default function StudentDashboard() {
             </Card>
           )}
 
-          {/* 1. Welcome Banner */}
-          <div className="relative overflow-hidden rounded-3xl bg-[#2563eb] p-8 text-white shadow-xl shadow-blue-200">
+  {/* Highlighted Fee Cards: Pending and Discount */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    {/* Pending Fees Card - Large and Highlighted */}
+    <Card className="border-none shadow-xl rounded-3xl bg-gradient-to-r from-rose-50 to-rose-100 border-2 border-rose-200">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-rose-600 mb-2">Pending Fees</p>
+            <p className="text-3xl md:text-4xl font-bold text-rose-800 tabular-nums">
+              ₹{data.overview.pendingFees.toLocaleString('en-IN')}
+            </p>
+            <p className="text-sm text-rose-600 mt-1">
+              {data.overview.pendingFees > 0 ? 'Fees due after all discounts' : 'All dues cleared'}
+            </p>
+          </div>
+          <div className="h-20 w-20 rounded-2xl bg-rose-100 flex items-center justify-center">
+            <IndianRupee className="h-10 w-10 text-rose-600" />
+          </div>
+        </div>
+        {data.overview.pendingFees > 0 && data.feesBreakdown.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-rose-200">
+            <p className="text-xs font-semibold text-rose-700 mb-2">Breakdown:</p>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {data.feesBreakdown.map((item, idx) => (
+                <div key={idx} className="flex justify-between text-xs">
+                  <span className="text-rose-700 truncate pr-2">{item.batchName}</span>
+                  <span className="font-bold text-rose-800 whitespace-nowrap">₹{item.totalPending.toLocaleString('en-IN')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+
+    {/* Discount Card - Large and Highlighted */}
+    <Card className="border-none shadow-xl rounded-3xl bg-gradient-to-r from-green-50 to-emerald-100 border-2 border-green-200">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-green-600 mb-2">Total Discount</p>
+            <p className="text-3xl md:text-4xl font-bold text-green-800 tabular-nums">
+              ₹{data.overview.totalDiscounts.toLocaleString('en-IN')}
+            </p>
+            <p className="text-sm text-green-600 mt-1">
+              {data.overview.totalDiscounts > 0 ? 'Fees reduced before discount' : 'No discounts applied'}
+            </p>
+          </div>
+          <div className="h-20 w-20 rounded-2xl bg-green-100 flex items-center justify-center">
+            <Percent className="h-10 w-10 text-green-600" />
+          </div>
+        </div>
+        {data.overview.totalDiscounts > 0 && data.discountsBreakdown.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-green-200">
+            <p className="text-xs font-semibold text-green-700 mb-2">Breakdown:</p>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {data.discountsBreakdown.map((item, idx) => (
+                <div key={idx} className="flex justify-between text-xs">
+                  <span className="text-green-700 truncate pr-2">{item.batchName}</span>
+                  <span className="font-bold text-green-800 whitespace-nowrap">-₹{item.discountValue.toLocaleString('en-IN')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  </div>
+
+  {/* 1. Welcome Banner */}
+  <div className="relative overflow-hidden rounded-3xl bg-[#2563eb] p-8 text-white shadow-xl shadow-blue-200">
             <div className="relative z-10 flex flex-col justify-center h-full max-w-2xl">
               <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white mb-2">
                 Good {timeOfDay}, Student! 👋

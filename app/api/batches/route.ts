@@ -14,9 +14,10 @@ export async function GET(req: Request) {
         }
 
         const batches = await db.batch.findMany({
-            orderBy: {
-                createdAt: 'desc',
-            },
+            orderBy: [
+                { name: 'asc' },
+                { subject: 'asc' }
+            ],
             include: {
                 teacher: {
                     select: {

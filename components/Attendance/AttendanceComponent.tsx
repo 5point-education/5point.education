@@ -164,8 +164,9 @@ const AttendanceComponent = ({
 
   // History states
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceHistory[]>([]);
+  const [authorizedBatches, setAuthorizedBatches] = useState<{ id: string; name: string; subject: string; classLevel: string | null }[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'new' | 'history'>(teacherTodayFocus ? 'new' : 'history');
+  const [activeTab, setActiveTab] = useState<'new' | 'history'>('history');
 
   // Filter states
   const [filterBatch, setFilterBatch] = useState<string>('all');
@@ -201,20 +202,12 @@ const AttendanceComponent = ({
     fetchBatches();
   }, [batchApiEndpoint, toast]);
 
-  const todayDayIndex = useMemo(() => new Date().getDay(), []);
+  const selectedDayIndex = useMemo(() => selectedDate.getDay(), [selectedDate]);
 
-  const todaysBatches = useMemo(() => {
+  const scheduledBatchesForDate = useMemo(() => {
     if (!teacherTodayFocus) return batches;
-    return batches.filter((batch) => parseScheduledDayIndexes(batch.schedule).includes(todayDayIndex));
-  }, [batches, teacherTodayFocus, todayDayIndex]);
-
-  const visibleTeacherBatches = useMemo(() => {
-    if (!teacherTodayFocus) return [];
-    if (todaysBatches.length === 0) return batches;
-
-    const todayBatchIds = new Set(todaysBatches.map((batch) => batch.id));
-    return [...todaysBatches, ...batches.filter((batch) => !todayBatchIds.has(batch.id))];
-  }, [batches, teacherTodayFocus, todaysBatches]);
+    return batches.filter((batch) => parseScheduledDayIndexes(batch.schedule).includes(selectedDayIndex));
+  }, [batches, teacherTodayFocus, selectedDayIndex]);
 
   useEffect(() => {
     if (!teacherTodayFocus) return;
@@ -228,7 +221,14 @@ const AttendanceComponent = ({
       const response = await fetch('/api/attendance/history');
       if (!response.ok) throw new Error('Failed to fetch history');
       const data = await response.json();
-      setAttendanceHistory(data);
+      // Handle new response format with history and authorizedBatches
+      if (data.history) {
+        setAttendanceHistory(data.history);
+        setAuthorizedBatches(data.authorizedBatches || []);
+      } else {
+        // Backward compatibility
+        setAttendanceHistory(data);
+      }
     } catch (error) {
       console.error('Error fetching attendance history:', error);
       toast({
@@ -301,7 +301,7 @@ const AttendanceComponent = ({
   useEffect(() => {
     if (!teacherTodayFocus || activeTab !== 'new') return;
 
-    if (visibleTeacherBatches.length === 0) {
+    if (scheduledBatchesForDate.length === 0) {
       setTeacherBatchStates({});
       return;
     }
@@ -309,17 +309,17 @@ const AttendanceComponent = ({
     setTeacherBatchStates((currentStates) => {
       const nextStates: Record<string, BatchAttendanceState> = {};
 
-      visibleTeacherBatches.forEach((batch) => {
+      scheduledBatchesForDate.forEach((batch) => {
         nextStates[batch.id] = currentStates[batch.id] ?? createEmptyBatchAttendanceState();
       });
 
       return nextStates;
     });
 
-    visibleTeacherBatches.forEach((batch) => {
+    scheduledBatchesForDate.forEach((batch) => {
       fetchTeacherBatchAttendance(batch.id);
     });
-  }, [activeTab, fetchTeacherBatchAttendance, teacherTodayFocus, visibleTeacherBatches]);
+  }, [activeTab, fetchTeacherBatchAttendance, teacherTodayFocus, scheduledBatchesForDate]);
 
   // Fetch students when batch and date are selected
   const fetchStudentsForAttendance = useCallback(async () => {
@@ -368,7 +368,9 @@ const AttendanceComponent = ({
   }, [students, teacherTodayFocus]);
 
   // Derive filter options
-  const uniqueBatches = Array.from(new Set(attendanceHistory.map(h => h.batchName))).sort();
+  // Use authorizedBatches for batch filter (shows all authorized batches, not just those with history)
+  const uniqueBatches = Array.from(new Set(authorizedBatches.map(b => b.name))).sort();
+  // Use history for subjects (since subjects come from history records)
   const uniqueSubjects = Array.from(new Set(attendanceHistory.map(h => h.subject))).sort();
 
   // Filter history
@@ -1122,16 +1124,16 @@ const AttendanceComponent = ({
                   </Popover>
                 </div>
 
-                {visibleTeacherBatches.length === 0 ? (
+                {scheduledBatchesForDate.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-muted-foreground">
-                    No batches found for this teacher.
+                    No batches scheduled for this date.
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {visibleTeacherBatches.map((batch, index) => {
+                    {scheduledBatchesForDate.map((batch, index) => {
                       const batchState = teacherBatchStates[batch.id] ?? createEmptyBatchAttendanceState();
                       const batchSummary = getAttendanceSummary(batchState.students);
-                      const isTodayBatch = todaysBatches.some((todayBatch) => todayBatch.id === batch.id);
+                      const isToday = selectedDate.toDateString() === new Date().toDateString();
 
                       return (
                         <div
@@ -1142,19 +1144,16 @@ const AttendanceComponent = ({
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
                                 <h3 className="text-lg font-semibold text-gray-900">{batch.name}</h3>
-                                {isTodayBatch && (
+                                {isToday && (
                                   <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
                                     Today
                                   </Badge>
-                                )}
-                                {!isTodayBatch && todaysBatches.length > 0 && (
-                                  <Badge variant="outline">Other Batch</Badge>
                                 )}
                               </div>
                               <p className="text-sm text-muted-foreground">{batch.subject}</p>
                             </div>
                             <span className="text-sm text-muted-foreground">
-                              Batch {index + 1} of {visibleTeacherBatches.length}
+                              Batch {index + 1} of {scheduledBatchesForDate.length}
                             </span>
                           </div>
 

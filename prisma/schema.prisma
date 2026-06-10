@@ -280,6 +280,9 @@ model Payment {
   coveredToDate   DateTime? // Auto-generated from coveredMonths
   
   notes           String?  // Optional notes
+  
+  // NEW: Payment-only discount (separate from admission discount)
+  discountAmount Float @default(0)
 
   student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   admission        Admission?           @relation(fields: [admissionId], references: [id])

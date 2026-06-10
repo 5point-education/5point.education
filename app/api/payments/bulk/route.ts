@@ -12,6 +12,7 @@ import {
 interface BulkPaymentItem {
   admissionId: string;
   months: string[];
+  discountAmount?: number; // Optional per-batch discount
 }
 
 export async function POST(req: Request) {
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
       months: string[];
       monthlyFee: number;
       expectedAmount: number;
+      discountAmount: number;
     }[] = [];
 
     for (const item of items) {
@@ -118,13 +120,18 @@ export async function POST(req: Request) {
 
       // Calculate expected amount
       const monthlyFee = getMonthlyFee(admission.batch, admission);
-      const expectedAmount = item.months.length * monthlyFee;
+      const subtotal = item.months.length * monthlyFee;
+      
+      // Apply discount (cannot exceed subtotal)
+      const discountAmount = Math.min(item.discountAmount || 0, subtotal);
+      const expectedAmount = subtotal - discountAmount;
 
       validatedItems.push({
         admission,
         months: item.months,
         monthlyFee,
         expectedAmount,
+        discountAmount,
       });
     }
 
@@ -136,7 +143,7 @@ export async function POST(req: Request) {
       // For bulk payments, we append a suffix to make each receipt_no unique
       // First payment gets the base receipt_no, subsequent ones get -2, -3, etc.
       for (let i = 0; i < validatedItems.length; i++) {
-        const { admission, months, monthlyFee, expectedAmount } = validatedItems[i];
+        const { admission, months, monthlyFee, expectedAmount, discountAmount } = validatedItems[i];
         const { from, to } = generateDateRange(months);
 
         const itemReceiptNo = i === 0 ? receipt_no : `${receipt_no}-${i + 1}`;
@@ -152,6 +159,7 @@ export async function POST(req: Request) {
             coveredFromDate: from,
             coveredToDate: to,
             notes: notes || null,
+            discountAmount,
           },
         });
 

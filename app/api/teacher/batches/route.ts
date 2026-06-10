@@ -12,10 +12,16 @@ export async function GET(req: Request) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
-        // Get batches assigned to the current teacher
+        // Get batches assigned to the current teacher with students
         const batches = await db.batch.findMany({
             where: {
                 teacherId: user.id,
+                isActive: true,
+                admissions: {
+                    some: {
+                        status: "ACTIVE"
+                    }
+                }
             },
             include: {
                 teacher: {
@@ -29,9 +35,10 @@ export async function GET(req: Request) {
                     }
                 }
             },
-            orderBy: {
-                createdAt: 'desc',
-            }
+            orderBy: [
+                { name: 'asc' },
+                { subject: 'asc' }
+            ]
         });
 
         // Transform the data to match the expected interface

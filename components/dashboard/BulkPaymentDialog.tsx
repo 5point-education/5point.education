@@ -29,6 +29,7 @@ import {
   Calendar,
   Receipt,
   Check,
+  IndianRupee,
 } from "lucide-react";
 import { formatMonth } from "@/lib/fees-utils";
 
@@ -85,6 +86,10 @@ export function UnifiedPaymentDialog({
   const [receiptNo, setReceiptNo] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  
+  // Discount state
+  const [totalDiscount, setTotalDiscount] = useState<string>(""); // For "all batches" mode
+  const [batchDiscounts, setBatchDiscounts] = useState<Map<string, string>>(new Map()); // Per-batch discounts
 
   const { toast } = useToast();
 
@@ -230,10 +235,28 @@ export function UnifiedPaymentDialog({
     return months.size * item.monthlyFee;
   };
 
+  const getBatchDiscount = (admissionId: string): number => {
+    // If all batches are selected, use equal split of total discount
+    const allBatchesSelected = selectedAdmissions.size === allPendingData.length && allPendingData.length > 0;
+    if (allBatchesSelected && totalDiscount) {
+      const totalDiscountValue = parseFloat(totalDiscount) || 0;
+      return totalDiscountValue / selectedAdmissions.size;
+    }
+    // Otherwise use per-batch discount
+    const batchDiscount = batchDiscounts.get(admissionId);
+    return parseFloat(batchDiscount || "0") || 0;
+  };
+
+  const getDiscountedSubtotal = (admissionId: string): number => {
+    const subtotal = getSubtotal(admissionId);
+    const discount = getBatchDiscount(admissionId);
+    return Math.max(0, subtotal - discount);
+  };
+
   const getGrandTotal = (): number => {
     let total = 0;
     selectedAdmissions.forEach((id) => {
-      total += getSubtotal(id);
+      total += getDiscountedSubtotal(id);
     });
     return total;
   };
@@ -244,6 +267,38 @@ export function UnifiedPaymentDialog({
       total += selectedMonthsMap.get(id)?.size || 0;
     });
     return total;
+  };
+  
+  // Validation for discounts
+  const validateDiscounts = (): string | null => {
+    const allBatchesSelected = selectedAdmissions.size === allPendingData.length && allPendingData.length > 0;
+    
+    if (allBatchesSelected) {
+      const totalDiscountValue = parseFloat(totalDiscount) || 0;
+      if (totalDiscountValue < 0) return "Total discount cannot be negative";
+      
+      // Check if equal split exceeds any batch subtotal
+      const perBatchDiscount = totalDiscountValue / selectedAdmissions.size;
+      for (const admissionId of selectedAdmissions) {
+        const subtotal = getSubtotal(admissionId);
+        if (perBatchDiscount > subtotal) {
+          const item = allPendingData.find(d => d.admissionId === admissionId);
+          return `Discount exceeds subtotal for ${item?.batchName || admissionId}`;
+        }
+      }
+    } else {
+      // Validate per-batch discounts
+      for (const admissionId of selectedAdmissions) {
+        const discount = parseFloat(batchDiscounts.get(admissionId) || "0") || 0;
+        if (discount < 0) return "Discount cannot be negative";
+        const subtotal = getSubtotal(admissionId);
+        if (discount > subtotal) {
+          const item = allPendingData.find(d => d.admissionId === admissionId);
+          return `Discount exceeds subtotal for ${item?.batchName || admissionId}`;
+        }
+      }
+    }
+    return null;
   };
 
   // ==================== SUBMIT ====================
@@ -258,11 +313,27 @@ export function UnifiedPaymentDialog({
       return;
     }
 
-    const items: { admissionId: string; months: string[] }[] = [];
+    // Validate discounts
+    const discountError = validateDiscounts();
+    if (discountError) {
+      toast({
+        title: "Invalid Discount",
+        description: discountError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const items: { admissionId: string; months: string[]; discountAmount?: number }[] = [];
     selectedAdmissions.forEach((admissionId) => {
       const months = selectedMonthsMap.get(admissionId);
       if (months && months.size > 0) {
-        items.push({ admissionId, months: Array.from(months).sort() });
+        const discountAmount = getBatchDiscount(admissionId);
+        items.push({ 
+          admissionId, 
+          months: Array.from(months).sort(),
+          discountAmount: discountAmount > 0 ? discountAmount : undefined
+        });
       }
     });
 
@@ -630,6 +701,74 @@ export function UnifiedPaymentDialog({
                     className="h-9"
                   />
                 </div>
+                
+                {/* Discount Controls */}
+                <div className="space-y-3 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <h4 className="text-xs font-semibold text-amber-800 flex items-center gap-1">
+                    <IndianRupee className="h-3 w-3" />
+                    Discount
+                  </h4>
+                  <p className="text-[10px] text-amber-700">
+                    {selectedAdmissions.size === allPendingData.length && allPendingData.length > 0
+                      ? "Enter total discount for all selected batches (will be divided equally)"
+                      : "Enter discount per batch"}
+                  </p>
+                  
+                  {selectedAdmissions.size === allPendingData.length && allPendingData.length > 0 ? (
+                    // All batches selected - single total discount input
+                    <div className="space-y-1.5">
+                      <Label htmlFor="total-discount" className="text-xs">Total Discount (₹)</Label>
+                      <Input
+                        id="total-discount"
+                        type="number"
+                        value={totalDiscount}
+                        onChange={(e) => setTotalDiscount(e.target.value)}
+                        placeholder="0"
+                        min="0"
+                        step="1"
+                        className="h-9"
+                      />
+                      {totalDiscount && (
+                        <p className="text-[10px] text-amber-700">
+                          Per batch: ₹{(parseFloat(totalDiscount) / selectedAdmissions.size).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    // Per-batch discount inputs
+                    <div className="space-y-2">
+                      {allPendingData
+                        .filter((item) => selectedAdmissions.has(item.admissionId))
+                        .map((item) => {
+                          const batchDiscount = batchDiscounts.get(item.admissionId) || "";
+                          const subtotal = getSubtotal(item.admissionId);
+                          return (
+                            <div key={item.admissionId} className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-32 truncate">
+                                {item.batchName.split(" - ")[0]}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">(Subtotal: ₹{subtotal.toLocaleString()})</span>
+                              <Input
+                                type="number"
+                                value={batchDiscount}
+                                onChange={(e) => {
+                                  const next = new Map(batchDiscounts);
+                                  next.set(item.admissionId, e.target.value);
+                                  setBatchDiscounts(next);
+                                }}
+                                placeholder="0"
+                                min="0"
+                                max={subtotal}
+                                step="1"
+                                className="h-9 w-24"
+                              />
+                              <span className="text-xs text-muted-foreground">₹</span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
               </section>
 
               {/* ── Section 4: Summary ── */}
@@ -644,6 +783,23 @@ export function UnifiedPaymentDialog({
                         Total for {totalMonths} selected month{totalMonths !== 1 ? "s" : ""}{" "}
                         across {selectedAdmissions.size} batch{selectedAdmissions.size !== 1 ? "es" : ""}
                       </p>
+                      {/* Discount breakdown */}
+                      {(totalDiscount || Array.from(batchDiscounts.values()).some(v => parseFloat(v) > 0)) && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs font-medium text-amber-800 flex items-center gap-1">
+                            <IndianRupee className="h-3 w-3" />
+                            Discount Applied: ₹{(
+                              selectedAdmissions.size === allPendingData.length && allPendingData.length > 0
+                                ? parseFloat(totalDiscount) || 0
+                                : Array.from(selectedAdmissions).reduce((sum, id) => sum + (parseFloat(batchDiscounts.get(id) || "0") || 0), 0)
+                            ).toLocaleString()}
+                          </p>
+                          <p className="text-[10px] text-amber-700">
+                            Subtotal: ₹{selectedAdmissions.size > 0 ? Array.from(selectedAdmissions).reduce((sum, id) => sum + getSubtotal(id), 0).toLocaleString() : "0"} 
+                            → After Discount: ₹{grandTotal.toLocaleString()}
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

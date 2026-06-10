@@ -32,7 +32,8 @@ export async function GET(req: Request) {
         batch: true,
         payments: {
           select: {
-            coveredMonths: true
+            coveredMonths: true,
+            discountAmount: true
           }
         }
       },
@@ -45,6 +46,7 @@ export async function GET(req: Request) {
     const feesBreakdown = [];
 
     // Calculate total discounts across all batches (independent of pending fees)
+    // This includes both admission discounts and payment-only discounts
     let totalDiscounts = 0;
     const discountsBreakdown: Array<{
       batchName: string;
@@ -53,13 +55,31 @@ export async function GET(req: Request) {
       status: string;
     }> = [];
 
+    // First, collect admission discounts
     for (const adm of admissions) {
       if (adm.discount_value && adm.discount_value > 0) {
         totalDiscounts += adm.discount_value;
         discountsBreakdown.push({
           batchName: adm.batch ? `${adm.batch.name} - ${adm.batch.subject}` : 'No Batch',
           discountValue: adm.discount_value,
-          discountType: adm.discount_type,
+          discountType: adm.discount_type || 'Admission Discount',
+          status: adm.status,
+        });
+      }
+    }
+
+    // Then, collect payment-only discounts
+    for (const adm of admissions) {
+      const paymentDiscounts = adm.payments
+        .filter(p => p.discountAmount && p.discountAmount > 0)
+        .reduce((sum, p) => sum + (p.discountAmount || 0), 0);
+      
+      if (paymentDiscounts > 0) {
+        totalDiscounts += paymentDiscounts;
+        discountsBreakdown.push({
+          batchName: adm.batch ? `${adm.batch.name} - ${adm.batch.subject}` : 'No Batch',
+          discountValue: paymentDiscounts,
+          discountType: 'Payment Discount',
           status: adm.status,
         });
       }
@@ -100,6 +120,13 @@ export async function GET(req: Request) {
       totalAdmissionChargePending += admissionChargePending;
 
       if (totalPending > 0) {
+        // Calculate total discount for this admission (admission + payment)
+        const admissionDiscount = adm.discount_value || 0;
+        const paymentDiscount = adm.payments
+          .filter(p => p.discountAmount && p.discountAmount > 0)
+          .reduce((sum, p) => sum + (p.discountAmount || 0), 0);
+        const totalAdmissionDiscount = admissionDiscount + paymentDiscount;
+
         feesBreakdown.push({
           admissionId: adm.id,
           batchName: adm.batch ? `${adm.batch.name} - ${adm.batch.subject}` : 'No Batch',
@@ -108,7 +135,7 @@ export async function GET(req: Request) {
           totalPending,
           monthlyFee,
           pendingMonths: pendingMonths.length,
-          discountVal: adm.discount_value,
+          discountVal: totalAdmissionDiscount,
           discountType: adm.discount_type,
           status: adm.status,
         });

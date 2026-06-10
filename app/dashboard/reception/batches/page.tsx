@@ -97,6 +97,16 @@ export default function BatchesPage() {
   // Class Selection State (Create)
   const [classLevel, setClassLevel] = useState<string>("");
   const [board, setBoard] = useState<string>("");
+  
+  // Subject dropdown state (Create)
+  const [subjectValue, setSubjectValue] = useState<string>("");
+  const [customSubject, setCustomSubject] = useState<string>("");
+  const [showCustomSubject, setShowCustomSubject] = useState(false);
+  
+  // Board dropdown state (Create)
+  const [boardValue, setBoardValue] = useState<string>("");
+  const [customBoard, setCustomBoard] = useState<string>("");
+  const [showCustomBoard, setShowCustomBoard] = useState(false);
 
   // Fee Configuration State (Create)
   const [feeModel, setFeeModel] = useState<FeeModel>(null);
@@ -114,6 +124,17 @@ export default function BatchesPage() {
     teacherId: "",
     capacity: "",
   });
+  
+  // Subject dropdown state (Edit)
+  const [editSubjectValue, setEditSubjectValue] = useState<string>("");
+  const [editCustomSubject, setEditCustomSubject] = useState<string>("");
+  const [editShowCustomSubject, setEditShowCustomSubject] = useState(false);
+  
+  // Board dropdown state (Edit)
+  const [editBoardValue, setEditBoardValue] = useState<string>("");
+  const [editCustomBoard, setEditCustomBoard] = useState<string>("");
+  const [editShowCustomBoard, setEditShowCustomBoard] = useState(false);
+  
   const [editScheduleItems, setEditScheduleItems] = useState<ScheduleItem[]>([]);
 
   // Fee Configuration State (Edit)
@@ -224,6 +245,34 @@ export default function BatchesPage() {
       teacherId: batch.teacherId,
       capacity: batch.capacity?.toString() || "",
     });
+    // Set edit dropdown states
+    const batchSubject = batch.subject || "";
+    const batchBoard = batch.board || "";
+    
+    if (subjectOptions.includes(batchSubject)) {
+      setEditSubjectValue(batchSubject);
+      setEditShowCustomSubject(false);
+      setEditCustomSubject("");
+    } else {
+      setEditSubjectValue("__custom__");
+      setEditShowCustomSubject(true);
+      setEditCustomSubject(batchSubject);
+    }
+    
+    if (boardOptions.includes(batchBoard)) {
+      setEditBoardValue(batchBoard);
+      setEditShowCustomBoard(false);
+      setEditCustomBoard("");
+    } else if (batchBoard) {
+      setEditBoardValue("__custom__");
+      setEditShowCustomBoard(true);
+      setEditCustomBoard(batchBoard);
+    } else {
+      setEditBoardValue("");
+      setEditShowCustomBoard(false);
+      setEditCustomBoard("");
+    }
+    
     try {
       const schedule = JSON.parse(batch.schedule);
       setEditScheduleItems(Array.isArray(schedule) ? schedule : [{ day: "", startTime: "12:00", endTime: "13:00" }]);
@@ -268,6 +317,20 @@ export default function BatchesPage() {
       return;
     }
 
+    // Get subject and board from dropdown states
+    const finalSubject = showCustomSubject ? customSubject : subjectValue;
+    const finalBoard = showCustomBoard ? customBoard : boardValue;
+
+    if (!finalSubject) {
+      toast({
+        title: "Missing Subject",
+        description: "Please select or enter a subject.",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+      return;
+    }
+
     // Convert days-wise fees from string to number
     const daysWiseFeesNumeric: Record<string, number> = {};
     if (daysWiseFeesEnabled) {
@@ -280,8 +343,9 @@ export default function BatchesPage() {
 
     const payload = {
       ...data,
+      subject: finalSubject,
       classLevel: classLevel,
-      board: board.trim() || null,
+      board: finalBoard.trim() || null,
       schedule: JSON.stringify(scheduleItems),
       feeModel: feeModel,
       feeAmount: feeAmount,
@@ -312,6 +376,12 @@ export default function BatchesPage() {
       setScheduleItems([{ day: "", startTime: "12:00", endTime: "13:00" }]);
       setClassLevel("");
       setBoard("");
+      setSubjectValue("");
+      setCustomSubject("");
+      setShowCustomSubject(false);
+      setBoardValue("");
+      setCustomBoard("");
+      setShowCustomBoard(false);
       setFeeModel(null);
       setFeeAmount("");
       setInstallments([]);
@@ -348,6 +418,20 @@ export default function BatchesPage() {
       return;
     }
 
+    // Get subject and board from dropdown states
+    const finalSubject = editShowCustomSubject ? editCustomSubject : editSubjectValue;
+    const finalBoard = editShowCustomBoard ? editCustomBoard : editBoardValue;
+
+    if (!finalSubject) {
+      toast({
+        title: "Missing Subject",
+        description: "Please select or enter a subject.",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+      return;
+    }
+
     // Convert days-wise fees from string to number
     const editDaysWiseFeesNumeric: Record<string, number> = {};
     if (editDaysWiseFeesEnabled) {
@@ -361,7 +445,8 @@ export default function BatchesPage() {
     const payload = {
       id: editingBatch.id,
       ...editFormData,
-      board: editFormData.board.trim() || null,
+      subject: finalSubject,
+      board: finalBoard.trim() || null,
       schedule: JSON.stringify(editScheduleItems),
       feeModel: editFeeModel,
       feeAmount: editFeeAmount,
@@ -390,6 +475,12 @@ export default function BatchesPage() {
       });
       setEditOpen(false);
       setEditingBatch(null);
+      setEditSubjectValue("");
+      setEditCustomSubject("");
+      setEditShowCustomSubject(false);
+      setEditBoardValue("");
+      setEditCustomBoard("");
+      setEditShowCustomBoard(false);
       fetchData();
     } catch (error: any) {
       toast({
@@ -485,7 +576,26 @@ export default function BatchesPage() {
   };
 
   // Get unique subjects for filter dropdown
-  const uniqueSubjects = Array.from(new Set(batches.map(b => b.subject).filter(Boolean))).sort();
+  const uniqueSubjects = Array.from(new Set(batches.map(b => b.subject).filter((s): s is string => !!s))).sort();
+  
+  // Get unique boards for filter dropdown
+  const uniqueBoards = Array.from(new Set(batches.map(b => b.board).filter((b): b is string => !!b))).sort();
+  
+  // Common subject options
+  const commonSubjects = [
+    "Physics", "Chemistry", "Mathematics", "Biology", "English", "Hindi", "Bengali",
+    "History", "Geography", "Political Science", "Economics", "Accountancy", "Business Studies",
+    "Computer Science", "Informatics Practices", "Physical Education", "Sanskrit"
+  ];
+  
+  // Common board options
+  const commonBoards = ["CBSE", "ICSE", "WBBSE", "WB", "Other"];
+  
+  // Combined subject options (existing + common)
+  const subjectOptions = Array.from(new Set([...uniqueSubjects, ...commonSubjects])).sort();
+  
+  // Combined board options (existing + common)
+  const boardOptions = Array.from(new Set([...uniqueBoards, ...commonBoards])).sort();
 
   // Filter batches based on search and filters
   const filterBatches = (batchList: Batch[]) => {
@@ -1069,16 +1179,75 @@ export default function BatchesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="subject">Subject</Label>
-                  <Input id="subject" name="subject" required placeholder="Physics" />
+                  <Select
+                    value={subjectValue || (showCustomSubject ? "__custom__" : "")}
+                    onValueChange={(val) => {
+                      if (val === "__custom__") {
+                        setShowCustomSubject(true);
+                        setSubjectValue("");
+                      } else {
+                        setShowCustomSubject(false);
+                        setSubjectValue(val);
+                        setCustomSubject("");
+                      }
+                    }}
+                    required
+                  >
+                    <SelectTrigger id="subject">
+                      <SelectValue placeholder="Select subject or add new" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjectOptions.map((subject) => (
+                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">+ Add new subject...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {showCustomSubject && (
+                    <Input
+                      id="custom-subject"
+                      value={customSubject}
+                      onChange={(e) => setCustomSubject(e.target.value)}
+                      placeholder="Enter new subject name"
+                      className="mt-2"
+                      required
+                    />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="board">Board</Label>
-                  <Input
-                    id="board"
-                    value={board}
-                    onChange={(e) => setBoard(e.target.value)}
-                    placeholder="e.g. ICSE, CBSE, WB (optional)"
-                  />
+                  <Select
+                    value={boardValue || (showCustomBoard ? "__custom__" : "")}
+                    onValueChange={(val) => {
+                      if (val === "__custom__") {
+                        setShowCustomBoard(true);
+                        setBoardValue("");
+                      } else {
+                        setShowCustomBoard(false);
+                        setBoardValue(val);
+                        setCustomBoard("");
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="board">
+                      <SelectValue placeholder="Select board or add new (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {boardOptions.map((board) => (
+                        <SelectItem key={board} value={board}>{board}</SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">+ Add new board...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {showCustomBoard && (
+                    <Input
+                      id="custom-board"
+                      value={customBoard}
+                      onChange={(e) => setCustomBoard(e.target.value)}
+                      placeholder="Enter new board name"
+                      className="mt-2"
+                    />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="classLevel">Class / Course</Label>
@@ -1164,22 +1333,83 @@ export default function BatchesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-subject">Subject</Label>
-                  <Input
-                    id="edit-subject"
-                    value={editFormData.subject}
-                    onChange={(e) => setEditFormData({ ...editFormData, subject: e.target.value })}
+                  <Select
+                    value={editSubjectValue || (editShowCustomSubject ? "__custom__" : "")}
+                    onValueChange={(val) => {
+                      if (val === "__custom__") {
+                        setEditShowCustomSubject(true);
+                        setEditSubjectValue("");
+                      } else {
+                        setEditShowCustomSubject(false);
+                        setEditSubjectValue(val);
+                        setEditCustomSubject("");
+                      }
+                      setEditFormData({ ...editFormData, subject: val === "__custom__" ? editCustomSubject : val });
+                    }}
                     required
-                    placeholder="Physics"
-                  />
+                  >
+                    <SelectTrigger id="edit-subject">
+                      <SelectValue placeholder="Select subject or add new" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjectOptions.map((subject) => (
+                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">+ Add new subject...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {editShowCustomSubject && (
+                    <Input
+                      id="edit-custom-subject"
+                      value={editCustomSubject}
+                      onChange={(e) => {
+                        setEditCustomSubject(e.target.value);
+                        setEditFormData({ ...editFormData, subject: e.target.value });
+                      }}
+                      placeholder="Enter new subject name"
+                      className="mt-2"
+                      required
+                    />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-board">Board</Label>
-                  <Input
-                    id="edit-board"
-                    value={editFormData.board}
-                    onChange={(e) => setEditFormData({ ...editFormData, board: e.target.value })}
-                    placeholder="e.g. ICSE, CBSE, WB (optional)"
-                  />
+                  <Select
+                    value={editBoardValue || (editShowCustomBoard ? "__custom__" : "")}
+                    onValueChange={(val) => {
+                      if (val === "__custom__") {
+                        setEditShowCustomBoard(true);
+                        setEditBoardValue("");
+                      } else {
+                        setEditShowCustomBoard(false);
+                        setEditBoardValue(val);
+                        setEditCustomBoard("");
+                      }
+                      setEditFormData({ ...editFormData, board: val === "__custom__" ? editCustomBoard : val });
+                    }}
+                  >
+                    <SelectTrigger id="edit-board">
+                      <SelectValue placeholder="Select board or add new (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {boardOptions.map((board) => (
+                        <SelectItem key={board} value={board}>{board}</SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">+ Add new board...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {editShowCustomBoard && (
+                    <Input
+                      id="edit-custom-board"
+                      value={editCustomBoard}
+                      onChange={(e) => {
+                        setEditCustomBoard(e.target.value);
+                        setEditFormData({ ...editFormData, board: e.target.value });
+                      }}
+                      placeholder="Enter new board name"
+                      className="mt-2"
+                    />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-classLevel">Class / Course</Label>

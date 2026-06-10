@@ -92,10 +92,37 @@ export async function GET(req: Request) {
 
     // Filter out nulls and admissions with no pending/future months
     const validResults = results.filter(
-      (r) => r !== null && (r.pendingMonths.length > 0 || r.futureMonths.length > 0)
+      (r): r is Exclude<typeof results[number], null> => r !== null && (r.pendingMonths.length > 0 || r.futureMonths.length > 0)
     );
 
-    return NextResponse.json(validResults);
+    // Also fetch all payments for this student to include payment-only discounts
+    const allPayments = await db.payment.findMany({
+      where: {
+        studentId,
+      },
+      select: {
+        admissionId: true,
+        discountAmount: true,
+        coveredMonths: true,
+      }
+    });
+
+    // Calculate payment-only discount totals per admission
+    const paymentDiscounts = new Map<string, number>();
+    allPayments.forEach(payment => {
+      if (payment.admissionId && payment.discountAmount) {
+        const current = paymentDiscounts.get(payment.admissionId) || 0;
+        paymentDiscounts.set(payment.admissionId, current + payment.discountAmount);
+      }
+    });
+
+    // Add payment discount info to results
+    const resultsWithPaymentDiscounts = validResults.map(item => ({
+      ...item,
+      paymentDiscount: paymentDiscounts.get(item.admissionId) || 0,
+    }));
+
+    return NextResponse.json(resultsWithPaymentDiscounts);
   } catch (error: any) {
     console.log("[FEES_PENDING_BULK_GET]", error);
     return new NextResponse(error.message || "Internal Error", { status: 500 });
