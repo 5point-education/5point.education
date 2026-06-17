@@ -92,7 +92,7 @@ export async function GET(req: Request) {
 
     // Filter out nulls and admissions with no pending/future months
     const validResults = results.filter(
-      (r): r is Exclude<typeof results[number], null> => r !== null && (r.pendingMonths.length > 0 || r.futureMonths.length > 0)
+      (r): r is NonNullable<typeof r> => r !== null && (r.pendingMonths.length > 0 || r.futureMonths.length > 0)
     );
 
     // Also fetch all payments for this student to include payment-only discounts

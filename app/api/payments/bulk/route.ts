@@ -135,15 +135,15 @@ export async function POST(req: Request) {
       });
     }
 
-    // Execute all payments in a transaction
-    const result = await db.$transaction(async (tx) => {
+    // Execute all payments in a transaction (keep it minimal to avoid timeout)
+    const paymentRecords = await db.$transaction(async (tx) => {
       const payments = [];
       let totalAmount = 0;
 
       // For bulk payments, we append a suffix to make each receipt_no unique
       // First payment gets the base receipt_no, subsequent ones get -2, -3, etc.
       for (let i = 0; i < validatedItems.length; i++) {
-        const { admission, months, monthlyFee, expectedAmount, discountAmount } = validatedItems[i];
+        const { admission, months, expectedAmount, discountAmount } = validatedItems[i];
         const { from, to } = generateDateRange(months);
 
         const itemReceiptNo = i === 0 ? receipt_no : `${receipt_no}-${i + 1}`;
@@ -163,9 +163,18 @@ export async function POST(req: Request) {
           },
         });
 
-        // Recalculate pending fees for this admission
-        const updatedAdmission = await tx.admission.findUnique({
-          where: { id: admission.id },
+        payments.push(payment);
+        totalAmount += expectedAmount;
+      }
+
+      return { payments, totalAmount, admissionIds: validatedItems.map(v => v.admission.id) };
+    });
+
+    // Recalculate pending fees AFTER transaction commits (avoids transaction timeout)
+    for (const admissionId of paymentRecords.admissionIds) {
+      try {
+        const updatedAdmission = await db.admission.findUnique({
+          where: { id: admissionId },
           include: {
             batch: true,
             payments: {
@@ -177,27 +186,25 @@ export async function POST(req: Request) {
         if (updatedAdmission && updatedAdmission.batch) {
           const pendingData = await calculatePendingFees(
             updatedAdmission,
-            admission.selectedDays
+            updatedAdmission.selectedDays
           );
 
-          await tx.admission.update({
-            where: { id: admission.id },
+          await db.admission.update({
+            where: { id: admissionId },
             data: { fees_pending: pendingData.pendingAmount },
           });
         }
-
-        payments.push(payment);
-        totalAmount += expectedAmount;
+      } catch (err) {
+        console.error(`Failed to recalculate pending fees for admission ${admissionId}:`, err);
+        // Don't throw - payment was recorded successfully
       }
-
-      return { payments, totalAmount };
-    });
+    }
 
     return NextResponse.json({
       success: true,
-      paymentsCreated: result.payments.length,
-      totalAmount: result.totalAmount,
-      payments: result.payments,
+      paymentsCreated: paymentRecords.payments.length,
+      totalAmount: paymentRecords.totalAmount,
+      payments: paymentRecords.payments,
     });
   } catch (error: any) {
     console.log("[PAYMENTS_BULK_POST]", error);
