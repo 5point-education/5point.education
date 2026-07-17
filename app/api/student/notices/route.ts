@@ -102,7 +102,11 @@ export async function GET(req: Request) {
         },
         batch: {
           select: { id: true, name: true, subject: true }
-        }
+        },
+        recipients: {
+          where: { studentId: studentProfile.id },
+          select: { acknowledgedAt: true },
+        },
       }
     });
 
@@ -120,7 +124,9 @@ export async function GET(req: Request) {
         : notice.scope === NoticeScope.BATCH 
           ? `Batch: ${notice.batch?.name || "Unknown"}` 
           : "To: You",
-      createdBy: notice.creator.name
+      createdBy: notice.creator.name,
+      acknowledgedAt: notice.recipients[0]?.acknowledgedAt || null,
+      isAcknowledged: Boolean(notice.recipients[0]?.acknowledgedAt),
     }));
 
     return NextResponse.json({

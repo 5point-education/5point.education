@@ -129,7 +129,7 @@ export default function StudentListTable({
 
   // Modal State
   const [isAddBatchOpen, setIsAddBatchOpen] = useState(false);
-  const [selectedStudentForBatch, setSelectedStudentForBatch] = useState<{ id: string, name: string, existingBatchIds: string[] } | null>(null);
+  const [selectedStudentForBatch, setSelectedStudentForBatch] = useState<{ id: string, name: string, existingBatchIds: string[], existingSubjectKeys: string[] } | null>(null);
 
   // Details Modal State
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -272,10 +272,14 @@ export default function StudentListTable({
 
   const openAddBatchModal = (student: Student) => {
     const existingIds = student.batches ? student.batches.map(b => b.id) : [];
+    const existingSubjectKeys = (student.admissions || [])
+      .filter((admission) => admission.batch)
+      .map((admission) => admission.batch!.subject.trim().toLowerCase());
     setSelectedStudentForBatch({
       id: student.studentId,
       name: student.name,
-      existingBatchIds: existingIds
+      existingBatchIds: existingIds,
+      existingSubjectKeys,
     });
     setIsAddBatchOpen(true);
   };
@@ -806,6 +810,7 @@ export default function StudentListTable({
             setRefreshKey(k => k + 1);
           }}
           existingBatchIds={selectedStudentForBatch.existingBatchIds}
+          existingSubjectKeys={selectedStudentForBatch.existingSubjectKeys}
         />
       )}
 

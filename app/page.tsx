@@ -21,6 +21,8 @@ import {
   Activity,
 } from "lucide-react";
 
+const heroVideoUrl = process.env.NEXT_PUBLIC_HERO_VIDEO_URL;
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-white font-sans text-slate-800">
@@ -59,6 +61,13 @@ export default function HomePage() {
 
       {/* ========== HERO SECTION ========== */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#EFF6FF] via-white to-[#FFF7ED]">
+        {heroVideoUrl ? (
+          <video className="absolute inset-0 h-full w-full object-cover opacity-15" autoPlay muted loop playsInline poster="/landing/1.jpeg">
+            <source src={heroVideoUrl} />
+          </video>
+        ) : (
+          <Image src="/landing/1.jpeg" alt="" fill priority className="object-cover opacity-5" />
+        )}
         {/* Decorative blobs */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/60 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-100/60 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4 pointer-events-none" />
@@ -104,6 +113,11 @@ export default function HomePage() {
                     Call Us Now
                   </Button>
                 </a>
+                <a href="tel:8902673460">
+                  <Button size="lg" variant="outline" className="border-2 border-[#F97316] text-[#C2410C] hover:bg-[#F97316] hover:text-white text-lg px-6 h-14 rounded-xl font-bold w-full sm:w-auto bg-white transition-all duration-300">
+                    <Phone className="mr-2 h-5 w-5" /> 8902673460
+                  </Button>
+                </a>
               </div>
 
               {/* Stats row */}
@@ -111,7 +125,7 @@ export default function HomePage() {
                 {[
                   { value: "500+", label: "Students" },
                   { value: "95%", label: "Success Rate" },
-                  { value: "10+", label: "Expert Faculty" },
+                  { value: "ISO 9001:2015", label: "Quality Standard" },
                 ].map((s, i) => (
                   <div key={i} className="text-center lg:text-left">
                     <div className="text-2xl sm:text-3xl font-black text-[#1B4F8A]">
@@ -128,8 +142,10 @@ export default function HomePage() {
             {/* Right — Main banner poster */}
             <div className="relative mx-auto w-full max-w-lg lg:max-w-none">
               <div className="rounded-2xl overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-200/50">
-                <img
+                <Image
                   src="/landing/1.jpeg"
+                  width={1200}
+                  height={800}
                   alt="5 Point Education Hub — Programs & Courses"
                   className="w-full h-auto block"
                 />
@@ -247,16 +263,20 @@ export default function HomePage() {
       <section className="py-16 bg-slate-50 border-y border-slate-100">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-10">
           <div className="rounded-2xl overflow-hidden shadow-xl border border-slate-200 bg-white">
-            <img
+            <Image
               src="/landing/3.jpeg"
+              width={1600}
+              height={1000}
               alt="5 Point Education Hub — Our Facilities"
               className="w-full h-auto block"
               loading="lazy"
             />
           </div>
           <div className="rounded-2xl overflow-hidden shadow-xl border border-slate-200 bg-white">
-            <img
+            <Image
               src="/landing/2.jpeg"
+              width={1600}
+              height={1000}
               alt="5 Point Education Hub — Home Tuition Program"
               className="w-full h-auto block"
               loading="lazy"
@@ -319,8 +339,10 @@ export default function HomePage() {
 
               {/* SVG Result Sheet */}
               <div className="p-4 sm:p-6 bg-white">
-                <img
+                <Image
                   src="/landing/class-x-result-2026.svg"
+                  width={1600}
+                  height={1000}
                   alt="5 Point Education Hub — Class X Board Examination Results 2026"
                   className="w-full h-auto block rounded-xl border border-slate-100"
                   loading="lazy"
@@ -528,6 +550,11 @@ export default function HomePage() {
                 Call 8100567748
               </Button>
             </a>
+            <a href="tel:8902673460">
+              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-[#1B4F8A] rounded-xl px-8 h-14 text-lg font-bold w-full sm:w-auto">
+                <Phone className="mr-2 w-5 h-5" /> Call 8902673460
+              </Button>
+            </a>
           </div>
         </div>
       </section>
@@ -618,6 +645,11 @@ export default function HomePage() {
                     Kolkata, West Bengal
                   </span>
                 </li>
+                <li className="flex items-center gap-3">
+                  <Phone className="w-5 h-5 text-[#F97316] flex-shrink-0" />
+                  <a href="tel:8902673460" className="text-slate-300 font-bold hover:text-white transition-colors text-base">+91 8902673460</a>
+                </li>
+                <li className="text-xs font-semibold uppercase tracking-widest text-slate-500">ISO 9001:2015 certified quality processes</li>
                 <li className="flex items-center gap-3">
                   <Phone className="w-5 h-5 text-[#F97316] flex-shrink-0" />
                   <a

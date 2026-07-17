@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role, AdmissionStatus } from "@prisma/client";
+import { recalculateAdmissionBalance } from "@/lib/fee-ledger";
 
 export async function PATCH(
   req: Request,
@@ -61,9 +62,11 @@ export async function PATCH(
         where: { id: admissionId },
         data: {
           status: AdmissionStatus.WITHDRAWN,
-          endDate: parsedEndDate ?? new Date()
+          endDate: parsedEndDate ?? new Date(),
+          activeSubjectKey: null,
         }
       });
+      await recalculateAdmissionBalance(admissionId);
 
       // Log the withdrawal
       const studentName = admission.student.user?.name || "Unknown Student";

@@ -2,6 +2,9 @@ import { db } from "@/lib/db";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role, Board, ServiceType } from "@prisma/client";
+import { AccountAuditAction } from "@prisma/client";
+import { getPasswordResetRedirect } from "@/lib/app-url";
+import { recordAccountAudit } from "@/lib/account-audit";
 
 
 export async function POST(req: Request) {
@@ -132,11 +135,9 @@ export async function POST(req: Request) {
 
         // Send password reset email so the student can set their own password
         try {
-            const origin = req.headers.get("origin") ?? (req.headers.get("x-forwarded-host") ? `https://${req.headers.get("x-forwarded-host")}` : null);
-            const redirectTo = origin ? `${origin}/auth/callback?next=/auth/update-password` : undefined;
             const authClient = createClient();
             const { error: resetError } = await authClient.auth.resetPasswordForEmail(email, {
-                redirectTo: redirectTo ?? undefined,
+                redirectTo: getPasswordResetRedirect(req),
             });
             if (resetError) {
                 console.warn("[STUDENTS_POST] Password reset email failed:", resetError.message);
@@ -316,6 +317,8 @@ export async function PATCH(req: Request) {
             console.error("Failed to sync auth status:", authError);
             // We continue even if auth sync fails, though ideally we should handle this better
         }
+
+        await recordAccountAudit({ action: isActive ? AccountAuditAction.ACCOUNT_REACTIVATED : AccountAuditAction.ACCOUNT_SUSPENDED, userId: studentProfile.userId, actorId: user.id, request: req });
 
         return NextResponse.json(updatedUser);
 

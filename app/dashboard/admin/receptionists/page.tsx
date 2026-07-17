@@ -18,7 +18,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { UserPlus, Loader2, Search, X, Archive, Pencil, RotateCcw, Users, Eye, EyeOff, Trash2 } from "lucide-react";
+import { UserPlus, Loader2, Search, X, Archive, Pencil, RotateCcw, Users, Eye, EyeOff, Trash2, KeyRound } from "lucide-react";
 
 export default function AdminReceptionistsPage() {
   const [receptionists, setReceptionists] = useState<any[]>([]);
@@ -198,6 +198,16 @@ export default function AdminReceptionistsPage() {
     }
   };
 
+  const handleSendResetLink = async (receptionist: any) => {
+    try {
+      const response = await fetch(`/api/admin/users/${receptionist.id}/reset`, { method: "POST" });
+      if (!response.ok) throw new Error((await response.text()) || "Failed to send reset link");
+      toast({ title: "Reset link sent", description: `A password reset email was sent to ${receptionist.email}.` });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to send reset link", variant: "destructive" });
+    }
+  };
+
   const handleDeleteClick = (receptionist: any) => {
     setDeletingReceptionist(receptionist);
     setDeleteOpen(true);
@@ -314,6 +324,15 @@ export default function AdminReceptionistsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handleSendResetLink(receptionist)}
+                            title="Send password reset link"
+                            className="h-8 w-8"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleArchiveReceptionist(receptionist)}
                             title="Archive receptionist"
                             className="h-8 w-8"
@@ -386,6 +405,15 @@ export default function AdminReceptionistsPage() {
                           className="h-8 w-8"
                         >
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleSendResetLink(receptionist)}
+                          title="Send password reset link"
+                          className="h-8 w-8"
+                        >
+                          <KeyRound className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"

@@ -2,6 +2,9 @@ import { db } from "@/lib/db";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
+import { AccountAuditAction } from "@prisma/client";
+import { getPasswordResetRedirect } from "@/lib/app-url";
+import { recordAccountAudit } from "@/lib/account-audit";
 
 export async function POST(req: Request) {
     try {
@@ -56,11 +59,9 @@ export async function POST(req: Request) {
 
         // Send password reset email so the receptionist can set their own password
         try {
-            const origin = req.headers.get("origin") ?? (req.headers.get("x-forwarded-host") ? `https://${req.headers.get("x-forwarded-host")}` : null);
-            const redirectTo = origin ? `${origin}/auth/callback?next=/auth/update-password` : undefined;
             const authClient = createClient();
             const { error: resetError } = await authClient.auth.resetPasswordForEmail(email, {
-                redirectTo: redirectTo ?? undefined,
+                redirectTo: getPasswordResetRedirect(req),
             });
             if (resetError) {
                 console.warn("[RECEPTIONISTS_POST] Password reset email failed:", resetError.message);
@@ -154,6 +155,14 @@ export async function PATCH(req: Request) {
             where: { id },
             data: updateData,
         });
+
+        if (is_active !== undefined) {
+            await supabase.auth.admin.updateUserById(id, { ban_duration: is_active ? "none" : "876600h" });
+            await recordAccountAudit({ action: is_active ? AccountAuditAction.ACCOUNT_REACTIVATED : AccountAuditAction.ACCOUNT_SUSPENDED, userId: id, actorId: user.id, email: receptionist.email, request: req });
+        }
+        if (email !== undefined && email !== existingReceptionist.email) {
+            await recordAccountAudit({ action: AccountAuditAction.EMAIL_CHANGED, userId: id, actorId: user.id, email, request: req, metadata: { previousEmail: existingReceptionist.email } });
+        }
 
         return NextResponse.json(receptionist);
 

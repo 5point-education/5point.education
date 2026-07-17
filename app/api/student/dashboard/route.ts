@@ -143,6 +143,7 @@ export async function GET(req: Request) {
     }
 
     const pendingFees = totalCalculatedFeesPending;
+    const feesBeforeDiscount = totalCalculatedFeesPending + totalDiscounts;
 
     // Simplistic Logic for "Next Class": Take schedule from latest batch
     let nextClass = "Not Assigned";
@@ -203,6 +204,7 @@ export async function GET(req: Request) {
         totalFeesPending: totalCalculatedFeesPending,
         totalAdmissionChargePending,
         totalDiscounts,
+        feesBeforeDiscount,
         nextClass
       },
       feesBreakdown,

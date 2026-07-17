@@ -1,116 +1,82 @@
+import { Role } from "@prisma/client";
+import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
 
 export async function GET(req: Request) {
   try {
     const supabase = createAdminClient();
     const { data: { user }, error } = await supabase.auth.getUser();
-
-    if (error || !user || (user.user_metadata.role !== Role.TEACHER && user.user_metadata.role !== Role.RECEPTIONIST && user.user_metadata.role !== Role.ADMIN)) {
+    const role = user?.user_metadata.role as Role | undefined;
+    if (error || !user || (role !== Role.TEACHER && role !== Role.RECEPTIONIST && role !== Role.ADMIN)) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const url = new URL(req.url);
-    const batchId = url.searchParams.get("batchId"); // Optional filter by batch
-
-    // Build query condition for attendance records
-    const whereCondition: any = {};
-    if (batchId) {
-      whereCondition.batchId = batchId;
+    const requestedBatchId = new URL(req.url).searchParams.get("batchId");
+    const authorizedWhere = role === Role.TEACHER
+      ? { teacherId: user.id, isActive: true, admissions: { some: { status: "ACTIVE" as const } } }
+      : { isActive: true };
+    const authorizedBatches = await db.batch.findMany({
+      where: authorizedWhere,
+      select: { id: true, name: true, subject: true, classLevel: true },
+      orderBy: { name: "asc" },
+    });
+    const authorizedIds = new Set(authorizedBatches.map((batch) => batch.id));
+    if (requestedBatchId && !authorizedIds.has(requestedBatchId)) {
+      return new NextResponse("You are not authorized to view this batch history", { status: 403 });
     }
 
-    // If user is teacher, only show their batches
-    if (user.user_metadata.role === Role.TEACHER) {
-      const teacherBatches = await db.batch.findMany({
-        where: { teacherId: user.id, isActive: true },
-        select: { id: true }
-      });
-      whereCondition.batchId = { in: teacherBatches.map(b => b.id) };
-    }
-
-    // Get all attendance records grouped by batch and date
-    const attendanceRecords = await (db as any).attendance.findMany({
-      where: whereCondition,
+    const records = await db.attendance.findMany({
+      where: { batchId: requestedBatchId ? requestedBatchId : { in: Array.from(authorizedIds) } },
       include: {
-        batch: {
-          select: {
-            id: true,
-            name: true,
-            subject: true,
-            classLevel: true
-          }
-        }
+        batch: { select: { id: true, name: true, subject: true, classLevel: true } },
+        session: { select: { id: true, type: true, label: true } },
       },
-      orderBy: {
-        date: 'desc'
-      }
+      orderBy: [{ date: "desc" }, { batchId: "asc" }],
     });
 
-    // Group by batchId and date
     const historyMap = new Map<string, {
       batchId: string;
       batchName: string;
       subject: string;
       classLevel: string | null;
       date: string;
+      sessionId: string | null;
+      sessionType: string;
+      sessionLabel: string;
       present: number;
       absent: number;
       total: number;
     }>();
 
-    for (const record of attendanceRecords) {
-      const dateStr = record.date.toISOString().split('T')[0];
-      const key = `${record.batchId}-${dateStr}`;
-
-      if (!historyMap.has(key)) {
-        historyMap.set(key, {
-          batchId: record.batchId,
-          batchName: record.batch.name,
-          subject: record.batch.subject,
-          classLevel: record.batch.classLevel,
-          date: dateStr,
-          present: 0,
-          absent: 0,
-          total: 0
-        });
-      }
-
-      const entry = historyMap.get(key)!;
-      entry.total += 1;
-      if (record.status) {
-        entry.present += 1;
-      } else {
-        entry.absent += 1;
-      }
-    }
-
-    // Convert map to array and sort by date desc
-    const history = Array.from(historyMap.values()).sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-
-    // Also fetch all authorized batches for filter dropdown (even those without history)
-    let authorizedBatches: any[] = [];
-    if (user.user_metadata.role === Role.TEACHER) {
-      authorizedBatches = await db.batch.findMany({
-        where: { teacherId: user.id, isActive: true },
-        select: { id: true, name: true, subject: true, classLevel: true }
-      });
-    } else if (user.user_metadata.role === Role.RECEPTIONIST || user.user_metadata.role === Role.ADMIN) {
-      authorizedBatches = await db.batch.findMany({
-        where: { isActive: true },
-        select: { id: true, name: true, subject: true, classLevel: true }
-      });
+    for (const record of records) {
+      const date = record.date.toISOString().slice(0, 10);
+      const key = `${record.sessionId || record.batchId + ":" + date}`;
+      const current = historyMap.get(key) || {
+        batchId: record.batchId,
+        batchName: record.batch.name,
+        subject: record.batch.subject,
+        classLevel: record.batch.classLevel,
+        date,
+        sessionId: record.sessionId,
+        sessionType: record.session?.type || "REGULAR",
+        sessionLabel: record.session?.label || "Regular Class",
+        present: 0,
+        absent: 0,
+        total: 0,
+      };
+      current.total += 1;
+      if (record.status) current.present += 1;
+      else current.absent += 1;
+      historyMap.set(key, current);
     }
 
     return NextResponse.json({
-      history,
-      authorizedBatches
+      history: Array.from(historyMap.values()).sort((a, b) => b.date.localeCompare(a.date)),
+      authorizedBatches,
     });
   } catch (error) {
-    console.log("[ATTENDANCE_HISTORY_GET]", error);
+    console.error("[ATTENDANCE_HISTORY_GET]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }

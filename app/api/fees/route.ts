@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { PaymentKind, Role } from "@prisma/client";
 import { calculatePendingFees } from "@/lib/fees-utils";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,9 @@ export async function GET(req: Request) {
                         },
                         payments: {
                             select: {
-                                coveredMonths: true
+                                amount: true,
+                                kind: true,
+                                coveredMonths: true,
                             }
                         }
                     }
@@ -102,13 +104,18 @@ export async function GET(req: Request) {
                             calculatedPendingAmount = adm.fees_pending;
                         }
                     } else {
-                        // For ONE_TIME/CUSTOM, use database values
+                        const paidBatchFees = (adm.payments || [])
+                            .filter((payment) => payment.kind === PaymentKind.BATCH_FEE)
+                            .reduce((sum, payment) => sum + payment.amount, 0);
                         calculatedTotalFees = adm.total_fees;
-                        calculatedPendingAmount = adm.fees_pending;
+                        calculatedPendingAmount = Math.max(0, Math.round((adm.total_fees - adm.discount_value - paidBatchFees) * 100) / 100);
                     }
 
                     const admissionCharge = adm.admission_charge || 0;
-                    const admissionChargePending = adm.admission_charge_pending || 0;
+                    const paidAdmissionCharge = (adm.payments || [])
+                        .filter((payment) => payment.kind === PaymentKind.ADMISSION_CHARGE)
+                        .reduce((sum, payment) => sum + payment.amount, 0);
+                    const admissionChargePending = Math.max(0, Math.round((admissionCharge - paidAdmissionCharge) * 100) / 100);
 
                     totalCalculatedFees += calculatedTotalFees;
                     totalCalculatedFeesPending += calculatedPendingAmount;

@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { WhatsAppService } from "@/lib/whatsapp-service";
+import { recalculateAdmissionBalance } from "@/lib/fee-ledger";
 
 export async function GET(req: Request) {
     try {
@@ -13,6 +14,7 @@ export async function GET(req: Request) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
+        const studentId = new URL(req.url).searchParams.get("studentId");
         const batches = await db.batch.findMany({
             orderBy: [
                 { name: 'asc' },
@@ -32,7 +34,17 @@ export async function GET(req: Request) {
             }
         });
 
-        return NextResponse.json(batches);
+        if (!studentId) return NextResponse.json(batches);
+
+        const existingSubjects = new Set(
+            (await db.admission.findMany({
+                where: { studentId, status: "ACTIVE", batchId: { not: null } },
+                include: { batch: { select: { subject: true } } },
+            }))
+                .map((admission) => admission.batch?.subject.trim().toLowerCase())
+                .filter(Boolean),
+        );
+        return NextResponse.json(batches.filter((batch) => !existingSubjects.has(batch.subject.trim().toLowerCase())));
 
     } catch (error) {
         // Log full error for Vercel/server debugging (visible in Vercel Functions log)
@@ -162,6 +174,11 @@ export async function PATCH(req: Request) {
                     endDate: batch.endDate || new Date()
                 }
             });
+            await Promise.all(
+                currentBatch.admissions
+                    .filter((admission) => admission.status === "ACTIVE")
+                    .map((admission) => recalculateAdmissionBalance(admission.id)),
+            );
         }
 
         // Send WhatsApp notification for schedule change

@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { PaymentKind, Role } from "@prisma/client";
 
 /**
  * POST /api/payments/admission-charge
@@ -81,6 +81,7 @@ export async function POST(req: Request) {
                 receipt_no,
                 coveredMonths: [], // Admission charges don't cover months
                 notes: notes ? `Admission Charge Payment${notes ? ': ' + notes : ''}` : 'Admission Charge Payment',
+                kind: PaymentKind.ADMISSION_CHARGE,
             }
         });
 

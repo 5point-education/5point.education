@@ -4,10 +4,16 @@ import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 
 export async function GET(
-    _req: Request,
+    req: Request,
     { params }: { params: { studentId: string } }
 ) {
     try {
+        const supabase = createAdminClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+        const role = user?.user_metadata.role as Role | undefined;
+        if (error || !user || (role !== Role.ADMIN && role !== Role.RECEPTIONIST && user.id !== (await db.studentProfile.findUnique({ where: { id: params.studentId }, select: { userId: true } }))?.userId)) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
         const { studentId } = params;
 
         const studentProfile = await db.studentProfile.findUnique({

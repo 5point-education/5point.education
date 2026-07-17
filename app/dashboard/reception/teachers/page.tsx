@@ -32,7 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserPlus, Loader2, Search, X, Archive, Pencil, RotateCcw, Users, Eye, EyeOff, Trash2, MoreVertical } from "lucide-react";
+import { UserPlus, Loader2, Search, X, Archive, Pencil, RotateCcw, Users, Eye, EyeOff, Trash2, MoreVertical, KeyRound } from "lucide-react";
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -220,6 +220,16 @@ export default function TeachersPage() {
     }
   };
 
+  const handleSendResetLink = async (teacher: any) => {
+    try {
+      const response = await fetch(`/api/admin/users/${teacher.id}/reset`, { method: "POST" });
+      if (!response.ok) throw new Error((await response.text()) || "Failed to send reset link");
+      toast({ title: "Reset link sent", description: `A password reset email was sent to ${teacher.email}.` });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to send reset link", variant: "destructive" });
+    }
+  };
+
   const handleDeleteClick = (teacher: any) => {
     setDeletingTeacher(teacher);
     setDeleteOpen(true);
@@ -308,8 +318,8 @@ export default function TeachersPage() {
     });
   };
 
-  const activeTeachers = filterTeachers(teachers.filter(t => t.teacherProfile?.isActive !== false));
-  const archivedTeachers = filterTeachers(teachers.filter(t => t.teacherProfile?.isActive === false));
+  const activeTeachers = filterTeachers(teachers.filter(t => t.is_active !== false));
+  const archivedTeachers = filterTeachers(teachers.filter(t => t.is_active === false));
 
   const renderTeacherTable = (teacherList: any[], isArchived: boolean = false) => (
     <div className="rounded-md border overflow-hidden">
@@ -368,6 +378,10 @@ export default function TeachersPage() {
                             <DropdownMenuItem onClick={() => handleEditClick(teacher)}>
                               <Pencil className="mr-2 h-4 w-4" />
                               Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSendResetLink(teacher)}>
+                              <KeyRound className="mr-2 h-4 w-4" />
+                              Send Reset Link
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -431,6 +445,10 @@ export default function TeachersPage() {
                             <DropdownMenuItem onClick={() => handleEditClick(teacher)}>
                               <Pencil className="mr-2 h-4 w-4" />
                               Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSendResetLink(teacher)}>
+                              <KeyRound className="mr-2 h-4 w-4" />
+                              Send Reset Link
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -653,7 +671,7 @@ export default function TeachersPage() {
             <Badge variant="outline" className="ml-1 font-normal border-amber-500 text-amber-600">
               {activeTeachers.length}
               {(searchQuery || qualificationFilter !== "all" || subjectFilter !== "all") &&
-                ` / ${teachers.filter(t => t.teacherProfile?.isActive !== false).length}`}
+                ` / ${teachers.filter(t => t.is_active !== false).length}`}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="archived" className="flex items-center gap-2">
@@ -662,7 +680,7 @@ export default function TeachersPage() {
             <Badge variant="outline" className="ml-1 font-normal border-amber-500 text-amber-600">
               {archivedTeachers.length}
               {(searchQuery || qualificationFilter !== "all" || subjectFilter !== "all") &&
-                ` / ${teachers.filter(t => t.teacherProfile?.isActive === false).length}`}
+                ` / ${teachers.filter(t => t.is_active === false).length}`}
             </Badge>
           </TabsTrigger>
         </TabsList>

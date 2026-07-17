@@ -64,6 +64,41 @@ enum NoticePriority {
   URGENT
 }
 
+enum PaymentKind {
+  BATCH_FEE
+  ADMISSION_CHARGE
+  LEGACY_UNALLOCATED
+}
+
+enum AttendanceSessionType {
+  REGULAR
+  EXTRA
+}
+
+enum AccountAuditAction {
+  LOGIN_SUCCESS
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  EMAIL_CHANGED
+  ACCOUNT_SUSPENDED
+  ACCOUNT_REACTIVATED
+}
+
+enum NotificationEventType {
+  ABSENCE_ALERT
+  FEE_REMINDER
+  EXAM_UPDATE
+  NOTICE_ACK_REMINDER
+  INACTIVE_STUDENT
+  MISSED_ATTENDANCE
+}
+
+enum NotificationDeliveryStatus {
+  SENT
+  FAILED
+  SKIPPED
+}
+
 // Models
 model User {
   id            String    @id @default(cuid())
@@ -75,6 +110,7 @@ model User {
   is_active     Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  lastActivityAt DateTime?
 
   studentProfile StudentProfile?
   teacherProfile TeacherProfile?
@@ -83,6 +119,7 @@ model User {
   noticesCreated Notice[]         @relation("NoticesCreated")
   teacherFeeSheetsAsTeacher TeacherFeeSheet[] @relation("TeacherFeeSheetTeacher")
   teacherFeeSheetsCreated   TeacherFeeSheet[] @relation("TeacherFeeSheetCreatedBy")
+  attendanceSessionsCreated AttendanceSession[] @relation("AttendanceSessionsCreated")
 
   @@map("users")
 }
@@ -227,6 +264,7 @@ model Batch {
   admissions Admission[]
   exams      Exam[]
   attendances  Attendance[]
+  attendanceSessions AttendanceSession[]
   notices      Notice[]
   teacherFeeSheets TeacherFeeSheet[]
 
@@ -255,6 +293,7 @@ model Admission {
   // Discount fields
   discount_value   Float    @default(0)  // Fixed discount amount in rupees (deducted from monthly fee)
   discount_type    String?              // Optional: "Sibling Discount", "Early Bird", etc.
+  activeSubjectKey String?              // Normalized subject key for duplicate-subject protection
 
   student          StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   batch            Batch?               @relation(fields: [batchId], references: [id])
@@ -262,6 +301,7 @@ model Admission {
   teacherFeeSheetRows TeacherFeeSheetRow[]
 
   @@map("admissions")
+  @@index([studentId, activeSubjectKey])
 }
 
 model Payment {
@@ -278,6 +318,7 @@ model Payment {
   coveredMonths   String[] // Array of month strings: ["2025-01", "2025-02"]
   coveredFromDate DateTime? // Auto-generated from coveredMonths
   coveredToDate   DateTime? // Auto-generated from coveredMonths
+  kind            PaymentKind @default(LEGACY_UNALLOCATED)
   
   notes           String?  // Optional notes
   
@@ -399,15 +440,35 @@ model Attendance {
   date       DateTime @default(now())
   batchId    String
   studentId  String
+  sessionId  String?
   status     Boolean  @default(true) // true = Present, false = Absent
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   batch   Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
   student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  session AttendanceSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  @@unique([date, batchId, studentId])
+  @@unique([sessionId, studentId])
   @@map("attendances")
+}
+
+model AttendanceSession {
+  id          String                @id @default(cuid())
+  batchId     String
+  date        DateTime
+  type        AttendanceSessionType @default(REGULAR)
+  label       String                @default("Regular Class")
+  createdById String
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  batch       Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("AttendanceSessionsCreated", fields: [createdById], references: [id])
+  attendances Attendance[]
+
+  @@index([batchId, date])
+  @@map("attendance_sessions")
 }
 
 model Notice {
@@ -438,6 +499,7 @@ model NoticeRecipient {
   id        String @id @default(cuid())
   noticeId  String
   studentId String
+  acknowledgedAt DateTime?
 
   notice  Notice         @relation(fields: [noticeId], references: [id], onDelete: Cascade)
   student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -445,6 +507,41 @@ model NoticeRecipient {
   @@unique([noticeId, studentId])
   @@index([studentId])
   @@map("notice_recipients")
+}
+
+model AccountAudit {
+  id        String            @id @default(cuid())
+  userId    String?
+  actorId   String?
+  action    AccountAuditAction
+  email     String?
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime          @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("account_audits")
+}
+
+model NotificationDelivery {
+  id              String                    @id @default(cuid())
+  eventType       NotificationEventType
+  status          NotificationDeliveryStatus
+  dedupeKey       String                    @unique
+  recipientPhone  String?
+  recipientUserId  String?
+  message         String?
+  providerId      String?
+  errorMessage    String?
+  metadata        Json?
+  createdAt       DateTime                  @default(now())
+  sentAt          DateTime?
+
+  @@index([eventType, createdAt])
+  @@index([recipientUserId, createdAt])
+  @@map("notification_deliveries")
 }
 
 // Subscription Management

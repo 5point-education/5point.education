@@ -138,6 +138,8 @@ export function UnifiedPaymentDialog({
       setSelectedAdmissions(new Set());
       setSelectedMonthsMap(new Map());
       setShowAdvanceMap(new Map());
+      setTotalDiscount("");
+      setBatchDiscounts(new Map());
       setPaymentMode("CASH");
       setReceiptNo("");
       setNotes("");
@@ -146,7 +148,17 @@ export function UnifiedPaymentDialog({
 
   // ==================== SELECTION LOGIC ====================
 
+  const selectedIdsInOrder = (ids: Set<string>) => allPendingData.filter((item) => ids.has(item.admissionId)).map((item) => item.admissionId);
+
+  const splitDiscountInCents = (total: number, ids: string[]) => {
+    const totalCents = Math.max(0, Math.round(total * 100));
+    const base = ids.length ? Math.floor(totalCents / ids.length) : 0;
+    const remainder = ids.length ? totalCents % ids.length : 0;
+    return new Map(ids.map((id, index) => [id, ((base + (index < remainder ? 1 : 0)) / 100).toFixed(2)]));
+  };
+
   const handleToggleBatch = (admissionId: string) => {
+    const wasAllSelected = selectedAdmissions.size === allPendingData.length && allPendingData.length > 0;
     const next = new Set(selectedAdmissions);
     const nextMonths = new Map(selectedMonthsMap);
 
@@ -160,6 +172,16 @@ export function UnifiedPaymentDialog({
       if (item) nextMonths.set(admissionId, new Set(item.pendingMonths));
     }
 
+    if (wasAllSelected && totalDiscount) {
+      const allocations = splitDiscountInCents(parseFloat(totalDiscount) || 0, selectedIdsInOrder(selectedAdmissions));
+      allocations.delete(admissionId);
+      setBatchDiscounts(allocations);
+      setTotalDiscount("");
+    } else if (next.size === allPendingData.length && allPendingData.length > 0) {
+      const total = selectedIdsInOrder(next).reduce((sum, id) => sum + (parseFloat(batchDiscounts.get(id) || "0") || 0), 0);
+      setTotalDiscount(total ? total.toFixed(2) : "");
+    }
+
     setSelectedAdmissions(next);
     setSelectedMonthsMap(nextMonths);
   };
@@ -168,6 +190,7 @@ export function UnifiedPaymentDialog({
     if (selectedAdmissions.size === allPendingData.length) {
       setSelectedAdmissions(new Set());
       setSelectedMonthsMap(new Map());
+      setTotalDiscount("");
     } else {
       const all = new Set<string>();
       const allM = new Map<string, Set<string>>();
@@ -177,6 +200,8 @@ export function UnifiedPaymentDialog({
       });
       setSelectedAdmissions(all);
       setSelectedMonthsMap(allM);
+      const total = selectedIdsInOrder(all).reduce((sum, id) => sum + (parseFloat(batchDiscounts.get(id) || "0") || 0), 0);
+      setTotalDiscount(total ? total.toFixed(2) : "");
     }
   };
 
@@ -239,8 +264,8 @@ export function UnifiedPaymentDialog({
     // If all batches are selected, use equal split of total discount
     const allBatchesSelected = selectedAdmissions.size === allPendingData.length && allPendingData.length > 0;
     if (allBatchesSelected && totalDiscount) {
-      const totalDiscountValue = parseFloat(totalDiscount) || 0;
-      return totalDiscountValue / selectedAdmissions.size;
+      const allocations = splitDiscountInCents(parseFloat(totalDiscount) || 0, selectedIdsInOrder(selectedAdmissions));
+      return parseFloat(allocations.get(admissionId) || "0") || 0;
     }
     // Otherwise use per-batch discount
     const batchDiscount = batchDiscounts.get(admissionId);
@@ -277,11 +302,10 @@ export function UnifiedPaymentDialog({
       const totalDiscountValue = parseFloat(totalDiscount) || 0;
       if (totalDiscountValue < 0) return "Total discount cannot be negative";
       
-      // Check if equal split exceeds any batch subtotal
-      const perBatchDiscount = totalDiscountValue / selectedAdmissions.size;
       for (const admissionId of selectedAdmissions) {
+        const discount = getBatchDiscount(admissionId);
         const subtotal = getSubtotal(admissionId);
-        if (perBatchDiscount > subtotal) {
+        if (discount > subtotal) {
           const item = allPendingData.find(d => d.admissionId === admissionId);
           return `Discount exceeds subtotal for ${item?.batchName || admissionId}`;
         }
@@ -730,7 +754,7 @@ export function UnifiedPaymentDialog({
                       />
                       {totalDiscount && (
                         <p className="text-[10px] text-amber-700">
-                          Per batch: ₹{(parseFloat(totalDiscount) / selectedAdmissions.size).toFixed(2)}
+                          Per batch starts at: ₹{getBatchDiscount(selectedIdsInOrder(selectedAdmissions)[0] || "").toFixed(2)}
                         </p>
                       )}
                     </div>

@@ -1,13 +1,13 @@
 import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { PaymentKind, Role } from "@prisma/client";
 import {
   generateDateRange,
   validateMonthSelection,
   getMonthlyFee,
-  calculatePendingFees,
 } from "@/lib/fees-utils";
+import { recalculateAdmissionBalance } from "@/lib/fee-ledger";
 
 export async function GET(req: Request) {
     try {
@@ -129,34 +129,11 @@ export async function POST(req: Request) {
                     coveredFromDate: from,
                     coveredToDate: to,
                     notes: notes || null,
+                    kind: PaymentKind.BATCH_FEE,
                 }
             });
 
-            // Recalculate pending fees for this admission
-            // Get updated admission with new payment
-            const updatedAdmission = await db.admission.findUnique({
-                where: { id: admissionId },
-                include: {
-                    batch: true,
-                    payments: {
-                        select: {
-                            coveredMonths: true
-                        }
-                    }
-                }
-            });
-
-            if (updatedAdmission && updatedAdmission.batch) {
-                const pendingData = await calculatePendingFees(
-                    updatedAdmission,
-                    admission.selectedDays
-                );
-
-                await db.admission.update({
-                    where: { id: admissionId },
-                    data: { fees_pending: pendingData.pendingAmount }
-                });
-            }
+            await recalculateAdmissionBalance(admissionId);
 
             return NextResponse.json(payment);
         }
@@ -166,7 +143,16 @@ export async function POST(req: Request) {
             return new NextResponse("Student ID is required for legacy payments", { status: 400 });
         }
 
-        // Create Payment (legacy - no months)
+        const admission = admissionId
+            ? await db.admission.findUnique({ where: { id: admissionId }, include: { batch: true } })
+            : null;
+
+        if (admissionId && (!admission || admission.studentId !== studentId)) {
+            return new NextResponse("Admission does not belong to this student", { status: 400 });
+        }
+
+        // Payments without covered months are intentionally kept isolated from
+        // recurring batch allocations. They can be reconciled manually later.
         const payment = await db.payment.create({
             data: {
                 studentId,
@@ -175,33 +161,14 @@ export async function POST(req: Request) {
                 mode,
                 receipt_no,
                 coveredMonths: [],
+                kind: admission?.batch && (admission.batch.feeModel === "ONE_TIME" || admission.batch.feeModel === "CUSTOM")
+                    ? PaymentKind.BATCH_FEE
+                    : PaymentKind.LEGACY_UNALLOCATED,
             }
         });
 
-        // Update Pending Fees on admissions - skip if already calculated during admission creation
-        if (!skipFeesPendingUpdate) {
-            const admissionsWithPending = await db.admission.findMany({
-                where: { 
-                    studentId,
-                    fees_pending: { gt: 0 }
-                },
-                orderBy: { createdAt: 'asc' }
-            });
-
-            let remainingPayment = paymentAmount;
-            for (const admission of admissionsWithPending) {
-                if (remainingPayment <= 0) break;
-                
-                const amountToApply = Math.min(remainingPayment, admission.fees_pending);
-                const newPending = admission.fees_pending - amountToApply;
-                
-                await db.admission.update({
-                    where: { id: admission.id },
-                    data: { fees_pending: newPending }
-                });
-                
-                remainingPayment -= amountToApply;
-            }
+        if (admissionId && !skipFeesPendingUpdate && payment.kind === PaymentKind.BATCH_FEE) {
+            await recalculateAdmissionBalance(admissionId);
         }
 
         return NextResponse.json(payment);
@@ -222,7 +189,7 @@ export async function PATCH(req: Request) {
         }
 
         const body = await req.json();
-        const { id, amount, mode, receipt_no } = body;
+        const { id, amount, mode, receipt_no, discountAmount } = body;
 
         if (!id) {
             return new NextResponse("Payment ID is required", { status: 400 });
@@ -245,37 +212,34 @@ export async function PATCH(req: Request) {
         if (amount !== undefined) updateData.amount = newAmount;
         if (mode !== undefined) updateData.mode = mode;
         if (receipt_no !== undefined) updateData.receipt_no = receipt_no;
+        if (discountAmount !== undefined) {
+            const parsedDiscount = Number(discountAmount);
+            if (!Number.isFinite(parsedDiscount) || parsedDiscount < 0) {
+                return new NextResponse("Discount must be a non-negative number", { status: 400 });
+            }
+            updateData.discountAmount = parsedDiscount;
+        }
 
         const payment = await db.payment.update({
             where: { id },
             data: updateData
         });
 
-        // If amount changed, update fees_pending on admissions
-        if (amountDifference !== 0) {
-            const admissions = await db.admission.findMany({
-                where: { studentId: oldPayment.studentId },
-                orderBy: { createdAt: 'asc' }
-            });
-
-            // Recalculate all fees_pending based on total payments
-            const allPayments = await db.payment.findMany({
-                where: { studentId: oldPayment.studentId }
-            });
-            const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
-
-            // Distribute total paid across admissions
-            let remainingPaid = totalPaid;
-            for (const admission of admissions) {
-                const paidForThis = Math.min(remainingPaid, admission.total_fees);
-                const newPending = Math.max(0, admission.total_fees - paidForThis);
-                
-                await db.admission.update({
-                    where: { id: admission.id },
-                    data: { fees_pending: newPending }
+        if (oldPayment.admissionId && (amountDifference !== 0 || discountAmount !== undefined)) {
+            if (oldPayment.kind === PaymentKind.ADMISSION_CHARGE) {
+                const charges = await db.payment.aggregate({
+                    where: { admissionId: oldPayment.admissionId, kind: PaymentKind.ADMISSION_CHARGE },
+                    _sum: { amount: true },
                 });
-                
-                remainingPaid -= paidForThis;
+                const admission = await db.admission.findUnique({ where: { id: oldPayment.admissionId } });
+                if (admission) {
+                    await db.admission.update({
+                        where: { id: admission.id },
+                        data: { admission_charge_pending: Math.max(0, admission.admission_charge - (charges._sum.amount || 0)) },
+                    });
+                }
+            } else {
+                await recalculateAdmissionBalance(oldPayment.admissionId);
             }
         }
 
@@ -312,37 +276,25 @@ export async function DELETE(req: Request) {
             return new NextResponse("Payment not found", { status: 404 });
         }
 
-        const studentId = payment.studentId;
-        const deletedAmount = payment.amount;
-
         // Delete the payment
         await db.payment.delete({
             where: { id }
         });
 
-        // Recalculate fees_pending for all admissions
-        const admissions = await db.admission.findMany({
-            where: { studentId },
-            orderBy: { createdAt: 'asc' }
-        });
-
-        const remainingPayments = await db.payment.findMany({
-            where: { studentId }
-        });
-        const totalPaid = remainingPayments.reduce((sum, p) => sum + p.amount, 0);
-
-        // Distribute total paid across admissions
-        let remainingPaid = totalPaid;
-        for (const admission of admissions) {
-            const paidForThis = Math.min(remainingPaid, admission.total_fees);
-            const newPending = Math.max(0, admission.total_fees - paidForThis);
-            
-            await db.admission.update({
-                where: { id: admission.id },
-                data: { fees_pending: newPending }
-            });
-            
-            remainingPaid -= paidForThis;
+        if (payment.admissionId) {
+            if (payment.kind === PaymentKind.ADMISSION_CHARGE) {
+                const charges = await db.payment.aggregate({
+                    where: { admissionId: payment.admissionId, kind: PaymentKind.ADMISSION_CHARGE },
+                    _sum: { amount: true },
+                });
+                const admission = await db.admission.findUnique({ where: { id: payment.admissionId }, select: { admission_charge: true } });
+                await db.admission.update({
+                    where: { id: payment.admissionId },
+                    data: { admission_charge_pending: Math.max(0, (admission?.admission_charge || 0) - (charges._sum.amount || 0)) },
+                });
+            } else {
+                await recalculateAdmissionBalance(payment.admissionId);
+            }
         }
 
         return NextResponse.json({ success: true });

@@ -41,3 +41,5 @@ next-env.d.ts
 
 # Prisma
 /prisma/migrations
+!/prisma/migrations/
+!/prisma/migrations/**

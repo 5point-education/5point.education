@@ -306,6 +306,11 @@ export default function AdmissionPage() {
             return;
         }
 
+        if (selectedBatches.some((selected) => selected.subject.trim().toLowerCase() === b.subject.trim().toLowerCase())) {
+            toast({ title: "Subject already selected", description: "A student can have only one active batch per subject.", variant: "destructive" });
+            return;
+        }
+
         setSelectedBatches(prev => [...prev, {
             id: tempBatchId,
             name: b.name,
@@ -508,14 +513,11 @@ export default function AdmissionPage() {
                 const admissionData = await admissionRes.json();
                 const admissionId = admissionData.id;
 
-                // 2b. Create Payment linked to this admission
-                // Calculate amount to pay for this specific admission context
-                // adm.paying (Tuition) + (index===0 ? payingAdmissionChargeAmount : 0)
+                // 2b. Create separate ledger entries for batch fees and admission charges.
                 const tuitionPayment = adm.paying || 0;
                 const admChargePayment = adm.index === 0 ? payingAdmissionChargeAmount : 0;
-                const totalPaymentForThisBatch = tuitionPayment + admChargePayment;
 
-                if (totalPaymentForThisBatch > 0) {
+                if (tuitionPayment > 0) {
                     // Check if tuition is fully paid for one or more months
                     let months: string[] = [];
                     // Only applicable for Monthly/Quarterly batches where fee > 0
@@ -538,20 +540,30 @@ export default function AdmissionPage() {
                         }
                     }
 
-                    // Handle generic receipt number - unique if multiple batches
-                    const receiptSuffix = admissionsToCreate.length > 1 ? `-${adm.index + 1}` : "";
-
                     await fetch("/api/payments", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             studentId,
                             admissionId, // Link to admission!
-                            amount: totalPaymentForThisBatch,
+                            amount: tuitionPayment,
                             mode: values.mode,
-                            receipt_no: values.receipt_no + receiptSuffix,
+                            receipt_no: values.receipt_no + (admissionsToCreate.length > 1 ? `-${adm.index + 1}` : ""),
                             months: months, // Pass calculated months
-                            skipFeesPendingUpdate: true, // Fees pending is already set correctly during admission creation
+                        }),
+                    });
+                }
+
+                if (admChargePayment > 0) {
+                    await fetch("/api/payments/admission-charge", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            studentId,
+                            admissionId,
+                            amount: admChargePayment,
+                            mode: values.mode,
+                            receipt_no: `${values.receipt_no}${admissionsToCreate.length > 1 ? `-${adm.index + 1}` : ""}-AC`,
                         }),
                     });
                 }
@@ -1105,7 +1117,9 @@ export default function AdmissionPage() {
                                                         <SelectValue placeholder="Select a batch..." />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {batches.filter(b => !selectedBatches.some(sb => sb.id === b.id)).map(b => (
+                                                        {batches.filter((b) => !selectedBatches.some((sb) =>
+                                                            sb.id === b.id || sb.subject.trim().toLowerCase() === b.subject.trim().toLowerCase()
+                                                        )).map(b => (
                                                             <SelectItem key={b.id} value={b.id} className="py-3">
                                                                 <div className="flex flex-col text-left gap-0.5">
                                                                     <span className="font-medium">{b.name}</span>

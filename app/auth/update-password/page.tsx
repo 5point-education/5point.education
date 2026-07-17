@@ -56,6 +56,11 @@ export default function UpdatePasswordPage() {
                     variant: "destructive",
                 });
             } else {
+                await fetch("/api/account/audit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "PASSWORD_RESET_COMPLETED" }),
+                });
                 toast({
                     title: "Success",
                     description: "Your password has been updated successfully.",

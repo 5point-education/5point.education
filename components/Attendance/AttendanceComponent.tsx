@@ -43,6 +43,9 @@ interface AttendanceHistory {
   present: number;
   absent: number;
   total: number;
+  sessionId?: string | null;
+  sessionType?: string;
+  sessionLabel?: string;
 }
 
 interface StudentAttendance {
@@ -70,6 +73,13 @@ interface BatchAttendanceState {
   loading: boolean;
   saving: boolean;
   error: string | null;
+}
+
+interface TeacherAttendanceTarget extends BatchItem {
+  attendanceKey: string;
+  sessionId?: string;
+  sessionType?: string;
+  sessionLabel?: string;
 }
 
 const DAY_INDEX_MAP: Record<string, number> = {
@@ -123,7 +133,7 @@ function parseScheduledDayIndexes(schedule: string | undefined): number[] {
 function normalizeStudentsForAttendance(students: StudentAttendance[]) {
   return students.map((student) => ({
     ...student,
-    isPresent: student.isPresent === null ? false : student.isPresent,
+    isPresent: student.isPresent === null ? true : student.isPresent,
   }));
 }
 
@@ -157,6 +167,10 @@ const AttendanceComponent = ({
   const [batches, setBatches] = useState<BatchItem[]>([]);
   const [students, setStudents] = useState<StudentAttendance[]>([]);
   const [teacherBatchStates, setTeacherBatchStates] = useState<Record<string, BatchAttendanceState>>({});
+  const [teacherExtraSessions, setTeacherExtraSessions] = useState<TeacherAttendanceTarget[]>([]);
+  const [extraClassOpen, setExtraClassOpen] = useState(false);
+  const [extraBatchId, setExtraBatchId] = useState("");
+  const [extraClassLabel, setExtraClassLabel] = useState("");
   const [selectedBatch, setSelectedBatch] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
@@ -209,6 +223,16 @@ const AttendanceComponent = ({
     return batches.filter((batch) => parseScheduledDayIndexes(batch.schedule).includes(selectedDayIndex));
   }, [batches, teacherTodayFocus, selectedDayIndex]);
 
+  const teacherAttendanceTargets = useMemo<TeacherAttendanceTarget[]>(() => [
+    ...scheduledBatchesForDate.map((batch) => ({ ...batch, attendanceKey: batch.id, sessionType: "REGULAR", sessionLabel: "Regular Class" })),
+    ...teacherExtraSessions,
+  ], [scheduledBatchesForDate, teacherExtraSessions]);
+
+  const teacherTargetsForDisplay = useMemo(() => teacherAttendanceTargets.filter((target) => {
+    const state = teacherBatchStates[target.attendanceKey];
+    return !state || state.loading || state.students.length > 0;
+  }), [teacherAttendanceTargets, teacherBatchStates]);
+
   useEffect(() => {
     if (!teacherTodayFocus) return;
     setActiveTab('new');
@@ -259,10 +283,10 @@ const AttendanceComponent = ({
   );
 
   const fetchTeacherBatchAttendance = useCallback(
-    async (batchId: string) => {
+    async (batchId: string, attendanceKey = batchId, sessionId?: string) => {
       if (!selectedDate) return;
 
-      updateTeacherBatchState(batchId, (currentState) => ({
+      updateTeacherBatchState(attendanceKey, (currentState) => ({
         ...currentState,
         loading: true,
         error: null,
@@ -270,7 +294,8 @@ const AttendanceComponent = ({
 
       try {
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        const response = await fetch(`/api/attendance?batchId=${batchId}&date=${dateStr}`);
+        const sessionQuery = sessionId ? `&sessionId=${sessionId}` : '';
+        const response = await fetch(`/api/attendance?batchId=${batchId}&date=${dateStr}${sessionQuery}`);
 
         if (!response.ok) {
           throw new Error('Failed to fetch students');
@@ -279,7 +304,7 @@ const AttendanceComponent = ({
         const data = await response.json();
         const normalizedStudents = normalizeStudentsForAttendance(data);
 
-        updateTeacherBatchState(batchId, (currentState) => ({
+        updateTeacherBatchState(attendanceKey, (currentState) => ({
           ...currentState,
           students: normalizedStudents,
           loading: false,
@@ -287,7 +312,7 @@ const AttendanceComponent = ({
         }));
       } catch (error) {
         console.error('Error fetching students:', error);
-        updateTeacherBatchState(batchId, (currentState) => ({
+        updateTeacherBatchState(attendanceKey, (currentState) => ({
           ...currentState,
           students: [],
           loading: false,
@@ -301,25 +326,39 @@ const AttendanceComponent = ({
   useEffect(() => {
     if (!teacherTodayFocus || activeTab !== 'new') return;
 
-    if (scheduledBatchesForDate.length === 0) {
-      setTeacherBatchStates({});
-      return;
-    }
+    if (teacherAttendanceTargets.length === 0) { setTeacherBatchStates({}); return; }
 
     setTeacherBatchStates((currentStates) => {
       const nextStates: Record<string, BatchAttendanceState> = {};
 
-      scheduledBatchesForDate.forEach((batch) => {
-        nextStates[batch.id] = currentStates[batch.id] ?? createEmptyBatchAttendanceState();
+      teacherAttendanceTargets.forEach((target) => {
+        nextStates[target.attendanceKey] = currentStates[target.attendanceKey] ?? createEmptyBatchAttendanceState();
       });
 
       return nextStates;
     });
 
-    scheduledBatchesForDate.forEach((batch) => {
-      fetchTeacherBatchAttendance(batch.id);
+    teacherAttendanceTargets.forEach((target) => {
+      fetchTeacherBatchAttendance(target.id, target.attendanceKey, target.sessionId);
     });
-  }, [activeTab, fetchTeacherBatchAttendance, teacherTodayFocus, scheduledBatchesForDate]);
+  }, [activeTab, fetchTeacherBatchAttendance, teacherTodayFocus, teacherAttendanceTargets]);
+
+  useEffect(() => {
+    if (!teacherTodayFocus || activeTab !== 'new' || batches.length === 0) return;
+    let cancelled = false;
+    const loadExtraSessions = async () => {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const sessions = await Promise.all(batches.map(async (batch) => {
+        const response = await fetch(`/api/attendance/sessions?batchId=${batch.id}`);
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.filter((session: { date: string; type: string }) => session.type === 'EXTRA' && session.date.slice(0, 10) === dateStr).map((session: { id: string; label: string }) => ({ ...batch, attendanceKey: session.id, sessionId: session.id, sessionType: 'EXTRA', sessionLabel: session.label }));
+      }));
+      if (!cancelled) setTeacherExtraSessions(sessions.flat());
+    };
+    loadExtraSessions().catch(console.error);
+    return () => { cancelled = true; };
+  }, [activeTab, batches, selectedDate, teacherTodayFocus]);
 
   // Fetch students when batch and date are selected
   const fetchStudentsForAttendance = useCallback(async () => {
@@ -401,8 +440,8 @@ const AttendanceComponent = ({
     ));
   };
 
-  const handleTeacherAttendanceChange = (batchId: string, studentId: string, isPresent: boolean) => {
-    updateTeacherBatchState(batchId, (currentState) => ({
+  const handleTeacherAttendanceChange = (attendanceKey: string, studentId: string, isPresent: boolean) => {
+    updateTeacherBatchState(attendanceKey, (currentState) => ({
       ...currentState,
       students: currentState.students.map((student) =>
         student.studentId === studentId ? { ...student, isPresent } : student
@@ -420,8 +459,8 @@ const AttendanceComponent = ({
     setStudents(prev => prev.map(student => ({ ...student, isPresent: status })));
   };
 
-  const handleTeacherMarkAll = (batchId: string, status: boolean) => {
-    updateTeacherBatchState(batchId, (currentState) => ({
+  const handleTeacherMarkAll = (attendanceKey: string, status: boolean) => {
+    updateTeacherBatchState(attendanceKey, (currentState) => ({
       ...currentState,
       students: currentState.students.map((student) => ({ ...student, isPresent: status })),
     }));
@@ -498,8 +537,32 @@ const AttendanceComponent = ({
     }
   };
 
-  const saveTeacherAttendance = async (batch: BatchItem) => {
-    const batchState = teacherBatchStates[batch.id] ?? createEmptyBatchAttendanceState();
+  const createExtraClass = async () => {
+    if (!extraBatchId || !extraClassLabel.trim() || !selectedDate) return;
+    try {
+      const response = await fetch('/api/attendance/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batchId: extraBatchId, date: format(selectedDate, 'yyyy-MM-dd'), label: extraClassLabel }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const session = await response.json();
+      const batch = batches.find((item) => item.id === extraBatchId);
+      if (batch) {
+        const target = { ...batch, attendanceKey: session.id, sessionId: session.id, sessionType: 'EXTRA', sessionLabel: session.label };
+        setTeacherExtraSessions((current) => [...current, target]);
+        setExtraClassLabel('');
+        setExtraClassOpen(false);
+        await fetchTeacherBatchAttendance(batch.id, session.id, session.id);
+      }
+      toast({ title: 'Extra class created', description: 'Mark attendance for the new session below.' });
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Could not create extra class', variant: 'destructive' });
+    }
+  };
+
+  const saveTeacherAttendance = async (batch: TeacherAttendanceTarget) => {
+    const batchState = teacherBatchStates[batch.attendanceKey] ?? createEmptyBatchAttendanceState();
 
     if (!selectedDate || batchState.students.length === 0) {
       toast({
@@ -520,7 +583,7 @@ const AttendanceComponent = ({
       return;
     }
 
-    updateTeacherBatchState(batch.id, (currentState) => ({
+    updateTeacherBatchState(batch.attendanceKey, (currentState) => ({
       ...currentState,
       saving: true,
       error: null,
@@ -542,6 +605,9 @@ const AttendanceComponent = ({
           batchId: batch.id,
           date: dateStr,
           attendanceData,
+          sessionId: batch.sessionId,
+          sessionType: batch.sessionType,
+          sessionLabel: batch.sessionLabel,
         }),
       });
 
@@ -557,10 +623,10 @@ const AttendanceComponent = ({
       });
 
       fetchAttendanceHistory();
-      await fetchTeacherBatchAttendance(batch.id);
+      await fetchTeacherBatchAttendance(batch.id, batch.attendanceKey, batch.sessionId);
     } catch (error: any) {
       console.error('Error saving attendance:', error);
-      updateTeacherBatchState(batch.id, (currentState) => ({
+      updateTeacherBatchState(batch.attendanceKey, (currentState) => ({
         ...currentState,
         error: error.message || 'Failed to save attendance',
       }));
@@ -570,7 +636,7 @@ const AttendanceComponent = ({
         variant: 'destructive',
       });
     } finally {
-      updateTeacherBatchState(batch.id, (currentState) => ({
+      updateTeacherBatchState(batch.attendanceKey, (currentState) => ({
         ...currentState,
         saving: false,
       }));
@@ -606,7 +672,8 @@ const AttendanceComponent = ({
         body: JSON.stringify({
           batchId: selectedHistory.batchId,
           date: selectedHistory.date,
-          attendanceData
+          attendanceData,
+          sessionId: selectedHistory.sessionId || undefined,
         })
       });
 
@@ -640,7 +707,8 @@ const AttendanceComponent = ({
     setModalLoading(true);
 
     try {
-      const response = await fetch(`/api/attendance?batchId=${history.batchId}&date=${history.date}`);
+      const sessionQuery = history.sessionId ? `&sessionId=${history.sessionId}` : '';
+      const response = await fetch(`/api/attendance?batchId=${history.batchId}&date=${history.date}${sessionQuery}`);
       if (!response.ok) throw new Error('Failed to fetch attendance details');
       const data = await response.json();
       setViewStudents(data);
@@ -662,13 +730,14 @@ const AttendanceComponent = ({
     setModalLoading(true);
 
     try {
-      const response = await fetch(`/api/attendance?batchId=${history.batchId}&date=${history.date}`);
+      const sessionQuery = history.sessionId ? `&sessionId=${history.sessionId}` : '';
+      const response = await fetch(`/api/attendance?batchId=${history.batchId}&date=${history.date}${sessionQuery}`);
       if (!response.ok) throw new Error('Failed to fetch attendance details');
       const data = await response.json();
-      // Set default status to false (absent) for any student with null attendance
+      // A partial legacy/extra session uses the same default-present policy.
       const studentsWithDefaultStatus = data.map((student: StudentAttendance) => ({
         ...student,
-        isPresent: student.isPresent === null ? false : student.isPresent
+        isPresent: student.isPresent === null ? true : student.isPresent
       }));
       setEditStudents(studentsWithDefaultStatus);
     } catch (error) {
@@ -947,7 +1016,7 @@ const AttendanceComponent = ({
                   ) : (
                     filteredHistory.map((history, index) => (
                       <div
-                        key={`${history.batchId}-${history.date}`}
+                        key={`${history.batchId}-${history.date}-${history.sessionId || 'regular'}`}
                         className="p-4 rounded-lg border bg-white shadow-sm"
                       >
                         <div className="flex justify-between items-start mb-3">
@@ -957,6 +1026,9 @@ const AttendanceComponent = ({
                             {history.classLevel && (
                               <Badge variant="outline" className="mt-1">{history.classLevel}</Badge>
                             )}
+                            <Badge variant="outline" className="mt-1 ml-1">
+                              {history.sessionType === 'EXTRA' ? (history.sessionLabel || 'Extra Class') : 'Regular Class'}
+                            </Badge>
                           </div>
                           <span className="text-xs text-gray-500">{formatDate(history.date)}</span>
                         </div>
@@ -1032,7 +1104,7 @@ const AttendanceComponent = ({
                       ) : (
                         filteredHistory.map((history, index) => (
                           <tr
-                            key={`${history.batchId}-${history.date}`}
+                            key={`${history.batchId}-${history.date}-${history.sessionId || 'regular'}`}
                             className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}
                           >
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -1043,6 +1115,9 @@ const AttendanceComponent = ({
                               {history.classLevel && (
                                 <Badge variant="outline" className="mt-1 text-xs">{history.classLevel}</Badge>
                               )}
+                              <Badge variant="outline" className="mt-1 ml-1 text-xs">
+                                {history.sessionType === 'EXTRA' ? (history.sessionLabel || 'Extra Class') : 'Regular Class'}
+                              </Badge>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-600">{formatDate(history.date)}</div>
@@ -1124,14 +1199,30 @@ const AttendanceComponent = ({
                   </Popover>
                 </div>
 
-                {scheduledBatchesForDate.length === 0 ? (
+                <div className="mb-6 flex justify-end">
+                  <Button variant="outline" onClick={() => setExtraClassOpen((open) => !open)}>
+                    <Plus className="mr-2 h-4 w-4" /> Record Extra Class
+                  </Button>
+                </div>
+
+                {extraClassOpen && (
+                  <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                      <div className="space-y-2"><Label>Batch</Label><Select value={extraBatchId} onValueChange={setExtraBatchId}><SelectTrigger><SelectValue placeholder="Choose batch" /></SelectTrigger><SelectContent>{batches.map((batch) => <SelectItem key={batch.id} value={batch.id}>{batch.name}</SelectItem>)}</SelectContent></Select></div>
+                      <div className="space-y-2"><Label>Session label</Label><input className="h-10 w-full rounded-md border bg-white px-3 text-sm" value={extraClassLabel} onChange={(event) => setExtraClassLabel(event.target.value)} placeholder="e.g. Extra Class - Algebra" /></div>
+                      <Button onClick={createExtraClass} disabled={!extraBatchId || !extraClassLabel.trim()}>Create</Button>
+                    </div>
+                  </div>
+                )}
+
+                {teacherTargetsForDisplay.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-muted-foreground">
-                    No batches scheduled for this date.
+                    No assigned batches with students are available for this date.
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {scheduledBatchesForDate.map((batch, index) => {
-                      const batchState = teacherBatchStates[batch.id] ?? createEmptyBatchAttendanceState();
+                    {teacherTargetsForDisplay.map((batch, index) => {
+                      const batchState = teacherBatchStates[batch.attendanceKey] ?? createEmptyBatchAttendanceState();
                       const batchSummary = getAttendanceSummary(batchState.students);
                       const isToday = selectedDate.toDateString() === new Date().toDateString();
 
@@ -1153,7 +1244,7 @@ const AttendanceComponent = ({
                               <p className="text-sm text-muted-foreground">{batch.subject}</p>
                             </div>
                             <span className="text-sm text-muted-foreground">
-                              Batch {index + 1} of {scheduledBatchesForDate.length}
+                              Batch {index + 1} of {teacherTargetsForDisplay.length}
                             </span>
                           </div>
 
@@ -1190,7 +1281,7 @@ const AttendanceComponent = ({
                           <div className="flex flex-col sm:flex-row gap-3 mb-6">
                             <Button
                               variant="outline"
-                              onClick={() => handleTeacherMarkAll(batch.id, true)}
+                              onClick={() => handleTeacherMarkAll(batch.attendanceKey, true)}
                               disabled={batchState.loading || batchState.saving || batchState.students.length === 0}
                               className="flex-1 flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
                             >
@@ -1199,7 +1290,7 @@ const AttendanceComponent = ({
                             </Button>
                             <Button
                               variant="outline"
-                              onClick={() => handleTeacherMarkAll(batch.id, false)}
+                              onClick={() => handleTeacherMarkAll(batch.attendanceKey, false)}
                               disabled={batchState.loading || batchState.saving || batchState.students.length === 0}
                               className="flex-1 flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
                             >
@@ -1216,8 +1307,8 @@ const AttendanceComponent = ({
                             <>
                               {renderAttendanceStudents(
                                 batchState.students,
-                                (studentId, isPresent) => handleTeacherAttendanceChange(batch.id, studentId, isPresent),
-                                `teacher-${batch.id}`
+                                (studentId, isPresent) => handleTeacherAttendanceChange(batch.attendanceKey, studentId, isPresent),
+                                `teacher-${batch.attendanceKey}`
                               )}
 
                               <div className="mt-6 flex justify-end">

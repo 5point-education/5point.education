@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role, NoticeScope, NoticePriority } from "@prisma/client";
 import { WhatsAppService } from "@/lib/whatsapp-service";
+import { NotificationEventType } from "@prisma/client";
+import { sendTrackedWhatsApp } from "@/lib/notification-delivery";
 
 /** Parse expiry as end of day (23:59:59.999) when date-only YYYY-MM-DD is provided. */
 function parseExpiresAtEndOfDay(expiresAt: string | null | undefined): Date | null {
@@ -87,6 +89,24 @@ export async function POST(req: Request) {
       }
     }
 
+    let recipientStudentIds: string[] = [];
+    if (scope === NoticeScope.GLOBAL || scope === NoticeScope.BATCH) {
+      const eligibleStudents = await db.studentProfile.findMany({
+        where: {
+          admissions: {
+            some: {
+              status: "ACTIVE",
+              ...(scope === NoticeScope.BATCH ? { batchId } : {}),
+            },
+          },
+        },
+        select: { id: true },
+      });
+      recipientStudentIds = eligibleStudents.map((student) => student.id);
+    } else if (scope === NoticeScope.INDIVIDUAL) {
+      recipientStudentIds = [...new Set(studentIds as string[])];
+    }
+
     // Create the notice
     const notice = await db.notice.create({
       data: {
@@ -97,10 +117,10 @@ export async function POST(req: Request) {
         expiresAt: parseExpiresAtEndOfDay(expiresAt),
         createdById: user.id,
         batchId: scope === NoticeScope.BATCH ? batchId : null,
-        // Create recipients if INDIVIDUAL scope
-        ...(scope === NoticeScope.INDIVIDUAL && {
+        // Seed one recipient row per addressed student so staff can see the full acknowledgement audience.
+        ...(recipientStudentIds.length > 0 && {
           recipients: {
-            create: studentIds.map((studentId: string) => ({
+            create: recipientStudentIds.map((studentId) => ({
               studentId
             }))
           }
@@ -156,7 +176,14 @@ export async function POST(req: Request) {
         // Send to uniquely identified phones
         const uniquePhones = [...new Set(phones)];
         for (const phone of uniquePhones) {
-          await WhatsAppService.sendAnnouncement(phone, title, noticeBody);
+          await sendTrackedWhatsApp({
+            eventType: NotificationEventType.EXAM_UPDATE,
+            dedupeKey: `notice:${notice.id}:${phone}`,
+            phone,
+            message: `${title}: ${noticeBody}`,
+            metadata: { noticeId: notice.id },
+            send: () => WhatsAppService.sendAnnouncement(phone, title, noticeBody),
+          });
         }
       } catch (err) {
         console.error("Failed to send WhatsApp announcement:", err);
@@ -244,7 +271,8 @@ export async function GET(req: Request) {
         },
         _count: {
           select: { recipients: true }
-        }
+        },
+        recipients: { select: { acknowledgedAt: true } }
       }
     });
 
@@ -252,7 +280,11 @@ export async function GET(req: Request) {
     const now = new Date();
     const noticesWithExpiredFlag = notices.map(notice => ({
       ...notice,
-      isExpired: notice.expiresAt ? notice.expiresAt < now : false
+      isExpired: notice.expiresAt ? notice.expiresAt < now : false,
+      acknowledgement: {
+        recipients: notice.recipients.length,
+        acknowledged: notice.recipients.filter((recipient) => Boolean(recipient.acknowledgedAt)).length,
+      },
     }));
 
     return NextResponse.json({

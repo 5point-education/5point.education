@@ -2,6 +2,9 @@ import { db } from "@/lib/db";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
+import { AccountAuditAction } from "@prisma/client";
+import { getPasswordResetRedirect } from "@/lib/app-url";
+import { recordAccountAudit } from "@/lib/account-audit";
 
 export async function POST(req: Request) {
     try {
@@ -63,11 +66,9 @@ export async function POST(req: Request) {
 
         // Send password reset email so the teacher can set their own password
         try {
-            const origin = req.headers.get("origin") ?? (req.headers.get("x-forwarded-host") ? `https://${req.headers.get("x-forwarded-host")}` : null);
-            const redirectTo = origin ? `${origin}/auth/callback?next=/auth/update-password` : undefined;
             const authClient = createClient();
             const { error: resetError } = await authClient.auth.resetPasswordForEmail(email, {
-                redirectTo: redirectTo ?? undefined,
+                redirectTo: getPasswordResetRedirect(req),
             });
             if (resetError) {
                 console.warn("[TEACHERS_POST] Password reset email failed:", resetError.message);
@@ -164,7 +165,7 @@ export async function PATCH(req: Request) {
         if (qualifications !== undefined) profileUpdateData.qualifications = qualifications;
         if (experience_years !== undefined) profileUpdateData.experience_years = parseInt(experience_years);
         if (subjects_specialization !== undefined) profileUpdateData.subjects_specialization = subjects_specialization;
-        if (isActive !== undefined) profileUpdateData.isActive = isActive;
+        if (isActive !== undefined) updateData.is_active = isActive;
 
         // If teacherProfile doesn't exist, create it; otherwise update it
         const teacher = await db.user.update({
@@ -179,6 +180,14 @@ export async function PATCH(req: Request) {
                 teacherProfile: true,
             },
         });
+
+        if (isActive !== undefined) {
+            await supabase.auth.admin.updateUserById(id, { ban_duration: isActive ? "none" : "876600h" });
+            await recordAccountAudit({ action: isActive ? AccountAuditAction.ACCOUNT_REACTIVATED : AccountAuditAction.ACCOUNT_SUSPENDED, userId: id, actorId: user.id, email: teacher.email, request: req });
+        }
+        if (email !== undefined && email !== existingTeacher.email) {
+            await recordAccountAudit({ action: AccountAuditAction.EMAIL_CHANGED, userId: id, actorId: user.id, email, request: req, metadata: { previousEmail: existingTeacher.email } });
+        }
 
         return NextResponse.json(teacher);
 

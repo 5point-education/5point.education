@@ -1,6 +1,7 @@
 [build]
   command = "npm run build"
-  publish = ".next"
+publish = ".next"
+functions = "netlify/functions"
 
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "NEXTAUTH_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_SUPABASE_URL"

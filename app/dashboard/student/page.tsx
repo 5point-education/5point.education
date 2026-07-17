@@ -27,6 +27,7 @@ interface DashboardData {
     totalFeesPending: number;
     totalAdmissionChargePending: number;
     totalDiscounts: number;
+    feesBeforeDiscount: number;
     nextClass: string;
   };
   feesBreakdown: Array<{

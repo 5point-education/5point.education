@@ -15,6 +15,8 @@ interface Notice {
     createdAt: string;
     source: string;
     createdBy: string;
+    acknowledgedAt: string | null;
+    isAcknowledged: boolean;
 }
 
 interface PaginationInfo {
@@ -96,6 +98,12 @@ export default function StudentNoticesPage() {
         });
     };
 
+    const acknowledge = async (noticeId: string) => {
+        const response = await fetch(`/api/student/notices/${noticeId}/acknowledge`, { method: "POST" });
+        if (!response.ok) return;
+        setNotices((current) => current.map((notice) => notice.id === noticeId ? { ...notice, isAcknowledged: true, acknowledgedAt: new Date().toISOString() } : notice));
+    };
+
     if (loading && notices.length === 0) {
         return (
             <div className="p-6">
@@ -170,6 +178,9 @@ export default function StudentNoticesPage() {
                                     </span>
                                     <span>By {notice.createdBy}</span>
                                     <span>{formatDate(notice.createdAt)}</span>
+                                    <Button size="sm" variant={notice.isAcknowledged ? "outline" : "default"} onClick={() => acknowledge(notice.id)} disabled={notice.isAcknowledged}>
+                                        {notice.isAcknowledged ? "Acknowledged" : "Acknowledge"}
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>

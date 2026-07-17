@@ -44,6 +44,7 @@ interface AddStudentToBatchModalProps {
     batches: Batch[];
     onSuccess: () => void;
     existingBatchIds?: string[];
+    existingSubjectKeys?: string[];
 }
 
 export function AddStudentToBatchModal({
@@ -53,7 +54,8 @@ export function AddStudentToBatchModal({
     onOpenChange,
     batches,
     onSuccess,
-    existingBatchIds = []
+    existingBatchIds = [],
+    existingSubjectKeys = [],
 }: AddStudentToBatchModalProps) {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
@@ -239,7 +241,7 @@ export function AddStudentToBatchModal({
                                     </SelectTrigger>
                                     <SelectContent>
                                         {batches
-                                            .filter(b => b.isActive !== false && !existingBatchIds.includes(b.id))
+                                            .filter(b => b.isActive !== false && !existingBatchIds.includes(b.id) && !existingSubjectKeys.includes(b.subject.trim().toLowerCase()))
                                             .map((batch) => (
                                                 <SelectItem key={batch.id} value={batch.id} className="py-3">
                                                     <div className="flex items-center gap-2">

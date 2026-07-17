@@ -1,13 +1,13 @@
 import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { PaymentKind, Role } from "@prisma/client";
 import {
   generateDateRange,
   validateMonthSelection,
   getMonthlyFee,
-  calculatePendingFees,
 } from "@/lib/fees-utils";
+import { recalculateAdmissionBalance } from "@/lib/fee-ledger";
 
 interface BulkPaymentItem {
   admissionId: string;
@@ -122,8 +122,13 @@ export async function POST(req: Request) {
       const monthlyFee = getMonthlyFee(admission.batch, admission);
       const subtotal = item.months.length * monthlyFee;
       
-      // Apply discount (cannot exceed subtotal)
-      const discountAmount = Math.min(item.discountAmount || 0, subtotal);
+      const discountAmount = Number(item.discountAmount || 0);
+      if (!Number.isFinite(discountAmount) || discountAmount < 0 || discountAmount > subtotal) {
+        return new NextResponse(
+          `${admission.batch.name}: discount must be between 0 and the selected subtotal`,
+          { status: 400 }
+        );
+      }
       const expectedAmount = subtotal - discountAmount;
 
       validatedItems.push({
@@ -160,6 +165,7 @@ export async function POST(req: Request) {
             coveredToDate: to,
             notes: notes || null,
             discountAmount,
+            kind: PaymentKind.BATCH_FEE,
           },
         });
 
@@ -173,27 +179,7 @@ export async function POST(req: Request) {
     // Recalculate pending fees AFTER transaction commits (avoids transaction timeout)
     for (const admissionId of paymentRecords.admissionIds) {
       try {
-        const updatedAdmission = await db.admission.findUnique({
-          where: { id: admissionId },
-          include: {
-            batch: true,
-            payments: {
-              select: { coveredMonths: true },
-            },
-          },
-        });
-
-        if (updatedAdmission && updatedAdmission.batch) {
-          const pendingData = await calculatePendingFees(
-            updatedAdmission,
-            updatedAdmission.selectedDays
-          );
-
-          await db.admission.update({
-            where: { id: admissionId },
-            data: { fees_pending: pendingData.pendingAmount },
-          });
-        }
+        await recalculateAdmissionBalance(admissionId);
       } catch (err) {
         console.error(`Failed to recalculate pending fees for admission ${admissionId}:`, err);
         // Don't throw - payment was recorded successfully
